@@ -1,0 +1,14 @@
+<?php
+
+namespace Laravel\StaticAnalyzer\NodeResolvers\Scalar\MagicConst;
+
+use Laravel\StaticAnalyzer\NodeResolvers\AbstractResolver;
+use PhpParser\Node;
+
+class Property extends AbstractResolver
+{
+    public function resolve(Node\Scalar\MagicConst\Property $node)
+    {
+        dd($node, $node::class . ' not implemented yet');
+    }
+}
