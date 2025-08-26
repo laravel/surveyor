@@ -54,8 +54,6 @@ describe('ReturnTypeAnalyzer', function () {
 
         $methodReturnTypes = $result->methodReturnType(UserController::class, 'builder');
 
-        dd($methodReturnTypes);
-
         $this->assertCount(1, $methodReturnTypes);
         $this->assertInstanceOf(View::class, $methodReturnTypes[0]);
         $this->assertEquals('users.update', $methodReturnTypes[0]->name);
