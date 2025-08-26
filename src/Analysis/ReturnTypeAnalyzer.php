@@ -2,6 +2,7 @@
 
 namespace Laravel\StaticAnalyzer\Analysis;
 
+use Illuminate\Support\Collection;
 use Laravel\StaticAnalyzer\NodeResolvers\AbstractResolver;
 use Laravel\StaticAnalyzer\Types\ClassType;
 use Laravel\StaticAnalyzer\Types\Contracts\Type as TypeContract;
@@ -40,9 +41,55 @@ class ReturnTypeAnalyzer extends AbstractResolver
 
         // dd($interfaces, $concrete);
 
-        dd($this->returnTypes);
+        return collect($this->returnTypes)
+            ->groupBy(fn ($type) => $type::class)
+            ->map(fn ($group, $class) => $this->collapseReturnTypes($group, $class))
+            ->values()
+            ->flatten()
+            ->all();
+    }
 
-        return $this->returnTypes;
+    protected function collapseReturnTypes(Collection $returnTypes, string $class)
+    {
+        switch ($class) {
+            case View::class:
+                return $this->collapseViewReturnTypes($returnTypes);
+        }
+
+        return $returnTypes;
+    }
+
+    protected function collapseViewReturnTypes(Collection $returnTypes)
+    {
+        return $returnTypes->groupBy(fn ($type) => $type->name)->map(function ($group) {
+            if ($group->count() === 1) {
+                return $group->first();
+            }
+
+            $dataKeys = $group->map(fn ($type) => array_keys($type->data));
+            $requiredKeys = array_values(array_intersect(...$dataKeys->all()));
+
+            $newData = [];
+
+            foreach ($group as $view) {
+                foreach ($view->data as $key => $value) {
+                    $value->required(in_array($key, $requiredKeys));
+
+                    $newData[$key] ??= [];
+                    $newData[$key][] = $value;
+                }
+            }
+
+            foreach ($newData as $key => $value) {
+                if (count($value) === 1) {
+                    $newData[$key] = $value[0];
+                } else {
+                    $newData[$key] = Type::union(...$value);
+                }
+            }
+
+            return View::from(new ClassType($group->first()->value), $group->first()->name, $newData);
+        });
     }
 
     protected function processStatements(array $statements): void

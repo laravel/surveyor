@@ -38,9 +38,12 @@ class UserController extends Controller
         //     return $item * 2;
         // });
 
-        return view('users.index', [
-            'whatever' => $whatever,
-        ]);
+        if (request()->has('whatever')) {
+            return view('users.index', [
+                'whatever' => $whatever,
+                // 'users' => $users,
+            ]);
+        }
 
         // if ($users->isEmpty()) {
         //     return view('users.empty', compact('users'));

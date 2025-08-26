@@ -57,7 +57,7 @@ class Reflector
             $arr = collect($node->getArgs())->flatMap(function ($arg) use ($node) {
                 if ($arg->value instanceof Node\Scalar\String_) {
                     return [
-                        $arg->value->value => VariableTracker::current()->getAtLine($arg->value->value, $node->getStartLine()),
+                        $arg->value->value => VariableTracker::current()->getAtLine($arg->value->value, $node->getStartLine())['type'],
                     ];
                 }
 
