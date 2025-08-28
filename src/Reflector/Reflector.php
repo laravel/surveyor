@@ -68,7 +68,7 @@ class Reflector
             $arr = collect($node->getArgs())->flatMap(function ($arg) use ($node) {
                 if ($arg->value instanceof Node\Scalar\String_) {
                     return [
-                        $arg->value->value => $this->scope->variableTracker()->getAtLine($arg->value->value, $node->getStartLine())['type'],
+                        $arg->value->value => $this->scope->stateTracker()->getVariableAtLine($arg->value->value, $node->getStartLine())['type'],
                     ];
                 }
 
@@ -123,9 +123,12 @@ class Reflector
         $className = $class instanceof ClassType ? $class->value : $class;
         $reflection = $this->reflectClass($class);
 
-        $analyzed = app(Analyzer::class)->analyze($reflection->getFileName());
+        if ($this->scope->className() !== $reflection->getName()) {
+            $analyzed = app(Analyzer::class)->analyze($reflection->getFileName());
 
-        dd($analyzed->analyzed());
+            dd($analyzed->analyzed());
+        }
+
         $returnTypes = [];
 
         if ($reflection->hasMethod($method)) {
@@ -212,7 +215,7 @@ class Reflector
     public function returnType(ReflectionNamedType|ReflectionUnionType|ReflectionIntersectionType $returnType): ?TypeContract
     {
         if ($returnType instanceof ReflectionNamedType) {
-            return Type::from($returnType->getName());
+            return Type::from($returnType->getName())->nullable($returnType->allowsNull());
         }
 
         if ($returnType instanceof ReflectionUnionType) {

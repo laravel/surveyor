@@ -266,6 +266,9 @@ class ReturnTypeAnalyzer extends AbstractResolver
             return;
         }
 
+        // TODO: Decide if we need to deal with this or not
+        return;
+
         dd($stmt, 'generic statement!');
         // Use reflection to find any properties that might contain statements
         $reflection = new \ReflectionObject($stmt);

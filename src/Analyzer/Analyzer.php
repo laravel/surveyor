@@ -23,16 +23,34 @@ class Analyzer
 
     public function analyze(string $path)
     {
+        $cached = AnalyzedCache::get($path);
+
+        if ($cached) {
+            dd('hit it');
+
+            return $cached;
+        }
+
+        if (AnalyzedCache::isInProgress($path)) {
+            return;
+        }
+
+        AnalyzedCache::inProgress($path);
+
         $parsed = $this->parser->parse(file_get_contents($path));
 
         Debug::log('🧠 Analyzing: '.$path);
 
         $this->scope = new Scope;
 
+        echo $path.PHP_EOL;
+
         $this->analyzed = collect($parsed)
             ->map(fn ($node) => $this->resolver->from($node, $this->scope))
             ->map(fn ($nodes) => array_values(array_filter($nodes)))
             ->all();
+
+        AnalyzedCache::add($path, $this->analyzed);
 
         return $this;
     }

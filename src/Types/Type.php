@@ -121,6 +121,7 @@ class Type
     public static function union(...$args): Contracts\Type
     {
         $args = self::flattenUnion($args)
+            ->filter()
             ->unique(fn ($type) => $type->toString())
             ->values();
 

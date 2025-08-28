@@ -2,7 +2,7 @@
 
 namespace Laravel\StaticAnalyzer\Analysis;
 
-use Laravel\StaticAnalyzer\Result\VariableTracker;
+use Laravel\StaticAnalyzer\Result\StateTracker;
 
 class Scope
 {
@@ -10,7 +10,7 @@ class Scope
 
     protected ?string $methodName = null;
 
-    protected VariableTracker $variableTracker;
+    protected StateTracker $stateTracker;
 
     protected array $children = [];
 
@@ -20,13 +20,13 @@ class Scope
 
     public function __construct(protected ?Scope $parent = null)
     {
-        $this->variableTracker = new VariableTracker;
+        $this->stateTracker = new StateTracker;
     }
 
     public function setClassName(string $className): void
     {
         $this->className = $className;
-        $this->variableTracker->setThis($className);
+        $this->stateTracker->setThis($className);
     }
 
     public function setNamespace(string $namespace): void
@@ -58,6 +58,10 @@ class Scope
 
     public function getUse(string $candidate): ?string
     {
+        if ($candidate === 'static' || $candidate === 'self') {
+            return $this->className;
+        }
+
         foreach ($this->uses as $use) {
             if ($candidate === $use || str_ends_with($use, '\\'.$candidate)) {
                 return $use;
@@ -86,9 +90,9 @@ class Scope
         return $this->methodName;
     }
 
-    public function variableTracker()
+    public function stateTracker()
     {
-        return $this->variableTracker;
+        return $this->stateTracker;
     }
 
     public function methodScope(string $methodName): Scope

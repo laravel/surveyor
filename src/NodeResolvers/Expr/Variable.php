@@ -9,6 +9,6 @@ class Variable extends AbstractResolver
 {
     public function resolve(Node\Expr\Variable $node)
     {
-        return $this->scope->variableTracker()->getAtLine($node->name, $node->getStartLine())['type'];
+        return $this->scope->stateTracker()->getVariableAtLine($node->name, $node->getStartLine())['type'];
     }
 }

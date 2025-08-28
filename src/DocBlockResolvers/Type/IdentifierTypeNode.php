@@ -12,9 +12,6 @@ class IdentifierTypeNode extends AbstractResolver
     {
         $name = (string) $node->name;
 
-        $name = $this->scope->getUse($name) ?? $name;
-        dd($name, $this->scope->getUse($name), $this->scope);
-
-        return Type::from($name);
+        return Type::from($this->scope->getUse($name) ?? $name);
     }
 }

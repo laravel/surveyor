@@ -3,6 +3,7 @@
 namespace Laravel\StaticAnalyzer\NodeResolvers\Stmt;
 
 use Laravel\StaticAnalyzer\NodeResolvers\AbstractResolver;
+use Laravel\StaticAnalyzer\Types\Type;
 use PhpParser\Node;
 
 class Property extends AbstractResolver
@@ -11,7 +12,13 @@ class Property extends AbstractResolver
     {
         foreach ($node->props as $prop) {
             $name = $prop->name->name;
-            dd($name);
+            $this->scope->stateTracker()->addProperty(
+                $name,
+                $node->type ? $this->from($node->type) : Type::null(),
+                $node->getLine()
+            );
         }
+
+        return null;
     }
 }

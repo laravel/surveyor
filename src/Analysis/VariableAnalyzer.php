@@ -4,24 +4,24 @@ namespace Laravel\StaticAnalyzer\Analysis;
 
 use Laravel\StaticAnalyzer\NodeResolvers\AbstractResolver;
 use Laravel\StaticAnalyzer\Parser\Parser;
-use Laravel\StaticAnalyzer\Result\VariableTracker;
+use Laravel\StaticAnalyzer\Result\StateTracker;
 use Laravel\StaticAnalyzer\Types\StringType;
 use Laravel\StaticAnalyzer\Types\Type;
 use PhpParser\Node;
 
 class VariableAnalyzer extends AbstractResolver
 {
-    protected VariableTracker $tracker;
+    protected StateTracker $tracker;
 
-    public function analyze(Node\Stmt\ClassMethod $methodNode, Scope $scope): VariableTracker
+    public function analyze(Node\Stmt\ClassMethod $methodNode, Scope $scope): StateTracker
     {
-        $this->tracker = $scope->variableTracker();
+        $this->tracker = $scope->stateTracker();
 
         // Add method parameters as initial variables
         foreach ($methodNode->params as $param) {
             if ($param->var instanceof Node\Expr\Variable && is_string($param->var->name)) {
                 $type = $param->type ? $this->from($param->type) : Type::mixed();
-                $this->tracker->add($param->var->name, $type, $param->getStartLine());
+                $this->tracker->addVariable($param->var->name, $type, $param->getStartLine());
             } else {
                 dd('not a variable??', $param);
             }
@@ -109,6 +109,16 @@ class VariableAnalyzer extends AbstractResolver
             return;
         }
 
+        if ($assignment->var instanceof Node\Expr\PropertyFetch) {
+            $this->tracker->addProperty(
+                $assignment->var->name instanceof Node\Identifier ? $assignment->var->name->name : dd('setting a property but not an identifier??', $assignment->var->name),
+                $this->from($assignment->expr),
+                $assignment->getStartLine(),
+            );
+
+            return;
+        }
+
         if (! $assignment->var instanceof Node\Expr\Variable) {
             dd($assignment->var, $this->from($assignment->expr), 'not a variable in assignment??');
         }
@@ -117,7 +127,7 @@ class VariableAnalyzer extends AbstractResolver
             dd('variable but not a string??', $assignment);
         }
 
-        $this->tracker->add(
+        $this->tracker->addVariable(
             $assignment->var->name,
             $this->from($assignment->expr),
             $assignment->getStartLine(),
@@ -128,7 +138,7 @@ class VariableAnalyzer extends AbstractResolver
     {
         if ($assignment->var instanceof Node\Expr\Variable && is_string($assignment->var->name)) {
             // For operations like +=, -=, etc., we keep the existing type but update the line
-            $existingStates = $this->tracker->getAtLine($assignment->var->name, $assignment->getStartLine());
+            $existingStates = $this->tracker->getVariableAtLine($assignment->var->name, $assignment->getStartLine());
             $type = ! empty($existingStates) ? $existingStates['type'] : Type::mixed();
 
             $this->tracker->addVariable(
@@ -146,9 +156,6 @@ class VariableAnalyzer extends AbstractResolver
 
         $conditionString = $printer->prettyPrintExpr($ifStmt->cond);
 
-        // Fork path for if branch
-        $ifPathId = $this->tracker->forkPath($conditionString, $pathId, $ifStmt->getStartLine(), $ifStmt->getEndLine());
-
         $ifChanges = [];
         $elseChanges = [];
 
@@ -156,33 +163,29 @@ class VariableAnalyzer extends AbstractResolver
 
         // Process if body
         if ($ifStmt->stmts) {
-            $this->tracker->startSnapshot($ifStmt->getStartLine());
-            $this->processStatements($ifStmt->stmts, $ifPathId);
-            $changed = $this->tracker->endSnapshot($ifStmt->getStartLine());
+            $this->tracker->startVariableSnapshot($ifStmt->getStartLine());
+            $this->processStatements($ifStmt->stmts, $pathId);
+            $changed = $this->tracker->endVariableSnapshot($ifStmt->getStartLine());
             $ifChanges[] = $changed;
         }
 
         // Process elseif branches
-        $currentElsePathId = $pathId;
         foreach ($ifStmt->elseifs as $elseif) {
-            $conditionElseIfString = $printer->prettyPrintExpr($elseif->cond);
-            $elseifPathId = $this->tracker->forkPath($conditionElseIfString, $currentElsePathId, $elseif->getStartLine(), $elseif->getEndLine());
             if ($elseif->stmts) {
-                $this->tracker->startSnapshot($elseif->getStartLine());
-                $this->processStatements($elseif->stmts, $elseifPathId);
-                $changed = $this->tracker->endSnapshot($elseif->getStartLine());
+                $this->tracker->startVariableSnapshot($elseif->getStartLine());
+                $this->processStatements($elseif->stmts, $pathId);
+                $changed = $this->tracker->endVariableSnapshot($elseif->getStartLine());
                 $ifChanges[] = $changed;
             }
-            $currentElsePathId = $this->tracker->forkPath($conditionElseIfString.'-false', $currentElsePathId, $elseif->getStartLine(), $elseif->getEndLine());
         }
 
         // Process else branch
         if ($ifStmt->else) {
             $elsePathId = $conditionString.'-false';
             if ($ifStmt->else->stmts) {
-                $this->tracker->startSnapshot($ifStmt->else->getStartLine());
+                $this->tracker->startVariableSnapshot($ifStmt->else->getStartLine());
                 $this->processStatements($ifStmt->else->stmts, $elsePathId);
-                $changed = $this->tracker->endSnapshot($ifStmt->else->getStartLine());
+                $changed = $this->tracker->endVariableSnapshot($ifStmt->else->getStartLine());
                 $elseChanges = $changed;
             }
         }
@@ -203,17 +206,18 @@ class VariableAnalyzer extends AbstractResolver
             if ($elseVariable) {
                 $types[] = $elseVariable[0]['type'];
             } else {
-                array_unshift($types, $this->tracker->getAtLine($name, $ifStmt->getStartLine() - 1)['type']);
+                array_unshift($types, $this->tracker->getVariableAtLine($name, $ifStmt->getStartLine() - 1)['type']);
             }
 
-            $this->tracker->add($name, Type::union(...$types), $ifStmt->getEndLine());
+            $this->tracker->addVariable($name, Type::union(...$types), $ifStmt->getEndLine());
         }
-
-        // dd($this->tracker->getVariables());
     }
 
     protected function processLoopStatement(Node $loopStmt, string $pathId): void
     {
+        // TODO:...
+        return;
+
         $loopType = match (true) {
             $loopStmt instanceof Node\Stmt\While_ => 'while',
             $loopStmt instanceof Node\Stmt\For_ => 'for',
@@ -221,17 +225,12 @@ class VariableAnalyzer extends AbstractResolver
             default => 'loop'
         };
 
-        // Fork path for loop body
-        $loopPathId = $this->tracker->forkPath($loopType.'-body', $pathId);
-
-        // Handle foreach variable assignments
         if ($loopStmt instanceof Node\Stmt\Foreach_) {
             if ($loopStmt->valueVar instanceof Node\Expr\Variable && is_string($loopStmt->valueVar->name)) {
                 $this->tracker->addVariable(
                     $loopStmt->valueVar->name,
                     Type::mixed(), // Could be improved with better type inference
                     $loopStmt->valueVar->getStartLine(),
-                    $loopPathId
                 );
             }
 
@@ -240,7 +239,6 @@ class VariableAnalyzer extends AbstractResolver
                     $loopStmt->keyVar->name,
                     Type::mixed(),
                     $loopStmt->keyVar->getStartLine(),
-                    $loopPathId
                 );
             }
         }
@@ -268,6 +266,6 @@ class VariableAnalyzer extends AbstractResolver
     protected function processReturnStatement(Node\Stmt\Return_ $returnStmt, string $pathId): void
     {
         // Terminate the current path when we hit a return statement
-        $this->tracker->terminatePath($pathId, $returnStmt->getStartLine());
+        // $this->tracker->terminatePath($pathId, $returnStmt->getStartLine());
     }
 }
