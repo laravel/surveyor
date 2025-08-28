@@ -11,13 +11,9 @@ class IdentifierTypeNode extends AbstractResolver
     public function resolve(Ast\Type\IdentifierTypeNode $node)
     {
         $name = (string) $node->name;
-        // $templates = $this->parsed->getTemplateTagValues();
 
-        // $matchingTemplate = collect($templates)->first(fn($template) => $template->name === $name);
-
-        // if ($matchingTemplate) {
-        //     // dd('Found template type: ' . $matchingTemplate);
-        // }
+        $name = $this->scope->getUse($name) ?? $name;
+        dd($name, $this->scope->getUse($name), $this->scope);
 
         return Type::from($name);
     }

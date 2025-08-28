@@ -14,6 +14,10 @@ class Scope
 
     protected array $children = [];
 
+    protected array $uses = [];
+
+    protected ?string $namespace = null;
+
     public function __construct(protected ?Scope $parent = null)
     {
         $this->variableTracker = new VariableTracker;
@@ -23,6 +27,11 @@ class Scope
     {
         $this->className = $className;
         $this->variableTracker->setThis($className);
+    }
+
+    public function setNamespace(string $namespace): void
+    {
+        $this->namespace = $namespace;
     }
 
     public function newChildScope(): self
@@ -40,6 +49,26 @@ class Scope
         $this->children[] = $instance;
 
         return $instance;
+    }
+
+    public function addUse(string $use): void
+    {
+        $this->uses[] = $use;
+    }
+
+    public function getUse(string $candidate): ?string
+    {
+        foreach ($this->uses as $use) {
+            if ($candidate === $use || str_ends_with($use, '\\'.$candidate)) {
+                return $use;
+            }
+        }
+
+        if ($this->namespace && class_exists($this->namespace.'\\'.$candidate)) {
+            return $this->namespace.'\\'.$candidate;
+        }
+
+        return null;
     }
 
     public function setMethodName(string $methodName): void

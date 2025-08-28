@@ -170,7 +170,6 @@ class ReturnTypeAnalyzer extends AbstractResolver
 
     protected function mapToView(ClassType $returnType, Node\Stmt\Return_ $returnStmt): View
     {
-
         if ($returnStmt->expr instanceof CallLike) {
             $args = $returnStmt->expr->getArgs();
             $args = collect($args)->map(fn (Arg $arg) => $this->from($arg->value))->toArray();
@@ -263,7 +262,11 @@ class ReturnTypeAnalyzer extends AbstractResolver
 
     protected function processGenericStatement(Node $stmt): void
     {
-        dd('generic statement!');
+        if ($stmt instanceof Node\Stmt\Nop) {
+            return;
+        }
+
+        dd($stmt, 'generic statement!');
         // Use reflection to find any properties that might contain statements
         $reflection = new \ReflectionObject($stmt);
 

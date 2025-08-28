@@ -111,16 +111,21 @@ class Reflector
             }
         }
 
-        dd($propertyReflection);
-
         if ($propertyReflection->hasType()) {
+            return $this->returnType($propertyReflection->getType());
         }
+
+        return null;
     }
 
     public function methodReturnType(ClassType|string $class, string $method, ?Node $node = null): array
     {
         $className = $class instanceof ClassType ? $class->value : $class;
         $reflection = $this->reflectClass($class);
+
+        $analyzed = app(Analyzer::class)->analyze($reflection->getFileName());
+
+        dd($analyzed->analyzed());
         $returnTypes = [];
 
         if ($reflection->hasMethod($method)) {

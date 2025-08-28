@@ -55,6 +55,14 @@ class VariableTracker
         }
     }
 
+    public function addProperty(string $name, Type $type, int $lineNumber): void
+    {
+        $changed = [
+            'type' => $type,
+            'lineNumber' => $lineNumber,
+        ];
+    }
+
     public function updateVariableArrayKey(string $name, string $key, Type $type, int $lineNumber): void
     {
         $this->variables[$name] ??= [];

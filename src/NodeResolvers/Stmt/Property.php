@@ -9,6 +9,9 @@ class Property extends AbstractResolver
 {
     public function resolve(Node\Stmt\Property $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        foreach ($node->props as $prop) {
+            $name = $prop->name->name;
+            dd($name);
+        }
     }
 }
