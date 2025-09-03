@@ -11,7 +11,6 @@ class MethodCall extends AbstractResolver
     public function resolve(Node\Expr\MethodCall $node)
     {
         try {
-
             return Type::union(
                 ...$this->reflector->methodReturnType($this->from($node->var), $node->name, $node)
             );
