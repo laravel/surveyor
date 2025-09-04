@@ -14,7 +14,7 @@ class Assign extends AbstractResolver
     {
         switch (true) {
             case $node->var instanceof Node\Expr\Variable:
-                $this->scope->stateTracker()->variables()->add(
+                $this->scope->variables()->add(
                     $node->var->name,
                     $this->from($node->expr),
                     $node->getStartLine()
@@ -22,7 +22,7 @@ class Assign extends AbstractResolver
                 break;
 
             case $node->var instanceof Node\Expr\PropertyFetch:
-                $this->scope->stateTracker()->properties()->add(
+                $this->scope->properties()->add(
                     $node->var->name->name,
                     $this->from($node->expr),
                     $node->getStartLine()
@@ -38,7 +38,7 @@ class Assign extends AbstractResolver
                 }
 
                 if ($node->var->var instanceof Node\Expr\Variable) {
-                    $this->scope->stateTracker()->variables()->updateArrayKey(
+                    $this->scope->variables()->updateArrayKey(
                         $node->var->var->name,
                         $dim->value,
                         $this->from($node->expr),
@@ -49,7 +49,7 @@ class Assign extends AbstractResolver
                 }
 
                 if ($node->var->var instanceof Node\Expr\PropertyFetch) {
-                    $this->scope->stateTracker()->properties()->updateArrayKey(
+                    $this->scope->properties()->updateArrayKey(
                         $node->var->var->name,
                         $dim->value,
                         $this->from($node->expr),

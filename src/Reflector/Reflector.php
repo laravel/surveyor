@@ -68,7 +68,7 @@ class Reflector
             $arr = collect($node->getArgs())->flatMap(function ($arg) use ($node) {
                 if ($arg->value instanceof Node\Scalar\String_) {
                     return [
-                        $arg->value->value => $this->scope->stateTracker()->variables()->getAtLine($arg->value->value, $node->getStartLine())['type'],
+                        $arg->value->value => $this->scope->variables()->getAtLine($arg->value->value, $node->getStartLine())['type'],
                     ];
                 }
 

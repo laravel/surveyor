@@ -123,9 +123,14 @@ class Scope
         return $this->methodName;
     }
 
-    public function stateTracker()
+    public function variables()
     {
-        return $this->stateTracker;
+        return $this->stateTracker->variables();
+    }
+
+    public function properties()
+    {
+        return $this->stateTracker->properties();
     }
 
     public function methodScope(string $methodName): Scope

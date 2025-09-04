@@ -10,7 +10,7 @@ class Param extends AbstractResolver
 {
     public function resolve(Node\Param $node)
     {
-        $this->scope->stateTracker()->variables()->add(
+        $this->scope->variables()->add(
             $node->var->name,
             $node->type ? $this->from($node->type) : Type::null(),
             $node->getStartLine(),

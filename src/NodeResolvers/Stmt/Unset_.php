@@ -11,9 +11,9 @@ class Unset_ extends AbstractResolver
     {
         foreach ($node->vars as $var) {
             if ($var instanceof Node\Expr\Variable) {
-                $this->scope->stateTracker()->variables()->unset($var->name, $node->getStartLine());
+                $this->scope->variables()->unset($var->name, $node->getStartLine());
             } elseif ($var instanceof Node\Expr\PropertyFetch) {
-                $this->scope->stateTracker()->properties()->unset($var->name->name, $node->getStartLine());
+                $this->scope->properties()->unset($var->name->name, $node->getStartLine());
             } else {
                 dd('unset: not a variable or property fetch??', $var);
             }

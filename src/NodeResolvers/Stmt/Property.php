@@ -12,7 +12,7 @@ class Property extends AbstractResolver
     {
         foreach ($node->props as $prop) {
             $name = $prop->name->name;
-            $this->scope->stateTracker()->properties()->add(
+            $this->scope->properties()->add(
                 $name,
                 $node->type ? $this->from($node->type) : Type::null(),
                 $node->getLine()

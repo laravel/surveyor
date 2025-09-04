@@ -9,7 +9,7 @@ class If_ extends AbstractResolver
 {
     public function resolve(Node\Stmt\If_ $node)
     {
-        $this->scope->stateTracker()->variables()->startSnapshot($node->getStartLine());
+        $this->scope->variables()->startSnapshot($node->getStartLine());
         // $changed = $this->tracker->endVariableSnapshot($ifStmt->getStartLine());
     }
 }

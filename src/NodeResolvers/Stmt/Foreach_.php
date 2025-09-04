@@ -27,14 +27,14 @@ class Foreach_ extends AbstractResolver
         }
 
         if ($node->keyVar) {
-            $this->scope->stateTracker()->variables()->add(
+            $this->scope->variables()->add(
                 $node->keyVar->name,
                 $iterating instanceof ArrayShapeType ? $iterating->keyType : Type::mixed(),
                 $node->keyVar->getStartLine(),
             );
         }
 
-        $this->scope->stateTracker()->variables()->add(
+        $this->scope->variables()->add(
             $node->valueVar->name,
             $iterating instanceof ArrayShapeType ? $iterating->valueType : Type::mixed(),
             $node->valueVar->getStartLine(),

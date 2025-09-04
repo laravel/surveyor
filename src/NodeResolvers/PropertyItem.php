@@ -9,7 +9,7 @@ class PropertyItem extends AbstractResolver
 {
     public function resolve(Node\PropertyItem $node)
     {
-        $this->scope->stateTracker()->properties()->add(
+        $this->scope->properties()->add(
             $node->name->name,
             $node->default ? $this->from($node->default) : Type::null(),
             $node->getStartLine()
