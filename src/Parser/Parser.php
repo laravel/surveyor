@@ -6,12 +6,10 @@ namespace Laravel\StaticAnalyzer\Parser;
 
 use Laravel\StaticAnalyzer\Resolvers\NodeResolver;
 use Laravel\StaticAnalyzer\Visitors\TypeResolver;
-use PhpParser\Node;
 use PhpParser\NodeFinder;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\NodeVisitor\ParentConnectingVisitor;
-use PhpParser\NodeVisitorAbstract;
 use PhpParser\Parser as PhpParserParser;
 use PhpParser\ParserFactory;
 use PhpParser\PrettyPrinter\Standard;
@@ -31,6 +29,8 @@ class Parser
 
     protected array $cache = [];
 
+    protected TypeResolver $typeResolver;
+
     public function __construct(
         protected Standard $prettyPrinter,
         protected NodeResolver $resolver,
@@ -40,20 +40,19 @@ class Parser
         $this->nodeTraverser = new NodeTraverser;
         // $this->nodeTraverser = new NodeTraverser(new ParentConnectingVisitor);
         $this->nodeTraverser->addVisitor(new NameResolver);
-        $this->nodeTraverser->addVisitor(new TypeResolver($this->resolver));
+
+        $this->typeResolver = new TypeResolver($this->resolver);
+        $this->nodeTraverser->addVisitor($this->typeResolver);
+    }
+
+    public function typeResolver()
+    {
+        return $this->typeResolver;
     }
 
     public function parse(string|ReflectionClass|ReflectionFunction|ReflectionMethod|SplFileInfo $code): array
     {
-        $key = match (true) {
-            is_string($code) => $code,
-            $code instanceof SplFileInfo => $code->getPathname(),
-            default => $code->getFileName(),
-        };
-
         return $this->parseCode($code);
-
-        // return $this->cache[$key] ??= $this->parseCode($code);
     }
 
     protected function parseCode(string|ReflectionClass|ReflectionFunction|ReflectionMethod|SplFileInfo $code): array
@@ -73,33 +72,6 @@ class Parser
 
         //     return [];
         // }
-    }
-
-    public function walk(array $stmts, callable $onEnter, ?callable $onLeave = null): void
-    {
-        $visitor = new class($onEnter, $onLeave) extends NodeVisitorAbstract
-        {
-            public function __construct(
-                protected $onEnter,
-                protected $onLeave = null
-            ) {}
-
-            public function enterNode(Node $node)
-            {
-                return ($this->onEnter)($node);
-            }
-
-            public function leaveNode(Node $node)
-            {
-                if ($this->onLeave) {
-                    return ($this->onLeave)($node);
-                }
-            }
-        };
-
-        $this->nodeTraverser->addVisitor($visitor);
-        $this->nodeTraverser->traverse($stmts);
-        $this->nodeTraverser->removeVisitor($visitor);
     }
 
     public function nodeFinder()

@@ -17,6 +17,8 @@ class Debug
 
     public static $currentlyInterested = false;
 
+    protected static $dumpTimes = null;
+
     public static function log($message, $data = null)
     {
         if (! self::$log) {
@@ -50,11 +52,26 @@ class Debug
         self::$currentlyInterested = $interested;
     }
 
+    public static function dumpTimes(int $times, ...$args)
+    {
+        self::$dumpTimes ??= $times;
+
+        if (self::$dump) {
+            if (self::$dumpTimes === 1) {
+                dd(...$args);
+            } else {
+                dump(...$args);
+                self::$dumpTimes--;
+            }
+        }
+    }
+
     public static function ddFromClass(...$args)
     {
         if (self::$dump) {
             $trace = debug_backtrace(limit: 1);
             array_push($args, $trace[0]['file'].':'.$trace[0]['line']);
+            exec('cursor '.$trace[0]['file'].' --reuse-window');
             dd(...$args);
         }
     }

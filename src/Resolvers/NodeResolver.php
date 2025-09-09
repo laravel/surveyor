@@ -2,48 +2,36 @@
 
 namespace Laravel\StaticAnalyzer\Resolvers;
 
-// use Laravel\StaticAnalyzer\Debug;
-// use Laravel\StaticAnalyzer\Types\Contracts\Type;
-
 use Illuminate\Container\Container;
+use InvalidArgumentException;
 use Laravel\StaticAnalyzer\Analysis\Scope;
 use PhpParser\NodeAbstract;
 
 class NodeResolver
 {
-    // protected array $parsed = [];
-
     public function __construct(
-        protected Container $container,
-    ) {}
-
-    // public function setParsed(array $parsed): self
-    // {
-    //     $this->parsed = $parsed;
-
-    //     return $this;
-    // }
+        protected Container $app,
+    ) {
+        //
+    }
 
     public function fromWithScope(NodeAbstract $node, Scope $scope)
     {
-        $className = str(get_class($node))->after('Node\\')->prepend('Laravel\\StaticAnalyzer\\NodeResolvers\\')->toString();
+        $className = $this->getClassName($node);
 
-        if (! class_exists($className)) {
-            dd("NodeResolver: Class {$className} does not exist");
-        }
-
-        $resolver = $this->container->make($className, [
-            // 'typeResolver' => $this,
-            // 'context' => $context,
-            // 'parsed' => $this->parsed,
-            'scope' => $scope,
-        ]);
+        $resolver = $this->app->make($className);
 
         $resolver->setScope($scope);
-        $newScope = $resolver->scope() ?? $scope;
-        $resolver->setScope($newScope);
 
-        $resolved = $resolver->resolve($node);
+        if ($scope->isAnalyzingCondition()) {
+            // TODO: Is this right? Might not be
+            $newScope = $scope;
+            $resolved = $resolver->resolveForCondition($node);
+        } else {
+            $newScope = $resolver->scope() ?? $scope;
+            $resolver->setScope($newScope);
+            $resolved = $resolver->resolve($node);
+        }
 
         if (is_array($resolved)) {
             dd($resolved, $className);
@@ -52,8 +40,29 @@ class NodeResolver
         return [$resolved, $newScope];
     }
 
+    public function exitNode(NodeAbstract $node, Scope $scope)
+    {
+        $className = $this->getClassName($node);
+
+        $resolver = $this->app->make($className);
+        $resolver->setScope($scope);
+
+        return $resolver->exitScope();
+    }
+
     public function from(NodeAbstract $node, Scope $scope)
     {
         return $this->fromWithScope($node, $scope)[0];
+    }
+
+    protected function getClassName(NodeAbstract $node)
+    {
+        $className = str(get_class($node))->after('Node\\')->prepend('Laravel\\StaticAnalyzer\\NodeResolvers\\')->toString();
+
+        if (! class_exists($className)) {
+            throw new InvalidArgumentException("NodeResolver: Class {$className} does not exist");
+        }
+
+        return $className;
     }
 }

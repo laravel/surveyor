@@ -32,6 +32,26 @@ class StateTrackerItem
         }
     }
 
+    public function narrow(string $name, TypeContract $type, int $lineNumber): void
+    {
+        $currentType = $this->getAtLine($name, $lineNumber)['type'];
+
+        if (Type::is($currentType, get_class($type))) {
+            return;
+        }
+
+        if ($currentType instanceof UnionType) {
+            $newType = array_filter(
+                $currentType->types,
+                fn ($t) => Type::is($t, get_class($type)),
+            )[0] ?? Type::from($type);
+        } else {
+            $newType = Type::from($type);
+        }
+
+        $this->add($name, $newType, $lineNumber);
+    }
+
     public function unset(string $name, int $lineNumber): void
     {
         $this->add($name, Type::null(), $lineNumber);
@@ -40,6 +60,29 @@ class StateTrackerItem
     public function unsetArrayKey(string $name, string $key, int $lineNumber): void
     {
         $this->updateArrayKey($name, $key, Type::null(), $lineNumber);
+    }
+
+    public function removeType(string $name, int $lineNumber, TypeContract $type): void
+    {
+        $currentType = $this->getAtLine($name, $lineNumber)['type'];
+
+        if ($currentType instanceof UnionType) {
+            $newType = new UnionType(array_filter($currentType->types, fn ($t) => ! Type::isSame($t, $type)));
+        } elseif (Type::isSame($currentType, $type)) {
+            // TODO: Hm.
+            dd('removing type that is the same as the current type??', $currentType, $type);
+            $newType = Type::mixed();
+        } else {
+            $newType = $currentType;
+            // dd('current type is not a union type and not the same as the type to remove??', $currentType, $type);
+        }
+
+        $this->add($name, $newType, $lineNumber);
+    }
+
+    public function removeArrayKeyType(string $name, string $key, TypeContract $type, int $lineNumber): void
+    {
+        // TODO: Implement
     }
 
     public function updateArrayKey(string $name, string $key, TypeContract $type, int $lineNumber): void
@@ -81,7 +124,13 @@ class StateTrackerItem
             return [];
         }
 
-        $lines = array_filter($this->variables[$name], fn ($variable) => $variable['lineNumber'] <= $lineNumber);
+        $lines = array_filter($this->variables[$name], fn ($variable) => $variable['lineNumber'] <= $lineNumber - 1);
+
+        // TODO: Not sure if this is always right...
+        if (empty($lines)) {
+            // This is the first instance of the variable, just return the actual line number
+            return $this->getAtLine($name, $lineNumber + 1);
+        }
 
         return end($lines);
     }

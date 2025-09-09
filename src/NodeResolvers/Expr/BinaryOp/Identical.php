@@ -12,4 +12,17 @@ class Identical extends AbstractResolver
     {
         return Type::bool();
     }
+
+    public function resolveForCondition(Node\Expr\BinaryOp\Identical $node)
+    {
+        $var = match (true) {
+            $node->left instanceof Node\Expr\Variable => $node->left,
+            $node->right instanceof Node\Expr\Variable => $node->right,
+            default => null,
+        };
+
+        if ($var === null) {
+            return;
+        }
+    }
 }

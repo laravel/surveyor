@@ -2,6 +2,7 @@
 
 namespace Laravel\StaticAnalyzer\NodeResolvers\Stmt;
 
+use Laravel\StaticAnalyzer\Debug\Debug;
 use Laravel\StaticAnalyzer\NodeResolvers\AbstractResolver;
 use Laravel\StaticAnalyzer\Types\ArrayShapeType;
 use Laravel\StaticAnalyzer\Types\ArrayType;
@@ -15,15 +16,15 @@ class Foreach_ extends AbstractResolver
         $iterating = $this->from($node->expr);
 
         if (! $iterating instanceof ArrayType && ! $iterating instanceof ArrayShapeType) {
-            dd($node, 'Foreach on non-array or shape?', $iterating);
+            Debug::ddFromClass($node, 'Foreach on non-array or shape?', $iterating);
         }
 
         if (! $node->keyVar instanceof Node\Expr\Variable && $node->keyVar !== null) {
-            dd('foreach keyVar is not a variable??', $node);
+            Debug::ddFromClass('foreach keyVar is not a variable??', $node);
         }
 
         if (! $node->valueVar instanceof Node\Expr\Variable) {
-            dd('foreach valueVar is not a variable??', $node);
+            Debug::ddFromClass('foreach valueVar is not a variable??', $node);
         }
 
         if ($node->keyVar) {

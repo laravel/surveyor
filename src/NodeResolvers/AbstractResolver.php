@@ -27,6 +27,11 @@ abstract class AbstractResolver
         $this->reflector->setScope($scope);
     }
 
+    public function exitScope(): Scope
+    {
+        return $this->scope;
+    }
+
     protected function from(NodeAbstract $node)
     {
         Debug::log('🔍 Resolving Node: '.$node->getType());

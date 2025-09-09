@@ -47,6 +47,8 @@ class Analyzer
 
         $parsed = $this->parser->parse(file_get_contents($path));
 
+        dd($this->parser->typeResolver()->scope());
+
         // $this->scope = new Scope;
 
         // $this->analyzed = collect($parsed)

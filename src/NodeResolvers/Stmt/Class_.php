@@ -35,8 +35,7 @@ class Class_ extends AbstractResolver
     public function scope(): Scope
     {
         // TODO: What about anonymous classes?
-        return new Scope;
-        // return $this->scope->newChildScope();
+        return $this->scope->newChildScope();
     }
 
     protected function getAllProperties(Node\Stmt\Class_ $node)

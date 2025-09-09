@@ -2,7 +2,10 @@
 
 namespace Laravel\StaticAnalyzer\DocBlockResolvers\Type;
 
+use Laravel\StaticAnalyzer\Debug\Debug;
 use Laravel\StaticAnalyzer\DocBlockResolvers\AbstractResolver;
+use Laravel\StaticAnalyzer\Types\ArrayShapeType;
+use Laravel\StaticAnalyzer\Types\ClassType;
 use Laravel\StaticAnalyzer\Types\Type;
 use PHPStan\PhpDocParser\Ast;
 
@@ -28,7 +31,27 @@ class GenericTypeNode extends AbstractResolver
             case 'object':
                 return Type::union(...$genericTypes);
             default:
-                dd('generic type', $genericTypes, $node);
+                return $this->handleUnknownType($node);
         }
+    }
+
+    protected function handleUnknownType(Ast\Type\GenericTypeNode $node)
+    {
+        if ($node->type instanceof Ast\Type\IdentifierTypeNode) {
+            $type = $this->from($node->type);
+
+            if ($type instanceof ClassType) {
+                return $type->setGenericTypes(array_map(fn ($type) => $type->name, $node->genericTypes));
+            }
+
+            if ($type instanceof ArrayShapeType) {
+                // TODO: Return to this
+                return $type;
+            }
+
+            Debug::ddFromClass($type, $node, 'unknown type');
+        }
+
+        Debug::ddFromClass($type, $node, 'unknown generic type');
     }
 }

@@ -24,6 +24,10 @@ class Scope
 
     protected array $constants = [];
 
+    protected bool $analyzingCondition = false;
+
+    protected array $conditionTypeNarrowing = [];
+
     public function __construct(protected ?Scope $parent = null)
     {
         $this->stateTracker = new StateTracker;
@@ -58,6 +62,11 @@ class Scope
         $this->namespace = $namespace;
     }
 
+    public function parent(): ?self
+    {
+        return $this->parent;
+    }
+
     public function newChildScope(): self
     {
         $instance = new self($this);
@@ -68,6 +77,10 @@ class Scope
 
         if ($this->methodName) {
             $instance->setMethodName($this->methodName);
+        }
+
+        if ($this->namespace) {
+            $instance->setNamespace($this->namespace);
         }
 
         $this->children[] = $instance;
@@ -85,7 +98,7 @@ class Scope
         $this->uses[] = $use;
     }
 
-    public function getUse(string $candidate): ?string
+    public function getUse(string $candidate): string
     {
         if ($candidate === 'static' || $candidate === 'self') {
             return $this->className;
@@ -105,7 +118,7 @@ class Scope
             return $this->parent->getUse($candidate);
         }
 
-        return null;
+        return $candidate;
     }
 
     public function setMethodName(string $methodName): void
@@ -136,5 +149,50 @@ class Scope
     public function methodScope(string $methodName): Scope
     {
         return collect($this->children)->first(fn ($child) => $child->methodName() === $methodName);
+    }
+
+    public function startConditionAnalysis(): void
+    {
+        $this->analyzingCondition = true;
+        $this->conditionTypeNarrowing = [];
+    }
+
+    public function endConditionAnalysis(): array
+    {
+        $this->analyzingCondition = false;
+        $narrowing = $this->conditionTypeNarrowing;
+        $this->conditionTypeNarrowing = [];
+
+        return $narrowing;
+    }
+
+    public function isAnalyzingCondition(): bool
+    {
+        return $this->analyzingCondition;
+    }
+
+    // public function addTypeNarrowing(string $variableName, $type, bool $truthyContext = true): void
+    // {
+    //     if (!$this->analyzingCondition) {
+    //         return;
+    //     }
+
+    //     $this->conditionTypeNarrowing[] = [
+    //         'variable' => $variableName,
+    //         'type' => $type,
+    //         'truthy' => $truthyContext,
+    //     ];
+    // }
+
+    public function getConditionTypeNarrowingCount(): int
+    {
+        return count($this->conditionTypeNarrowing);
+    }
+
+    public function invertRecentTypeNarrowing(int $fromIndex): void
+    {
+        for ($i = $fromIndex; $i < count($this->conditionTypeNarrowing); $i++) {
+            $this->conditionTypeNarrowing[$i]['truthy'] = ! $this->conditionTypeNarrowing[$i]['truthy'];
+        }
     }
 }

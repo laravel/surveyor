@@ -9,9 +9,18 @@ class ClassType extends AbstractType implements Contracts\Type
 {
     public readonly string $value;
 
+    protected array $genericTypes = [];
+
     public function __construct(string $value)
     {
         $this->value = ltrim($value, '\\');
+    }
+
+    public function setGenericTypes(array $genericTypes): self
+    {
+        $this->genericTypes = $genericTypes;
+
+        return $this;
     }
 
     public function isInterface(): bool

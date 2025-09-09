@@ -237,6 +237,24 @@ class Reflector
         return null;
     }
 
+    public function paramType(Node\Param $node, string $className, string $methodName): ?TypeContract
+    {
+        // TODO: This is really just analyzing the doc block... do both?
+
+        $reflection = $this->reflectClass($className);
+        $methodReflection = $reflection->getMethod($methodName);
+
+        if ($docBlock = $methodReflection->getDocComment()) {
+            $result = $this->docBlockParser->parseParam($docBlock, $node->var->name);
+
+            if ($result) {
+                return $result;
+            }
+        }
+
+        return null;
+    }
+
     protected function parseDocBlock(string $docBlock, ?Node $node = null): array
     {
         if (! $docBlock) {

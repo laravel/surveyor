@@ -17,10 +17,14 @@ class Type
         return new ArrayType($value);
     }
 
-    public static function is(Contracts\Type $type, string ...$classes): bool
+    public static function is(Contracts\Type $type, string|Contracts\Type ...$classes): bool
     {
         foreach ($classes as $class) {
-            if ($type instanceof $class) {
+            if ($class instanceof Contracts\Type) {
+                if ($type instanceof $class) {
+                    return true;
+                }
+            } elseif ($type instanceof $class) {
                 return true;
             }
         }
@@ -51,6 +55,11 @@ class Type
         return new IntType($value);
     }
 
+    public static function number(int|float|null $value = null): Contracts\Type
+    {
+        return new NumberType($value);
+    }
+
     public static function bool(?bool $bool = null): Contracts\Type
     {
         return new BoolType($bool);
@@ -71,6 +80,11 @@ class Type
         return new NeverType;
     }
 
+    public static function float(): Contracts\Type
+    {
+        return new FloatType;
+    }
+
     public static function void(): Contracts\Type
     {
         return new VoidType;
@@ -87,34 +101,24 @@ class Type
         }
 
         if (is_string($value)) {
-            // TODO: Handle more types
-            // - `array`
-            // - `callable`
-            // - `bool`
-            // - `float`
-            // - `int`
-            // - `string`
-            // - `iterable`
-            // - `object`
-            // - `mixed`
-            if ($value === 'array') {
-                return self::array([]);
-            }
+            $result = match ($value) {
+                'array' => self::array([]),
+                'true' => self::bool(true),
+                'false' => self::bool(false),
+                'object', 'iterable' => self::arrayShape(self::mixed(), self::mixed()),
+                'void' => self::void(),
+                'mixed' => self::mixed(),
+                'float' => self::float(),
+                'int' => self::int(),
+                'string' => self::string(),
+                'bool' => self::bool(),
+                'null' => self::null(),
+                // 'callable' => self::callable(),
+                default => null,
+            };
 
-            if ($value === 'true') {
-                return self::bool(true);
-            }
-
-            if ($value === 'false') {
-                return self::bool(false);
-            }
-
-            if ($value === 'object') {
-                return self::arrayShape(self::mixed(), self::mixed());
-            }
-
-            if ($value === 'void') {
-                return self::void();
+            if ($result) {
+                return $result;
             }
 
             if (method_exists(self::class, $value)) {

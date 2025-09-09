@@ -12,6 +12,5 @@ class Namespace_ extends AbstractResolver
         $this->scope->setNamespace($node->name->name);
 
         return null;
-        // return array_map(fn ($node) => $this->from($node), $node->stmts);
     }
 }

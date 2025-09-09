@@ -18,6 +18,11 @@ class TypeResolver extends NodeVisitorAbstract
         $this->scope = new Scope;
     }
 
+    public function scope()
+    {
+        return $this->scope;
+    }
+
     public function enterNode(Node $node)
     {
         Debug::log('❗ Resolving Node: '.$node->getType().' '.$node->getStartLine());
@@ -35,6 +40,6 @@ class TypeResolver extends NodeVisitorAbstract
 
     public function leaveNode(Node $node)
     {
-        //
+        $this->scope = $this->resolver->exitNode($node, $this->scope);
     }
 }
