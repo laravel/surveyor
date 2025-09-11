@@ -33,13 +33,14 @@ class TypeResolver extends NodeVisitorAbstract
         return $this->scopes;
     }
 
-    public function newScope()
+    public function newScope(string $path)
     {
         if (isset($this->scope)) {
             $this->scopes[] = $this->scope;
         }
 
         $this->scope = new Scope;
+        $this->scope->setPath($path);
     }
 
     public function enterNode(Node $node)

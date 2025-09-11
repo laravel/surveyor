@@ -15,4 +15,6 @@ interface Type
     public function nullable(bool $nullable = true): static;
 
     public function id(): string;
+
+    public function toString(): string;
 }

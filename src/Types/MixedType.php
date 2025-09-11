@@ -2,7 +2,7 @@
 
 namespace Laravel\Surveyor\Types;
 
-class MixedType extends AbstractType implements Contracts\Type
+class MixedType extends AbstractType
 {
     public function id(): string
     {

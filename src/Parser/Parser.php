@@ -51,9 +51,9 @@ class Parser
         return $this->typeResolver;
     }
 
-    public function parse(string|ReflectionClass|ReflectionFunction|ReflectionMethod|SplFileInfo $code): array
+    public function parse(string|ReflectionClass|ReflectionFunction|ReflectionMethod|SplFileInfo $code, string $path): array
     {
-        $this->parseCode($code);
+        $this->parseCode($code, $path);
 
         return array_map(fn ($scope) => $this->flipScope($scope), $this->typeResolver->scopes());
     }
@@ -67,7 +67,7 @@ class Parser
         return $scope;
     }
 
-    protected function parseCode(string|ReflectionClass|ReflectionFunction|ReflectionMethod|SplFileInfo $code): array
+    protected function parseCode(string|ReflectionClass|ReflectionFunction|ReflectionMethod|SplFileInfo $code, string $path): array
     {
         // try {
         $code = match (true) {
@@ -76,7 +76,7 @@ class Parser
             default => file_get_contents($code->getFileName()),
         };
 
-        $this->typeResolver->newScope();
+        $this->typeResolver->newScope($path);
 
         return $this->nodeTraverser->traverse($this->parser->parse($code));
         // } catch (Throwable $e) {

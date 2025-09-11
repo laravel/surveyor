@@ -28,6 +28,8 @@ class Scope
 
     protected bool $analyzingCondition = false;
 
+    protected string $path;
+
     /**
      * @var PHPStan\PhpDocParser\Ast\PhpDoc\TemplateTagValueNode[]
      */
@@ -36,6 +38,16 @@ class Scope
     public function __construct(protected ?Scope $parent = null)
     {
         $this->stateTracker = new StateTracker;
+    }
+
+    public function setPath(string $path): void
+    {
+        $this->path = $path;
+    }
+
+    public function path(): ?string
+    {
+        return $this->path ?? null;
     }
 
     public function addConstant(string $constant, Type $type): void

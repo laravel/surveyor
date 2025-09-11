@@ -15,12 +15,20 @@ class MethodCall extends AbstractResolver
         $var = $this->from($node->var);
 
         if (! $var instanceof ClassType) {
-            Debug::ddIfInterested($this->scope->variables());
             Debug::ddFromClass($var, $node, 'non-class for method call?');
         }
 
         return Type::union(
             ...$this->reflector->methodReturnType($this->scope->getUse($var->value), $node->name, $node)
         );
+    }
+
+    public function resolveForCondition(Node\Expr\MethodCall $node)
+    {
+        $this->scope->endConditionAnalysis();
+        $result = $this->resolve($node);
+        $this->scope->startConditionAnalysis();
+
+        return $result;
     }
 }

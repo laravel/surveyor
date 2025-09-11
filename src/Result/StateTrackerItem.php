@@ -131,7 +131,7 @@ class StateTrackerItem
             $newType = new UnionType(array_filter($currentType->types, fn ($t) => ! Type::isSame($t, $type)));
         } elseif (Type::isSame($currentType, $type)) {
             // TODO: Hm.
-            dd('removing type that is the same as the current type??', $currentType, $type);
+            dd('removing type that is the same as the current type??', $currentType, $type, $currentType->id(), $type->id());
             $newType = Type::mixed();
         } else {
             $newType = $currentType;

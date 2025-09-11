@@ -53,7 +53,7 @@ class Type
 
     public static function isSame(Contracts\Type $type1, Contracts\Type $type2): bool
     {
-        return $type1->id() === $type2->id();
+        return $type1->toString() === $type2->toString();
     }
 
     public static function int(?int $value = null): Contracts\Type

@@ -44,9 +44,9 @@ class Analyzer
             return $this;
         }
 
-        Debug::log("🧠 🧠 🧠 Analyzing: {$path} 🧠 🧠 🧠");
+        Debug::log("🧠 Analyzing: {$path}");
 
-        $this->analyzed = $this->parser->parse(file_get_contents($path));
+        $this->analyzed = $this->parser->parse(file_get_contents($path), $path);
 
         AnalyzedCache::add($path, $this->analyzed);
 

@@ -2,6 +2,8 @@
 
 namespace Laravel\Surveyor\NodeResolvers\Expr;
 
+use Laravel\Surveyor\Analysis\Condition;
+use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\IntType;
 use Laravel\Surveyor\Types\StringType;
@@ -39,7 +41,11 @@ class Assign extends AbstractResolver
 
     public function resolveForCondition(Node\Expr\Assign $node)
     {
-        dd($node);
+        if ($node->var instanceof Node\Expr\Variable) {
+            return new Condition($node->var->name, $this->from($node->expr));
+        }
+
+        Debug::ddFromClass($node, 'assign: variable but not a variable??');
     }
 
     protected function resolveForDimFetch(Node\Expr\Assign $node)

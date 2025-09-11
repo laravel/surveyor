@@ -46,7 +46,7 @@ abstract class AbstractType implements Contracts\Type
         return $this->nullable;
     }
 
-    public function toString()
+    public function toString(): string
     {
         return static::class.':'.$this->id();
     }
