@@ -39,21 +39,9 @@ abstract class AbstractResolver
 
     protected function from(NodeAbstract $node)
     {
-        $this->log($node);
-
-        return $this->resolver->from($node, $this->scope);
-    }
-
-    protected function log(NodeAbstract $node)
-    {
         Debug::log('🔍 Resolving Node: '.$node->getType(), level: 3);
 
-        if (! $this->scope->className()) {
-            return;
-        }
-
-        $scopeName = implode('::', array_filter([$this->scope->className(), $this->scope->methodName()]));
-        Debug::log('🔬 Scope: '.$scopeName, level: 2);
+        return $this->resolver->from($node, $this->scope);
     }
 
     public function scope(): Scope

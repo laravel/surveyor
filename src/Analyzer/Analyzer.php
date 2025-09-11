@@ -22,6 +22,8 @@ class Analyzer
 
     public function analyze(string $path)
     {
+        Debug::depth(0);
+
         if ($cached = AnalyzedCache::get($path)) {
             dd('hit it');
 

@@ -3,6 +3,7 @@
 namespace Laravel\Surveyor\Analysis;
 
 use Exception;
+use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Result\StateTracker;
 use Laravel\Surveyor\Types\Contracts\Type;
 use PHPStan\PhpDocParser\Ast\PhpDoc\TemplateTagValueNode;
@@ -59,6 +60,8 @@ class Scope
     {
         $this->className = $className;
         $this->stateTracker->setThis($className);
+
+        Debug::log('🔬 Scope: '.$className, level: 2);
     }
 
     public function setNamespace(string $namespace): void
@@ -128,6 +131,8 @@ class Scope
     public function setMethodName(string $methodName): void
     {
         $this->methodName = $methodName;
+
+        Debug::log("🔬 Scope: {$this->className}::{$methodName}", level: 2);
     }
 
     public function className(): ?string
