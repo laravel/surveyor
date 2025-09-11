@@ -2,6 +2,7 @@
 
 namespace Laravel\Surveyor\NodeResolvers\Stmt;
 
+use InvalidArgumentException;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
@@ -37,7 +38,11 @@ class If_ extends AbstractResolver
         foreach ($finalChanged as $name => $changes) {
             $types = array_map(fn ($change) => $change['type'], $changes);
 
-            array_unshift($types, $this->scope->variables()->getAtLine($name, $node)['type']);
+            try {
+                array_unshift($types, $this->scope->variables()->getAtLine($name, $node)['type']);
+            } catch (InvalidArgumentException $e) {
+                // No previous type found, probably a variable that was defined within the if statement
+            }
 
             $this->scope->variables()->addManually(
                 $name,

@@ -2,6 +2,7 @@
 
 namespace Laravel\Surveyor\Result;
 
+use InvalidArgumentException;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Type;
@@ -188,6 +189,12 @@ class StateTrackerItem
         );
 
         $result = end($lines);
+
+        if ($result === false) {
+            throw new InvalidArgumentException(
+                'No result found for '.$name.' at line '.$node->getStartLine().' and position '.$node->getStartTokenPos(),
+            );
+        }
 
         if ($result['startLine'] !== $node->getStartLine()) {
             return $result;

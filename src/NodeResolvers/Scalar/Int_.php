@@ -12,4 +12,9 @@ class Int_ extends AbstractResolver
     {
         return Type::int($node->value);
     }
+
+    public function resolveForCondition(Node\Scalar\Int_ $node)
+    {
+        return $this->resolve($node);
+    }
 }
