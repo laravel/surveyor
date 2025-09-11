@@ -56,12 +56,14 @@ class Scope
         return $this->constants[$constant] ?? throw new Exception('Constant '.$constant.' not found');
     }
 
-    public function setClassName(string $className): void
+    public function setClassName(string $className, bool $quietly = false): void
     {
         $this->className = $className;
         $this->stateTracker->setThis($className);
 
-        Debug::log('🔬 Scope: '.$className, level: 2);
+        if (! $quietly) {
+            Debug::log('🔬 Scope: '.$className, level: 2);
+        }
     }
 
     public function setNamespace(string $namespace): void
@@ -79,11 +81,11 @@ class Scope
         $instance = new self($this);
 
         if ($this->className) {
-            $instance->setClassName($this->className);
+            $instance->setClassName($this->className, true);
         }
 
         if ($this->methodName) {
-            $instance->setMethodName($this->methodName);
+            $instance->setMethodName($this->methodName, true);
         }
 
         if ($this->namespace) {
@@ -128,11 +130,13 @@ class Scope
         return $candidate;
     }
 
-    public function setMethodName(string $methodName): void
+    public function setMethodName(string $methodName, bool $quietly = false): void
     {
         $this->methodName = $methodName;
 
-        Debug::log("🔬 Scope: {$this->className}::{$methodName}", level: 2);
+        if (! $quietly) {
+            Debug::log("🔬 Scope: {$this->className}::{$methodName}", level: 2);
+        }
     }
 
     public function className(): ?string
