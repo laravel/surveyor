@@ -2,6 +2,7 @@
 
 namespace Laravel\Surveyor\NodeResolvers\Stmt;
 
+use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use PhpParser\Node;
 
@@ -16,7 +17,7 @@ class Unset_ extends AbstractResolver
                 $this->scope->properties()->unset($var->name->name, $node);
             } elseif ($var instanceof Node\Expr\ArrayDimFetch) {
                 if ($var->dim === null) {
-                    dd($node, $var, 'unset: array dim fetch but dim is null??');
+                    Debug::ddAndOpen($node, $var, 'unset: array dim fetch but dim is null??');
                 }
 
                 $dim = $this->from($var->dim);

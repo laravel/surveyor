@@ -10,7 +10,7 @@ class StringType extends AbstractType implements Contracts\Type
     {
         //
         if ($value === 'static') {
-            Debug::ddFromClass($this, $this, 'static');
+            Debug::ddAndOpen($this, $this, 'static');
         }
     }
 

@@ -29,13 +29,9 @@ class Param extends AbstractResolver
     {
         $results = [];
 
-        if ($this->scope->className() && $this->scope->methodName()) {
+        if ($this->scope->entityName() && $this->scope->methodName()) {
             Debug::interested($node->var->name === 'callback');
-            $result = $this->reflector->paramType($node, $this->scope->className(), $this->scope->methodName());
-
-            // if ($this->scope->getTemplateTags() !== [] && $node->var->name === 'callback') {
-            //     dd($node, $result, $this->scope->getTemplateTags());
-            // }
+            $result = $this->reflector->paramType($node, $this->scope->entityName(), $this->scope->methodName());
 
             if ($result) {
                 $results[] = $result;

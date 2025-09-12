@@ -10,6 +10,6 @@ class ThisTypeNode extends AbstractResolver
 {
     public function resolve(Ast\Type\ThisTypeNode $node)
     {
-        return Type::from($this->scope->className());
+        return Type::from($this->scope->entityName());
     }
 }

@@ -7,6 +7,7 @@ namespace Laravel\Surveyor;
 
 use Illuminate\Support\ServiceProvider;
 use Laravel\Surveyor\Console\Analyze;
+use Laravel\Surveyor\Console\RemoveAbstractClasses;
 use Laravel\Surveyor\Console\ScaffoldDocBlockResolversCommand;
 use Laravel\Surveyor\Console\ScaffoldResolversCommand;
 use Laravel\Surveyor\Parser\DocBlockParser;
@@ -66,6 +67,7 @@ class SurveyorServiceProvider extends ServiceProvider
                 Analyze::class,
                 ScaffoldResolversCommand::class,
                 ScaffoldDocBlockResolversCommand::class,
+                RemoveAbstractClasses::class,
             ]);
         }
     }

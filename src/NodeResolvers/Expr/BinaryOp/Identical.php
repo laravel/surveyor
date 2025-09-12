@@ -46,7 +46,7 @@ class Identical extends AbstractResolver
                 $type = $this->fromOutsideOfCondition($o);
 
                 if ($type === null) {
-                    Debug::ddFromClass($o, $node, 'type is null?');
+                    Debug::ddAndOpen($o, $node, 'type is null?');
                 }
 
                 // TODO: Can we get multiple conditions? Or no?

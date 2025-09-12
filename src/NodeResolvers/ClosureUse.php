@@ -2,12 +2,21 @@
 
 namespace Laravel\Surveyor\NodeResolvers;
 
+use Laravel\Surveyor\Debug\Debug;
 use PhpParser\Node;
 
 class ClosureUse extends AbstractResolver
 {
     public function resolve(Node\ClosureUse $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        if ($node->byRef) {
+            $this->scope->variables()->add(
+                $node->var->name,
+                $this->from($node->var),
+                $node,
+            );
+        } else {
+            Debug::ddAndOpen($node, 'figure out closure use');
+        }
     }
 }

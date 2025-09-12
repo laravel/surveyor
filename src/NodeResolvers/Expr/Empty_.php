@@ -21,7 +21,7 @@ class Empty_ extends AbstractResolver
         $type = $this->from($node->expr);
 
         if (! $type instanceof Condition) {
-            Debug::ddFromClass($type, $node, 'empty assessment is not a condition');
+            Debug::ddAndOpen($type, $node, 'empty assessment is not a condition');
         }
 
         return $type

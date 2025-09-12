@@ -45,7 +45,7 @@ class Assign extends AbstractResolver
             return new Condition($node->var->name, $this->from($node->expr));
         }
 
-        Debug::ddFromClass($node, 'assign: variable but not a variable??');
+        Debug::ddAndOpen($node, 'assign: variable but not a variable??');
     }
 
     protected function resolveForDimFetch(Node\Expr\Assign $node)

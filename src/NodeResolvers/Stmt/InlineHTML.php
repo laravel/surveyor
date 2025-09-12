@@ -9,6 +9,6 @@ class InlineHTML extends AbstractResolver
 {
     public function resolve(Node\Stmt\InlineHTML $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        return null;
     }
 }

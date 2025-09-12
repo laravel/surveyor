@@ -69,9 +69,9 @@ class GenericTypeNode extends AbstractResolver
                 return $type;
             }
 
-            Debug::ddFromClass($type, $node, 'unknown type');
+            Debug::ddAndOpen($type, $node, 'unknown type');
         }
 
-        Debug::ddFromClass($type, $node, 'unknown generic type');
+        Debug::ddAndOpen($type, $node, 'unknown generic type');
     }
 }

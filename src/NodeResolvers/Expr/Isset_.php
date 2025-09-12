@@ -28,7 +28,7 @@ class Isset_ extends AbstractResolver
                     $key = $this->fromOutsideOfCondition($var->dim);
 
                     if (! property_exists($key, 'value')) {
-                        Debug::ddFromClass($key, $node, 'unknown key');
+                        Debug::ddAndOpen($key, $node, 'unknown key');
                     }
 
                     if ($key->value === null) {

@@ -20,7 +20,7 @@ class Instanceof_ extends AbstractResolver
             $className = $node->class->toString();
             $fullClassName = $this->scope->getUse($className);
         } else {
-            Debug::ddFromClass($node->class, $node, 'unknown class');
+            Debug::ddAndOpen($node->class, $node, 'unknown class');
         }
 
         $expr = $node->expr;
@@ -29,7 +29,7 @@ class Instanceof_ extends AbstractResolver
             Debug::interested($expr->name === 'values');
             $this->scope->variables()->narrow($expr->name, new ClassType($fullClassName), $node);
         } else {
-            Debug::ddFromClass($expr, $node, 'unknown expression');
+            Debug::ddAndOpen($expr, $node, 'unknown expression');
         }
     }
 }

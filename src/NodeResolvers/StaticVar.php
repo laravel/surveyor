@@ -8,6 +8,14 @@ class StaticVar extends AbstractResolver
 {
     public function resolve(Node\StaticVar $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        $type = $this->from($node->default);
+
+        $this->scope->variables()->add(
+            $node->var->name,
+            $type,
+            $node,
+        );
+
+        return $type;
     }
 }

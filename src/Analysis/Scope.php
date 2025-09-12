@@ -10,7 +10,7 @@ use PHPStan\PhpDocParser\Ast\PhpDoc\TemplateTagValueNode;
 
 class Scope
 {
-    protected ?string $className = null;
+    protected ?string $entityName = null;
 
     protected ?string $methodName = null;
 
@@ -29,6 +29,8 @@ class Scope
     protected bool $analyzingCondition = false;
 
     protected string $path;
+
+    protected EntityType $entityType;
 
     /**
      * @var PHPStan\PhpDocParser\Ast\PhpDoc\TemplateTagValueNode[]
@@ -68,13 +70,18 @@ class Scope
         return $this->constants[$constant] ?? throw new Exception('Constant '.$constant.' not found');
     }
 
-    public function setClassName(string $className, bool $quietly = false): void
+    public function setEntityType(EntityType $entityType): void
     {
-        $this->className = $className;
-        $this->stateTracker->setThis($className);
+        $this->entityType = $entityType;
+    }
+
+    public function setEntityName(string $entityName, bool $quietly = false): void
+    {
+        $this->entityName = $entityName;
+        $this->stateTracker->setThis($entityName);
 
         if (! $quietly) {
-            Debug::log('🔬 Scope: '.$className, level: 2);
+            Debug::log('🔬 Scope: '.$entityName, level: 2);
         }
     }
 
@@ -92,8 +99,8 @@ class Scope
     {
         $instance = new self($this);
 
-        if ($this->className) {
-            $instance->setClassName($this->className, true);
+        if ($this->entityName) {
+            $instance->setEntityName($this->entityName, true);
         }
 
         if ($this->methodName) {
@@ -122,7 +129,7 @@ class Scope
     public function getUse(string $candidate): string
     {
         if ($candidate === 'static' || $candidate === 'self') {
-            return $this->className;
+            return $this->entityName;
         }
 
         foreach ($this->uses as $use) {
@@ -147,13 +154,13 @@ class Scope
         $this->methodName = $methodName;
 
         if (! $quietly) {
-            Debug::log("🔬 Scope: {$this->className}::{$methodName}", level: 2);
+            Debug::log("🔬 Scope: {$this->entityName}::{$methodName}", level: 2);
         }
     }
 
-    public function className(): ?string
+    public function entityName(): ?string
     {
-        return $this->className;
+        return $this->entityName;
     }
 
     public function methodName(): ?string

@@ -123,7 +123,7 @@ class Reflector
         $className = $class instanceof ClassType ? $class->value : $class;
         $reflection = $this->reflectClass($class);
 
-        if ($this->scope->className() !== $reflection->getName()) {
+        if ($this->scope->entityName() !== $reflection->getName()) {
             $analyzed = app(Analyzer::class)->analyze($reflection->getFileName());
         }
 
@@ -214,7 +214,7 @@ class Reflector
     {
         if ($returnType instanceof ReflectionNamedType) {
             if (in_array($returnType->getName(), ['static', 'self'])) {
-                return Type::from($this->scope->className());
+                return Type::from($this->scope->entityName());
             }
 
             return Type::from($returnType->getName())->nullable($returnType->allowsNull());

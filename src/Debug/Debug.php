@@ -85,7 +85,7 @@ class Debug
         }
     }
 
-    public static function ddFromClass(...$args)
+    public static function ddAndOpen(...$args)
     {
         if (self::$dump) {
             $trace = debug_backtrace(limit: 1);

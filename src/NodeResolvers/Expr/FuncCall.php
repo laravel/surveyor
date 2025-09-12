@@ -19,7 +19,7 @@ class FuncCall extends AbstractResolver
             $type = $this->scope->variables()->getAtLine($node->name->name, $node)['type'];
 
             if (! $type instanceof Types\CallableType) {
-                Debug::ddFromClass($type, $node, 'non-callable variable for func call');
+                Debug::ddAndOpen($type, $node, 'non-callable variable for func call');
             }
 
             return $type->returnType;

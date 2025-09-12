@@ -9,6 +9,6 @@ class Label extends AbstractResolver
 {
     public function resolve(Node\Stmt\Label $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        return null;
     }
 }

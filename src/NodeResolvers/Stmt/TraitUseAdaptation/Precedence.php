@@ -12,3 +12,26 @@ class Precedence extends AbstractResolver
         dd($node, $node::class.' not implemented yet');
     }
 }
+
+// trait A
+// {
+//     public function hello()
+//     {
+//         return "Hello from A";
+//     }
+// }
+
+// trait B
+// {
+//     public function hello()
+//     {
+//         return "Hello from B";
+//     }
+// }
+
+// class MyClass
+// {
+//     use A, B {
+//         A::hello insteadof B;  // This creates a Precedence node
+//     }
+// }

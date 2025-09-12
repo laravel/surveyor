@@ -9,6 +9,6 @@ class HaltCompiler extends AbstractResolver
 {
     public function resolve(Node\Stmt\HaltCompiler $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        return null;
     }
 }

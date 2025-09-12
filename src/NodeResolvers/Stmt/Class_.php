@@ -2,6 +2,7 @@
 
 namespace Laravel\Surveyor\NodeResolvers\Stmt;
 
+use Laravel\Surveyor\Analysis\EntityType;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use PhpParser\Node;
 use ReflectionClass;
@@ -10,7 +11,8 @@ class Class_ extends AbstractResolver
 {
     public function resolve(Node\Stmt\Class_ $node)
     {
-        $this->scope->setClassName($node->namespacedName->name);
+        $this->scope->setEntityName($node->namespacedName->name);
+        $this->scope->setEntityType(EntityType::CLASS_TYPE);
 
         return null;
     }

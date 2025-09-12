@@ -16,15 +16,15 @@ class Foreach_ extends AbstractResolver
         $iterating = $this->from($node->expr);
 
         if (! $iterating instanceof ArrayType && ! $iterating instanceof ArrayShapeType) {
-            Debug::ddFromClass($node, 'Foreach on non-array or shape?', $iterating);
+            Debug::ddAndOpen($node, 'Foreach on non-array or shape?', $iterating);
         }
 
         if (! $node->keyVar instanceof Node\Expr\Variable && $node->keyVar !== null) {
-            Debug::ddFromClass('foreach keyVar is not a variable??', $node);
+            Debug::ddAndOpen('foreach keyVar is not a variable??', $node);
         }
 
         if (! $node->valueVar instanceof Node\Expr\Variable) {
-            Debug::ddFromClass('foreach valueVar is not a variable??', $node);
+            Debug::ddAndOpen('foreach valueVar is not a variable??', $node);
         }
 
         if ($node->keyVar) {

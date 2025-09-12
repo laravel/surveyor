@@ -8,6 +8,6 @@ class DeclareItem extends AbstractResolver
 {
     public function resolve(Node\DeclareItem $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        return null;
     }
 }

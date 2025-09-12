@@ -9,6 +9,6 @@ class ErrorSuppress extends AbstractResolver
 {
     public function resolve(Node\Expr\ErrorSuppress $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        return null;
     }
 }

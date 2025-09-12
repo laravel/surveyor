@@ -9,6 +9,6 @@ class PostInc extends AbstractResolver
 {
     public function resolve(Node\Expr\PostInc $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        return null;
     }
 }
