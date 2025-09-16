@@ -9,6 +9,6 @@ class Print_ extends AbstractResolver
 {
     public function resolve(Node\Expr\Print_ $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        return null;
     }
 }

@@ -9,6 +9,6 @@ class BitwiseOr extends AbstractResolver
 {
     public function resolve(Node\Expr\BinaryOp\BitwiseOr $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        return null;
     }
 }

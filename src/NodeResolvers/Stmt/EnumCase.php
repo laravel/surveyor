@@ -9,6 +9,9 @@ class EnumCase extends AbstractResolver
 {
     public function resolve(Node\Stmt\EnumCase $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        $this->scope->addCase($node->name, $this->from($node->expr));
+
+        // TODO: As we're analyzing, this should probably return something?
+        return null;
     }
 }

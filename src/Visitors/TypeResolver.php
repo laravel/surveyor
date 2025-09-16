@@ -10,9 +10,7 @@ use PhpParser\NodeVisitorAbstract;
 
 class TypeResolver extends NodeVisitorAbstract
 {
-    /**
-     * @var Scope[]
-     */
+    /** @var Scope[] */
     protected $scopes = [];
 
     protected Scope $scope;
@@ -35,12 +33,9 @@ class TypeResolver extends NodeVisitorAbstract
 
     public function newScope(string $path)
     {
-        if (isset($this->scope)) {
-            $this->scopes[] = $this->scope;
-        }
-
         $this->scope = new Scope;
         $this->scope->setPath($path);
+        $this->scopes[] = $this->scope;
     }
 
     public function enterNode(Node $node)

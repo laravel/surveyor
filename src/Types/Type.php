@@ -3,6 +3,7 @@
 namespace Laravel\Surveyor\Types;
 
 use Illuminate\Support\Collection;
+use Laravel\Surveyor\Types\Contracts\CollapsibleType;
 use PHPStan\PhpDocParser\Ast\PhpDoc\TemplateTagValueNode;
 use Throwable;
 
@@ -16,6 +17,15 @@ class Type
     public static function array($value): Contracts\Type
     {
         return new ArrayType($value);
+    }
+
+    public static function collapse(Contracts\Type $type): Contracts\Type
+    {
+        if ($type instanceof CollapsibleType) {
+            return $type->collapse();
+        }
+
+        return $type;
     }
 
     public static function is(Contracts\Type $type, string|Contracts\Type ...$classes): bool
@@ -59,6 +69,11 @@ class Type
     public static function int(?int $value = null): Contracts\Type
     {
         return new IntType($value);
+    }
+
+    public static function object(): Contracts\Type
+    {
+        return new ObjectType;
     }
 
     public static function number(int|float|null $value = null): Contracts\Type

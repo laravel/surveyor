@@ -9,6 +9,6 @@ class Div extends AbstractResolver
 {
     public function resolve(Node\Expr\AssignOp\Div $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        return null;
     }
 }

@@ -9,6 +9,6 @@ class Minus extends AbstractResolver
 {
     public function resolve(Node\Expr\AssignOp\Minus $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        return null;
     }
 }

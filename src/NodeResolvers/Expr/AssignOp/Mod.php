@@ -9,6 +9,6 @@ class Mod extends AbstractResolver
 {
     public function resolve(Node\Expr\AssignOp\Mod $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        return null;
     }
 }

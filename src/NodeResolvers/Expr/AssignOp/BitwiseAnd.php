@@ -9,6 +9,6 @@ class BitwiseAnd extends AbstractResolver
 {
     public function resolve(Node\Expr\AssignOp\BitwiseAnd $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        return null;
     }
 }

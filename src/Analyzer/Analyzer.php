@@ -2,7 +2,6 @@
 
 namespace Laravel\Surveyor\Analyzer;
 
-use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Parser\Parser;
 use Laravel\Surveyor\Resolvers\NodeResolver;
@@ -10,8 +9,6 @@ use Laravel\Surveyor\Resolvers\NodeResolver;
 class Analyzer
 {
     protected array $analyzed = [];
-
-    protected Scope $scope;
 
     public function __construct(
         protected Parser $parser,
@@ -49,11 +46,6 @@ class Analyzer
         AnalyzedCache::add($path, $this->analyzed);
 
         return $this;
-    }
-
-    public function scope(): Scope
-    {
-        return $this->scope;
     }
 
     public function analyzed()

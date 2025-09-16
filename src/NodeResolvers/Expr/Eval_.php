@@ -9,6 +9,6 @@ class Eval_ extends AbstractResolver
 {
     public function resolve(Node\Expr\Eval_ $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        return null;
     }
 }

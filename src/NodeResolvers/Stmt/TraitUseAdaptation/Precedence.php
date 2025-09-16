@@ -9,7 +9,7 @@ class Precedence extends AbstractResolver
 {
     public function resolve(Node\Stmt\TraitUseAdaptation\Precedence $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        return null;
     }
 }
 

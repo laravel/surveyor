@@ -9,6 +9,6 @@ class Pow extends AbstractResolver
 {
     public function resolve(Node\Expr\BinaryOp\Pow $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        return null;
     }
 }

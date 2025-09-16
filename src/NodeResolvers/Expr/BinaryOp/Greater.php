@@ -9,6 +9,11 @@ class Greater extends AbstractResolver
 {
     public function resolve(Node\Expr\BinaryOp\Greater $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        return null;
+    }
+
+    public function resolveForCondition(Node\Expr\BinaryOp\Greater $node)
+    {
+        return null;
     }
 }

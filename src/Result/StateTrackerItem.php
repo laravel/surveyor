@@ -164,6 +164,11 @@ class StateTrackerItem
         }
     }
 
+    public function get(string $name): ?TypeContract
+    {
+        return $this->variables[$name][count($this->variables[$name]) - 1]['type'] ?? null;
+    }
+
     protected function resolveArrayKeyType(?array $lastValue, string $key, TypeContract $type): TypeContract
     {
         if ($lastValue === null) {

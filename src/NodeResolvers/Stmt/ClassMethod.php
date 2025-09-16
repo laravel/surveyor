@@ -13,6 +13,14 @@ class ClassMethod extends AbstractResolver
     {
         $this->scope->setMethodName($node->name);
 
+        if ($node->returnType) {
+            $returnTypes = $this->from($node->returnType);
+
+            if ($returnTypes) {
+                $this->scope->addReturnType($returnTypes, $node->getStartLine());
+            }
+        }
+
         return null;
     }
 

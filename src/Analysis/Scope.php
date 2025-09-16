@@ -28,9 +28,13 @@ class Scope
 
     protected bool $analyzingCondition = false;
 
+    protected array $returnTypes = [];
+
     protected string $path;
 
     protected EntityType $entityType;
+
+    protected array $cases = [];
 
     /**
      * @var PHPStan\PhpDocParser\Ast\PhpDoc\TemplateTagValueNode[]
@@ -57,6 +61,11 @@ class Scope
         $this->constants[$constant] = $type;
     }
 
+    public function children()
+    {
+        return $this->children;
+    }
+
     public function getConstant(string $constant): ?Type
     {
         if (! array_key_exists($constant, $this->constants)) {
@@ -68,6 +77,19 @@ class Scope
         }
 
         return $this->constants[$constant] ?? throw new Exception('Constant '.$constant.' not found');
+    }
+
+    public function addReturnType(Type $returnType, int $lineNumber): void
+    {
+        $this->returnTypes[] = [
+            'type' => $returnType,
+            'lineNumber' => $lineNumber,
+        ];
+    }
+
+    public function returnTypes(): array
+    {
+        return $this->returnTypes;
     }
 
     public function setEntityType(EntityType $entityType): void
@@ -156,6 +178,16 @@ class Scope
         if (! $quietly) {
             Debug::log("🔬 Scope: {$this->entityName}::{$methodName}", level: 2);
         }
+    }
+
+    public function namespace(): ?string
+    {
+        return $this->namespace;
+    }
+
+    public function addCase(string $case, ?Type $type): void
+    {
+        $this->cases[] = [$case, $type];
     }
 
     public function entityName(): ?string

@@ -24,7 +24,14 @@ class Analyze extends Command
 
         $path = $this->option('path');
 
-        $analyzer->analyze(getcwd().'/'.$path)->analyzed();
-        dd('done');
+        $result = $analyzer->analyze(getcwd().'/'.$path)->analyzed();
+
+        foreach ($result as $class) {
+            foreach ($class->children() as $method) {
+                dump($method->returnTypes());
+            }
+        }
+
+        dd($result);
     }
 }
