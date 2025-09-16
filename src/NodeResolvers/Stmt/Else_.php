@@ -3,19 +3,21 @@
 namespace Laravel\Surveyor\NodeResolvers\Stmt;
 
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
+use Laravel\Surveyor\NodeResolvers\Shared\CapturesConditionalChanges;
 use PhpParser\Node;
 use PhpParser\NodeAbstract;
 
 class Else_ extends AbstractResolver
 {
+    use CapturesConditionalChanges;
+
     public function resolve(Node\Stmt\Else_ $node)
     {
-        $this->scope->variables()->startSnapshot($node);
-        // $changed = $this->scope->variables()->endSnapshot($node->getStartLine());
+        $this->startCapturing($node);
     }
 
     public function onExit(NodeAbstract $node)
     {
-        $this->scope->variables()->endSnapshotAndAddToPending($node);
+        $this->capture($node);
     }
 }

@@ -3,6 +3,8 @@
 namespace Laravel\Surveyor\Result;
 
 use InvalidArgumentException;
+use Laravel\Surveyor\Debug\Debug;
+use Laravel\Surveyor\Support\ShimmedNode;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Type;
@@ -22,68 +24,27 @@ class StateTrackerItem
 
     public function add(string $name, TypeContract $type, NodeAbstract $node): void
     {
-        $changed = $this->getChanged($type, $node);
-
-        $this->variables[$name] ??= [];
-        $this->variables[$name][] = $changed;
-
-        if (count($this->activeSnapshots) > 0) {
-            $activeSnapshot = $this->activeSnapshots[count($this->activeSnapshots) - 1];
-            $this->snapshots[$activeSnapshot][$name] ??= [];
-            $this->snapshots[$activeSnapshot][$name][] = $changed;
-        }
+        $this->updateSnapshotOrVariable($name, $this->getAttributes($type, $node));
     }
 
-    public function addManually(string $name, TypeContract $type, int $line, int $tokenPos, int $endLine, int $endTokenPos): void
+    public function getActiveSnapshotKey(): ?string
     {
-        $this->add(
-            $name,
-            $type,
-            new class($line, $tokenPos, $endLine, $endTokenPos) extends NodeAbstract
-            {
-                public function __construct(
-                    protected int $line,
-                    protected int $tokenPos,
-                    protected int $endLine,
-                    protected int $endTokenPos,
-                ) {
-                    //
-                }
-
-                public function getStartLine(): int
-                {
-                    return $this->line;
-                }
-
-                public function getStartTokenPos(): int
-                {
-                    return $this->tokenPos;
-                }
-
-                public function getEndLine(): int
-                {
-                    return $this->endLine;
-                }
-
-                public function getEndTokenPos(): int
-                {
-                    return $this->endTokenPos;
-                }
-
-                public function getType(): string
-                {
-                    return 'NodeAbstract';
-                }
-
-                public function getSubNodeNames(): array
-                {
-                    return [];
-                }
-            }
-        );
+        return $this->activeSnapshots[count($this->activeSnapshots) - 1] ?? null;
     }
 
-    protected function getChanged(TypeContract $type, NodeAbstract $node): array
+    public function addManually(
+        string $name,
+        TypeContract $type,
+        int $line,
+        int $tokenPos,
+        int $endLine,
+        int $endTokenPos,
+        ?int $terminatedAt = null
+    ): void {
+        $this->add($name, $type, new ShimmedNode($line, $tokenPos, $endLine, $endTokenPos, $terminatedAt));
+    }
+
+    protected function getAttributes(TypeContract $type, NodeAbstract $node): array
     {
         return [
             'type' => $type,
@@ -91,6 +52,7 @@ class StateTrackerItem
             'endLine' => $node->getEndLine(),
             'startTokenPos' => $node->getStartTokenPos(),
             'endTokenPos' => $node->getEndTokenPos(),
+            'terminatedAt' => $node instanceof ShimmedNode ? $node->terminatedAt() : null,
         ];
     }
 
@@ -149,24 +111,58 @@ class StateTrackerItem
 
     public function updateArrayKey(string $name, string $key, TypeContract $type, NodeAbstract $node): void
     {
-        $this->variables[$name] ??= [];
-
-        $lastValue = $this->variables[$name][count($this->variables[$name]) - 1] ?? null;
+        $lastValue = $this->getLastSnapshotValue($name) ?? $this->getLastValue($name);
         $newType = $this->resolveArrayKeyType($lastValue, $key, $type);
-        $changed = $this->getChanged($newType, $node);
+        $changed = $this->getAttributes($newType, $node);
 
-        $this->variables[$name][] = $changed;
+        $this->updateSnapshotOrVariable($name, $changed);
+    }
 
-        if (count($this->activeSnapshots) > 0) {
-            $activeSnapshot = $this->activeSnapshots[count($this->activeSnapshots) - 1];
+    protected function updateSnapshotOrVariable(string $name, array $changed): void
+    {
+        $activeSnapshot = $this->getActiveSnapshotKey();
+
+        if ($activeSnapshot) {
+            Debug::log('🆕 Updating snapshot', [
+                'name' => $name,
+                'changes' => $changed,
+                'snapshot' => $activeSnapshot,
+            ], level: 2);
+
             $this->snapshots[$activeSnapshot][$name] ??= [];
             $this->snapshots[$activeSnapshot][$name][] = $changed;
+        } else {
+            Debug::log('🆕 Updating variable', [
+                'name' => $name,
+                'changes' => $changed,
+            ], level: 2);
+
+            $this->variables[$name] ??= [];
+            $this->variables[$name][] = $changed;
         }
+    }
+
+    public function getLastSnapshotValue(string $name): ?array
+    {
+        $activeSnapshot = $this->getActiveSnapshotKey();
+
+        if (! $activeSnapshot) {
+            return null;
+        }
+
+        $values = $this->snapshots[$activeSnapshot][$name] ?? [];
+
+        return $values[count($values) - 1] ?? null;
+    }
+
+    public function getLastValue(string $name): ?array
+    {
+        return $this->variables[$name][count($this->variables[$name]) - 1] ?? null;
     }
 
     public function get(string $name): ?TypeContract
     {
-        return $this->variables[$name][count($this->variables[$name]) - 1]['type'] ?? null;
+        return $this->getLastValue($name)['type'] ?? null;
     }
 
     protected function resolveArrayKeyType(?array $lastValue, string $key, TypeContract $type): TypeContract
@@ -200,11 +196,16 @@ class StateTrackerItem
             return [];
         }
 
+        Debug::interested($node->getStartLine() === 52);
+
         $lines = array_filter(
             $this->variables[$name],
             fn ($variable) => $variable['startLine'] <= $node->getStartLine()
-                && $variable['startTokenPos'] <= $node->getStartTokenPos(),
+                && $variable['startTokenPos'] <= $node->getStartTokenPos()
+                && ($variable['terminatedAt'] === null || $variable['terminatedAt'] >= $node->getStartLine()),
         );
+
+        Debug::dumpIfInterested($lines);
 
         $result = end($lines);
 
@@ -238,6 +239,11 @@ class StateTrackerItem
     {
         $key = $this->getSnapshotKey($node);
 
+        Debug::log('📸 Starting snapshot', [
+            'key' => $key,
+            'node' => get_class($node),
+        ], level: 2);
+
         $this->snapshots[$key] = [];
         $this->activeSnapshots[] = $key;
     }
@@ -248,15 +254,75 @@ class StateTrackerItem
 
         $changed = $this->snapshots[$key] ?? [];
 
+        Debug::log('📷 Ending snapshot', [
+            'key' => $key,
+            'node' => get_class($node),
+            'changed' => $changed,
+        ], level: 2);
+
         array_pop($this->activeSnapshots);
         unset($this->snapshots[$key]);
 
         return $changed;
     }
 
+    public function markSnapShotAsTerminated(NodeAbstract $node): void
+    {
+        $activeSnapshot = $this->getActiveSnapshotKey();
+
+        if (! $activeSnapshot) {
+            return;
+        }
+
+        [$line, $tokenPos] = explode(':', $activeSnapshot);
+
+        foreach ($this->snapshots[$activeSnapshot] as $name => $changes) {
+            foreach ($changes as $index => $_) {
+                $this->snapshots[$activeSnapshot][$name][$index]['terminatedAt'] = $node->getStartLine();
+            }
+        }
+
+        $this->endSnapshotAndAddToPending(new ShimmedNode($line, $tokenPos, 0, 0, $node->getStartLine()));
+    }
+
     public function endSnapshotAndAddToPending(NodeAbstract $node): void
     {
-        $this->addPendingType($node, $this->endSnapshot($node));
+        $changed = [$this->endSnapshot($node)];
+
+        $finalChanged = [];
+
+        foreach ($changed as $changes) {
+            foreach ($changes as $name => $changes) {
+                $finalChanged[$name] ??= [];
+                $finalChanged[$name] = array_merge($finalChanged[$name], $changes);
+            }
+        }
+
+        foreach ($finalChanged as $name => $changes) {
+            $types = [];
+
+            foreach ($changes as $change) {
+                // if (($change['terminatedAt'] ?? -1) > 0) {
+                //     $this->addTypes($name, $node, [...$types, $change['type']]);
+                // } else {
+                $types[] = $change['type'];
+                // }
+            }
+
+            $this->addTypes($name, $node, $types);
+        }
+    }
+
+    protected function addTypes(string $name, NodeAbstract $node, array $types): void
+    {
+        try {
+            dump($this->getAtLine($name, $node));
+            array_unshift($types, $this->getAtLine($name, $node)['type']);
+        } catch (InvalidArgumentException $e) {
+            // No previous type found, probably a variable that was defined within the if statement
+        }
+
+        $this->add($name, Type::union(...$types), $node);
     }
 
     public function addPendingType(NodeAbstract $node, array $types): void
@@ -268,22 +334,11 @@ class StateTrackerItem
 
     public function getPendingTypes(NodeAbstract $node): array
     {
-        $changed = [];
+        $key = $this->getSnapshotKey($node);
+        $pending = $this->pendingTypes[$key] ?? [];
 
-        foreach ($this->pendingTypes as $key => $types) {
-            [$line, $tokenPos] = explode(':', $key);
+        unset($this->pendingTypes[$key]);
 
-            if (
-                $line >= $node->getStartLine()
-                && $line <= $node->getEndLine()
-                && $tokenPos >= $node->getStartTokenPos()
-                && $tokenPos <= $node->getEndTokenPos()
-            ) {
-                $changed[] = $types;
-                unset($this->pendingTypes[$key]);
-            }
-        }
-
-        return $changed;
+        return [$pending];
     }
 }

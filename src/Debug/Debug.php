@@ -27,21 +27,21 @@ class Debug
             return;
         }
 
-        if (is_array($data) || is_object($data)) {
-            $data = json_encode($data, JSON_PRETTY_PRINT);
-        }
-
         $indent = str_repeat('    ', self::$depth);
+
+        if (is_array($data) || is_object($data)) {
+            $data = collect(explode(PHP_EOL, json_encode($data, JSON_PRETTY_PRINT)))->map(fn ($line) => $indent.$line)->implode(PHP_EOL);
+        }
 
         $formattedMessage = (is_string($message) ? $message : json_encode($message));
 
         if ($data) {
-            $formattedMessage .= PHP_EOL.$indent.$data;
+            $formattedMessage .= PHP_EOL.$data;
         }
 
         $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
 
-        info($indent.'[DEBUG] '.$backtrace[1]['class'].':'.($backtrace[1]['line'] ?? 0).PHP_EOL.$indent.$formattedMessage);
+        info($indent.'> '.$backtrace[1]['class'].':'.($backtrace[1]['line'] ?? 0).PHP_EOL.$indent.$formattedMessage);
     }
 
     public static function depth(int $depth)
