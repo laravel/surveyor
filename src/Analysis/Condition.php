@@ -5,6 +5,7 @@ namespace Laravel\Surveyor\Analysis;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Type;
 use Laravel\Surveyor\Types\UnionType;
+use PhpParser\NodeAbstract;
 
 class Condition
 {
@@ -15,10 +16,15 @@ class Condition
     protected bool $currentState = true;
 
     public function __construct(
-        public readonly string $variable,
+        public readonly NodeAbstract $node,
         public TypeContract $type,
     ) {
         //
+    }
+
+    public static function from(NodeAbstract $node, TypeContract $type): self
+    {
+        return new self($node, $type);
     }
 
     public function whenFalse(callable $callback): self
@@ -72,7 +78,7 @@ class Condition
         if ($this->type instanceof UnionType) {
             $newType = array_filter(
                 $this->type->types,
-                fn ($t) => Type::is($t, $type),
+                fn($t) => Type::is($t, $type),
             )[0] ?? $type;
         } else {
             $newType = Type::is($this->type, $type) ? $this->type : $type;
@@ -88,7 +94,7 @@ class Condition
         if ($this->type instanceof UnionType) {
             $newType = Type::union(...array_filter(
                 $this->type->types,
-                fn ($t) => ! Type::is($t, $type),
+                fn($t) => ! Type::is($t, $type),
             ));
         } else {
             $newType = Type::is($this->type, $type) ? Type::mixed() : $type;

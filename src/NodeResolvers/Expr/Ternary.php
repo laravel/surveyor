@@ -24,12 +24,12 @@ class Ternary extends AbstractResolver
         if ($result instanceof Condition) {
             if (! $result->hasConditions()) {
                 // Probably checking a variable for truthiness
-                $result->whenTrue(fn ($_, TypeContract $type) => $type->nullable(false))
-                    ->whenFalse(fn ($_, TypeContract $type) => $type->nullable(true));
+                $result->whenTrue(fn($_, TypeContract $type) => $type->nullable(false))
+                    ->whenFalse(fn($_, TypeContract $type) => $type->nullable(true));
             }
 
-            $this->scope->variables()->add($result->variable, $result->apply(), $node->if);
-            $this->scope->variables()->add($result->variable, $result->toggle()->apply(), $node->else);
+            $this->scope->state()->add($result->variable, $result->apply(), $node->if);
+            $this->scope->state()->add($result->variable, $result->toggle()->apply(), $node->else);
         }
 
         return Type::union($this->from($node->if), $this->from($node->else));

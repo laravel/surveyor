@@ -10,12 +10,7 @@ class Return_ extends AbstractResolver
 {
     public function resolve(Node\Stmt\Return_ $node)
     {
-        // if ($node->getStartLine() === 52) {
-        //     dd($this->scope()->variables());
-        // }
-
-        $this->scope->variables()->markSnapShotAsTerminated($node);
-        $this->scope->properties()->markSnapShotAsTerminated($node);
+        $this->scope->state()->markSnapShotAsTerminated($node);
 
         $result = Type::collapse($this->from($node->expr));
 

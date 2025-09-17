@@ -21,11 +21,11 @@ class Equal extends AbstractResolver
 
         // TODO: Not sure this is correct
         if ($left instanceof Condition) {
-            $this->scope->variables()->narrow($left->variable, $left->apply(), $node);
+            $this->scope->state()->narrow($left->node, $left->apply(), $node);
         }
 
         if ($right instanceof Condition) {
-            $this->scope->variables()->narrow($right->variable, $right->apply(), $node);
+            $this->scope->state()->narrow($right->node, $right->apply(), $node);
         }
     }
 }

@@ -9,10 +9,9 @@ class PropertyItem extends AbstractResolver
 {
     public function resolve(Node\PropertyItem $node)
     {
-        $this->scope->properties()->add(
-            $node->name->name,
-            $node->default ? $this->from($node->default) : Type::null(),
+        $this->scope->state()->add(
             $node,
+            $node->default ? $this->from($node->default) : Type::null(),
         );
 
         return null;

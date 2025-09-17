@@ -22,7 +22,7 @@ class Global_ extends AbstractResolver
             }
 
             if ($scope) {
-                $this->scope->variables()->add($var->name, $scope->variables()->get($var->name), $node);
+                $this->scope->state()->add($var, $scope->state()->get($var->name), $node);
             } else {
                 Debug::ddAndOpen($var, $this->scope, 'global: variable not found in scope');
             }

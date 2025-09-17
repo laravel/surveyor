@@ -14,26 +14,10 @@ class Assign extends AbstractResolver
 {
     public function resolve(Node\Expr\Assign $node)
     {
-        switch (true) {
-            case $node->var instanceof Node\Expr\Variable:
-                $this->scope->variables()->add(
-                    $node->var->name,
-                    $this->from($node->expr),
-                    $node
-                );
-                break;
-
-            case $node->var instanceof Node\Expr\PropertyFetch:
-                $this->scope->properties()->add(
-                    $node->var->name->name,
-                    $this->from($node->expr),
-                    $node
-                );
-                break;
-
-            case $node->var instanceof Node\Expr\ArrayDimFetch:
-                $this->resolveForDimFetch($node);
-                break;
+        if ($node->var instanceof Node\Expr\ArrayDimFetch) {
+            $this->resolveForDimFetch($node);
+        } else {
+            $this->scope->state()->add($node->var, $this->from($node->expr));
         }
 
         return null;
@@ -56,32 +40,13 @@ class Assign extends AbstractResolver
         $dim = $dimFetch->dim === null ? Type::int() : $this->from($dimFetch->dim);
         $validDim = Type::is($dim, StringType::class, IntType::class) && $dim->value !== null;
 
-        if (! $validDim) {
-            return;
-        }
-
-        if ($dimFetch->var instanceof Node\Expr\Variable) {
-            $this->scope->variables()->updateArrayKey(
-                $dimFetch->var->name,
+        if ($validDim) {
+            $this->scope->state()->updateArrayKey(
+                $dimFetch->var,
                 $dim->value,
                 $this->from($node->expr),
                 $node,
             );
-
-            return;
         }
-
-        if ($dimFetch->var instanceof Node\Expr\PropertyFetch) {
-            $this->scope->properties()->updateArrayKey(
-                $dimFetch->var->name,
-                $dim->value,
-                $this->from($node->expr),
-                $node,
-            );
-
-            return;
-        }
-
-        dd('assign: array dim fetch but not a variable or property fetch??', $node, $dim);
     }
 }

@@ -8,11 +8,11 @@ trait CapturesConditionalChanges
 {
     protected function startCapturing(NodeAbstract $node)
     {
-        $this->scope->variables()->startSnapshot($node);
+        $this->scope->state()->startSnapshot($node);
     }
 
     protected function capture(NodeAbstract $node)
     {
-        $this->scope->variables()->endSnapshotAndCapture($node);
+        $this->scope->state()->endSnapshotAndCapture($node);
     }
 }

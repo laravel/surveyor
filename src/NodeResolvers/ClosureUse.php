@@ -10,7 +10,7 @@ class ClosureUse extends AbstractResolver
     public function resolve(Node\ClosureUse $node)
     {
         if ($node->byRef) {
-            $this->scope->variables()->add(
+            $this->scope->state()->add(
                 $node->var->name,
                 $this->from($node->var),
                 $node,

@@ -25,7 +25,7 @@ class ArrowFunction extends AbstractResolver
                 $types[] = Type::mixed();
             }
 
-            $this->scope->variables()->add($param->var->name, Type::union(...$types), $node);
+            $this->scope->state()->add($param, Type::union(...$types));
         }
 
         return $this->from($node->expr);

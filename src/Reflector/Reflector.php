@@ -65,10 +65,10 @@ class Reflector
     protected function tryKnownFunctions(string $name, ?CallLike $node = null): ?array
     {
         if ($name === 'compact') {
-            $arr = collect($node->getArgs())->flatMap(function ($arg) use ($node) {
+            $arr = collect($node->getArgs())->flatMap(function ($arg) {
                 if ($arg->value instanceof Node\Scalar\String_) {
                     return [
-                        $arg->value->value => $this->scope->variables()->getAtLine($arg->value->value, $node)['type'],
+                        $arg->value->value => $this->scope->state()->getAtLine($arg)->type(),
                     ];
                 }
 
@@ -187,13 +187,13 @@ class Reflector
 
         $funcNode = $parser->nodeFinder()->findFirst(
             $parsed,
-            fn ($n) => ($n instanceof Node\Expr\Closure || $n instanceof Node\Expr\ArrowFunction)
+            fn($n) => ($n instanceof Node\Expr\Closure || $n instanceof Node\Expr\ArrowFunction)
                 && $n->getStartLine() === $funcReflection->getStartLine(),
         );
 
         $methodNodes = $parser->nodeFinder()->find(
             $parsed,
-            fn ($n) => $n instanceof ClassMethod && $n->getStartLine() < $funcReflection->getStartLine(),
+            fn($n) => $n instanceof ClassMethod && $n->getStartLine() < $funcReflection->getStartLine(),
         );
 
         $methodName = end($methodNodes)->name->name;
@@ -223,14 +223,14 @@ class Reflector
         if ($returnType instanceof ReflectionUnionType) {
             return Type::union(
                 ...collect($returnType->getTypes())
-                    ->map(fn ($t) => Type::from($t->getName())->nullable($t->allowsNull())),
+                    ->map(fn($t) => Type::from($t->getName())->nullable($t->allowsNull())),
             );
         }
 
         if ($returnType instanceof ReflectionIntersectionType) {
             return Type::intersection(
                 ...collect($returnType->getTypes())
-                    ->map(fn ($t) => $this->returnType($t)?->nullable($t->allowsNull())),
+                    ->map(fn($t) => $this->returnType($t)?->nullable($t->allowsNull())),
             );
         }
 

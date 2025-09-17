@@ -16,7 +16,7 @@ class FuncCall extends AbstractResolver
         $returnTypes = [];
 
         if ($node->name instanceof Node\Expr\Variable) {
-            $type = $this->scope->variables()->getAtLine($node->name->name, $node)['type'];
+            $type = $this->scope->state()->getAtLine($node)->type();
 
             if (! $type instanceof Types\CallableType) {
                 Debug::ddAndOpen($type, $node, 'non-callable variable for func call');
@@ -59,27 +59,12 @@ class FuncCall extends AbstractResolver
             return;
         }
 
-        $arg = $node->args[0]->value;
-
-        $variableName = match (true) {
-            $arg instanceof Node\Expr\Variable => $arg->name,
-            $arg instanceof Node\Expr\PropertyFetch => $arg->name->name,
-            $arg instanceof Node\Expr\StaticPropertyFetch => $arg->name->name,
-            default => null,
-        };
-
-        if ($variableName === null) {
-            return;
-        }
-
-        $condition = new Condition(
-            $variableName,
-            $this->scope->variables()->getAtLine($variableName, $node)['type'],
-        );
-
-        return $condition
-            ->whenTrue(fn (Condition $c) => $c->setType($type))
-            ->whenFalse(fn (Condition $c) => $c->removeType($type))
+        return Condition::from(
+            $node->args[0]->value,
+            $this->scope->state()->getAtLine($node)->type(),
+        )
+            ->whenTrue(fn(Condition $c) => $c->setType($type))
+            ->whenFalse(fn(Condition $c) => $c->removeType($type))
             ->makeTrue();
     }
 }

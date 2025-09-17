@@ -2,6 +2,7 @@
 
 namespace Laravel\Surveyor\NodeResolvers\Expr;
 
+use Laravel\Surveyor\Analysis\Condition;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\ClassType;
@@ -25,11 +26,9 @@ class Instanceof_ extends AbstractResolver
 
         $expr = $node->expr;
 
-        if ($expr instanceof Node\Expr\Variable) {
-            Debug::interested($expr->name === 'values');
-            $this->scope->variables()->narrow($expr->name, new ClassType($fullClassName), $node);
-        } else {
-            Debug::ddAndOpen($expr, $node, 'unknown expression');
-        }
+        return Condition::from($expr, new ClassType($fullClassName))
+            ->whenTrue(fn(Condition $c) => $c->setType(new ClassType($fullClassName)))
+            ->whenFalse(fn(Condition $c) => $c->removeType(new ClassType($fullClassName)))
+            ->makeTrue();
     }
 }

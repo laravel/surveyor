@@ -71,7 +71,7 @@ class StateTrackerItem
         if ($currentType instanceof UnionType) {
             $newType = array_filter(
                 $currentType->types,
-                fn ($t) => Type::is($t, get_class($type)),
+                fn($t) => Type::is($t, get_class($type)),
             )[0] ?? Type::from($type);
         } else {
             $newType = Type::from($type);
@@ -95,7 +95,7 @@ class StateTrackerItem
         $currentType = $this->getAtLine($name, $node)->type();
 
         if ($currentType instanceof UnionType) {
-            $newType = new UnionType(array_filter($currentType->types, fn ($t) => ! Type::isSame($t, $type)));
+            $newType = new UnionType(array_filter($currentType->types, fn($t) => ! Type::isSame($t, $type)));
         } elseif (Type::isSame($currentType, $type)) {
             // TODO: Hm.
             dd('removing type that is the same as the current type??', $currentType, $type, $currentType->id(), $type->id());
@@ -132,7 +132,7 @@ class StateTrackerItem
                 'name' => $name,
                 'changes' => $variableState->toArray(),
                 'snapshot' => $activeSnapshot,
-            ], level: 2);
+            ], level: 3);
 
             $this->snapshots[$activeSnapshot][$name] ??= [];
             $this->snapshots[$activeSnapshot][$name][] = $variableState;
@@ -140,7 +140,7 @@ class StateTrackerItem
             Debug::log('🆕 Updating variable', [
                 'name' => $name,
                 'changes' => $variableState,
-            ], level: 2);
+            ], level: 3);
 
             $this->variables[$name] ??= [];
             $this->variables[$name][] = $variableState;
@@ -185,7 +185,7 @@ class StateTrackerItem
 
             try {
                 return new UnionType(
-                    array_map(fn ($t) => new ArrayType(array_merge($t->value, [$key => $type])), $existingTypes)
+                    array_map(fn($t) => new ArrayType(array_merge($t->value, [$key => $type])), $existingTypes)
                 );
             } catch (Throwable $e) {
                 dd('t->value is null??', $key, $type, $existingTypes, $this, $e->getMessage());
@@ -203,7 +203,7 @@ class StateTrackerItem
 
         $lines = array_filter(
             $this->variables[$name],
-            fn ($variable) => $variable->startLine() <= $node->getStartLine()
+            fn($variable) => $variable->startLine() <= $node->getStartLine()
                 && $variable->startTokenPos() <= $node->getStartTokenPos()
                 && $variable->isTerminatedAfter($node->getStartLine()),
         );
@@ -212,7 +212,7 @@ class StateTrackerItem
 
         if ($result === false) {
             throw new InvalidArgumentException(
-                'No result found for '.$name.' at line '.$node->getStartLine().' and position '.$node->getStartTokenPos(),
+                'No result found for ' . $name . ' at line ' . $node->getStartLine() . ' and position ' . $node->getStartTokenPos(),
             );
         }
 
@@ -233,7 +233,7 @@ class StateTrackerItem
 
     protected function getSnapshotKey(NodeAbstract $node): string
     {
-        return $node->getStartLine().':'.$node->getStartTokenPos();
+        return $node->getStartLine() . ':' . $node->getStartTokenPos();
     }
 
     public function startSnapshot(NodeAbstract $node): void
@@ -243,7 +243,7 @@ class StateTrackerItem
         Debug::log('📸 Starting snapshot', [
             'key' => $key,
             'node' => get_class($node),
-        ], level: 2);
+        ], level: 3);
 
         $this->snapshots[$key] = [];
         $this->activeSnapshots[] = $key;
@@ -259,7 +259,7 @@ class StateTrackerItem
             'key' => $key,
             'node' => get_class($node),
             'changed' => $changed,
-        ], level: 2);
+        ], level: 3);
 
         array_pop($this->activeSnapshots);
         unset($this->snapshots[$key]);
@@ -300,20 +300,17 @@ class StateTrackerItem
         }
 
         foreach ($finalChanged as $name => $changes) {
-            $states = [];
-
-            foreach ($changes as $change) {
-                $states[] = $change;
-            }
-
-            $this->addTypes($name, $node, $states);
+            $this->addTypes($name, $node, $changes);
         }
     }
 
     protected function addTypes(string $name, NodeAbstract $node, array $states): void
     {
         try {
-            array_unshift($states, $this->getAtLine($name, $node));
+            $previousValue = $this->getAtLine($name, $node);
+            if ($previousValue) {
+                array_unshift($states, $previousValue);
+            }
         } catch (InvalidArgumentException $e) {
             // No previous type found, probably a variable that was defined within the if statement
         }
@@ -323,7 +320,7 @@ class StateTrackerItem
 
         $newState = $this->add(
             $name,
-            Type::union(...array_map(fn ($state) => $state->type(), $states)),
+            Type::union(...array_map(fn($state) => $state->type(), $states)),
             $node,
         );
 

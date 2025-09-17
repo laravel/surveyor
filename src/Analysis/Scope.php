@@ -200,15 +200,20 @@ class Scope
         return $this->methodName;
     }
 
-    public function variables()
+    public function state()
     {
-        return $this->stateTracker->variables();
+        return $this->stateTracker;
     }
 
-    public function properties()
-    {
-        return $this->stateTracker->properties();
-    }
+    // public function variables()
+    // {
+    //     return $this->stateTracker->variables();
+    // }
+
+    // public function properties()
+    // {
+    //     return $this->stateTracker->properties();
+    // }
 
     public function methodScope(string $methodName): Scope
     {

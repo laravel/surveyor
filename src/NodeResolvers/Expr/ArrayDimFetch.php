@@ -2,6 +2,7 @@
 
 namespace Laravel\Surveyor\NodeResolvers\Expr;
 
+use Laravel\Surveyor\Analysis\Condition;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\ArrayShapeType;
@@ -30,5 +31,10 @@ class ArrayDimFetch extends AbstractResolver
         }
 
         return Type::mixed();
+    }
+
+    public function resolveForCondition(Node\Expr\ArrayDimFetch $node)
+    {
+        return new Condition($node->var->var->name, $this->fromOutsideOfCondition($node));
     }
 }

@@ -10,11 +10,7 @@ class StaticVar extends AbstractResolver
     {
         $type = $this->from($node->default);
 
-        $this->scope->variables()->add(
-            $node->var->name,
-            $type,
-            $node,
-        );
+        $this->scope->state()->add($node, $type);
 
         return $type;
     }

@@ -19,12 +19,13 @@ class BooleanAnd extends AbstractResolver
         $left = $this->from($node->left);
         $right = $this->from($node->right);
 
+        // TODO: This seem incorrect
         if ($left instanceof Condition) {
-            $this->scope->variables()->narrow($left->variable, $left->apply(), $node);
+            $this->scope->state()->narrow($left->node, $left->apply(), $node);
         }
 
         if ($right instanceof Condition) {
-            $this->scope->variables()->narrow($right->variable, $right->apply(), $node);
+            $this->scope->state()->narrow($right->node, $right->apply(), $node);
         }
     }
 }
