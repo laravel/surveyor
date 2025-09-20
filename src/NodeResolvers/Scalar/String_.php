@@ -12,4 +12,9 @@ class String_ extends AbstractResolver
     {
         return Type::string($node->value);
     }
+
+    public function resolveForCondition(Node\Scalar\String_ $node)
+    {
+        return $this->fromOutsideOfCondition($node);
+    }
 }

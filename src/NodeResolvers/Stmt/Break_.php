@@ -9,6 +9,6 @@ class Break_ extends AbstractResolver
 {
     public function resolve(Node\Stmt\Break_ $node)
     {
-        dd($node, $node::class.' not implemented yet');
+        return null;
     }
 }
