@@ -21,4 +21,9 @@ class ClassConstFetch extends AbstractResolver
 
         return $this->reflector->constantType($node->name->name, $fqn, $node);
     }
+
+    public function resolveForCondition(Node\Expr\ClassConstFetch $node)
+    {
+        return $this->fromOutsideOfCondition($node);
+    }
 }

@@ -8,6 +8,7 @@ use Laravel\Surveyor\Support\ShimmedNode;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\MixedType;
+use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
 use Laravel\Surveyor\Types\UnionType;
 use PhpParser\NodeAbstract;
@@ -212,7 +213,12 @@ class StateTrackerItem
             }
         }
 
-        Debug::ddAndOpen($lastValue->type(), 'last value is not accounted for');
+        if ($lastValue->type() instanceof StringType) {
+            // Treating string as array
+            return Type::string();
+        }
+
+        Debug::ddAndOpen($lastValue->type(), $key, $type, 'last value is not accounted for');
 
         return new ArrayType([$key => $type]);
     }
