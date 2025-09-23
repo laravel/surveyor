@@ -91,8 +91,10 @@ class Debug
     {
         if (self::$dump) {
             $trace = debug_backtrace(limit: 1);
+            $marker = $trace[0]['file'].':'.$trace[0]['line'];
 
-            array_push($args, $trace[0]['file'].':'.$trace[0]['line']);
+            array_unshift($args, 'DEBUG START: '.$marker);
+            array_push($args, 'DEBUG END: '.$marker);
 
             $command = match (self::$ide) {
                 default => self::$ide.' --goto --reuse-window '.$trace[0]['file'].':'.$trace[0]['line'],
