@@ -11,6 +11,8 @@ class VariableState
 
     protected ?string $references = null;
 
+    protected bool $byRef = false;
+
     public function __construct(
         protected Type $type,
         protected int $startLine,
@@ -39,6 +41,13 @@ class VariableState
             $node->getEndLine(),
             $node->getEndTokenPos(),
         );
+    }
+
+    public function byRef(bool $byRef = true): self
+    {
+        $this->byRef = $byRef;
+
+        return $this;
     }
 
     public function addReference(string $referenceVar): void

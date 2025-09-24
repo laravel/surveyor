@@ -29,6 +29,10 @@ class StateTrackerItem
     {
         $variableState = VariableState::fromNode($type, $node);
 
+        if (property_exists($node, 'byRef')) {
+            $variableState->byRef($node->byRef);
+        }
+
         $this->updateSnapshotOrVariable($name, $variableState);
 
         return $variableState;
