@@ -17,6 +17,28 @@ class ArrayType extends AbstractType implements Contracts\Type
         return collect($this->value)->keys();
     }
 
+    public function keyType(): Contracts\Type
+    {
+        $types = array_keys($this->value);
+
+        if (count($types) === 0) {
+            return Type::union(Type::string(), Type::int());
+        }
+
+        return Type::union(...$types);
+    }
+
+    public function valueType(): Contracts\Type
+    {
+        $types = array_values($this->value);
+
+        if (count($types) === 0) {
+            return Type::mixed();
+        }
+
+        return Type::union(...$types);
+    }
+
     public function isMoreSpecificThan(Contracts\Type $type): bool
     {
         return $type instanceof ArrayShapeType && $this->value !== [];
