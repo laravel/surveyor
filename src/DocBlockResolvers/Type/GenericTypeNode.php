@@ -6,7 +6,11 @@ use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\DocBlockResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\ArrayShapeType;
 use Laravel\Surveyor\Types\ClassType;
+use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
+use Laravel\Surveyor\Types\IntersectionType;
+use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
+use Laravel\Surveyor\Types\UnionType;
 use PHPStan\PhpDocParser\Ast;
 
 class GenericTypeNode extends AbstractResolver
@@ -15,6 +19,7 @@ class GenericTypeNode extends AbstractResolver
     {
         $genericTypes = collect($node->genericTypes)
             ->map(fn ($type) => $this->from($type))
+            ->map(fn ($type) => $this->resolveGeneric($type))
             ->all();
 
         switch ($node->type->name) {
@@ -27,7 +32,7 @@ class GenericTypeNode extends AbstractResolver
             case 'list':
                 return Type::arrayShape(Type::int(), Type::union(...$genericTypes));
             case 'class-string':
-                return Type::union(...array_map(fn ($t) => Type::from($this->scope->getUse($t->value)), $genericTypes));
+                return Type::union(...array_map(fn ($t) => $this->resolveClassStringType($t), $genericTypes));
             case 'array-key':
                 return Type::union(...$genericTypes);
             case 'object':
@@ -37,6 +42,30 @@ class GenericTypeNode extends AbstractResolver
             default:
                 return $this->handleUnknownType($node);
         }
+    }
+
+    protected function resolveGeneric(TypeContract $type)
+    {
+        if (! $type instanceof StringType) {
+            return $type;
+        }
+
+        foreach ($this->scope->getTemplateTags() as $templateTag) {
+            if ($templateTag->name === $type->value) {
+                return $templateTag->bound;
+            }
+        }
+
+        return $type;
+    }
+
+    protected function resolveClassStringType(TypeContract $type)
+    {
+        if (Type::is($type, IntersectionType::class, UnionType::class)) {
+            return Type::intersection(...array_map(fn ($t) => $this->resolveClassStringType($t), $type->types));
+        }
+
+        return new ClassType($this->scope->getUse($type->value));
     }
 
     protected function handleIterableType(Ast\Type\GenericTypeNode $node, array $genericTypes)

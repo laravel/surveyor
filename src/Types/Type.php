@@ -170,6 +170,8 @@ class Type
         }
 
         Debug::ddAndOpen(Debug::trace(), $value, 'something else from');
+
+        return self::string($value);
     }
 
     protected static function flattenUnion(array $args): Collection

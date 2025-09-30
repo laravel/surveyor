@@ -4,6 +4,7 @@ namespace Laravel\Surveyor\Reflector;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Application;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Analyzer\Analyzer;
 use Laravel\Surveyor\Debug\Debug;
@@ -54,6 +55,8 @@ class Reflector
         }
 
         if ($reflection->getDocComment()) {
+            $templateTags = $this->docBlockParser->parseTemplateTags($reflection->getDocComment());
+
             array_push(
                 $returnTypes,
                 ...($this->docBlockParser->parseReturn($reflection->getDocComment(), $node) ?? []),
@@ -77,6 +80,34 @@ class Reflector
             });
 
             return [Type::array($arr->all())];
+        }
+
+        if ($name === 'app') {
+            if (count($node->getArgs()) === 0) {
+                return [new ClassType(Application::class)];
+            }
+
+            $firstArg = $node->getArgs()[0];
+
+            if ($firstArg->value instanceof Node\Scalar\String_) {
+                if (app()->getBindings()[$firstArg->value->value] ?? null) {
+                    return app()->getBindings()[$firstArg->value->value]->getConcrete();
+                }
+            }
+
+            dump(
+                app(NodeResolver::class)->from(
+                    $firstArg->value,
+                    $this->scope,
+                ),
+            );
+
+            return [
+                app(NodeResolver::class)->from(
+                    $firstArg->value,
+                    $this->scope,
+                ),
+            ];
         }
 
         return null;
@@ -169,16 +200,6 @@ class Reflector
                 ...$this->methodReturnType(Builder::class, $method, $node),
             );
         }
-
-        // if (method_exists($classType->value, $node->name->name)) {
-        //     // We couldn't figure it out...
-        //     return RangerType::mixed();
-        // }
-
-        // if (! method_exists($classType->value, 'hasMacro') || ! $classType->value::hasMacro($node->name->name)) {
-        //     // If the method doesn't exist and the class doesn't have macros, we can't do anything
-        //     return RangerType::mixed();
-        // }
 
         if (count($returnTypes) > 0) {
             return $returnTypes;

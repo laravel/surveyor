@@ -39,6 +39,11 @@ class ClassType extends AbstractType implements Contracts\Type
 
     public function resolved(): string
     {
+        if (! class_exists($this->value) && ! interface_exists($this->value)) {
+            // TODO: This *shouldn't* happen, but it does. Need to figure out why.
+            return $this->value;
+        }
+
         $reflection = new ReflectionClass($this->value);
 
         if ($reflection->isSubclassOf(Facade::class)) {
