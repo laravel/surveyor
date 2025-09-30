@@ -58,7 +58,15 @@ class Scope
 
     public function path(): ?string
     {
-        return $this->path ?? null;
+        if (isset($this->path)) {
+            return str_replace($_ENV['HOME'], '~', $this->path);
+        }
+
+        if ($this->parent) {
+            return $this->parent->path();
+        }
+
+        return null;
     }
 
     public function addConstant(string $constant, Type $type): void
@@ -259,7 +267,7 @@ class Scope
     public function startConditionAnalysis($quiet = false): void
     {
         if (! $quiet) {
-            Debug::log('🟢 Starting condition analysis', level: 2);
+            Debug::log('🟢 Starting condition analysis: '.$this->path(), level: 2);
         }
 
         $this->analyzingCondition = true;
@@ -268,7 +276,7 @@ class Scope
     public function endConditionAnalysis($quiet = false): void
     {
         if (! $quiet) {
-            Debug::log('🔴 Ending condition analysis', level: 2);
+            Debug::log('🔴 Ending condition analysis: '.$this->path(), level: 2);
         }
 
         $this->analyzingCondition = false;
@@ -276,7 +284,11 @@ class Scope
 
     public function pauseConditionAnalysis(): void
     {
-        Debug::log('🟡 Pausing condition analysis', level: 2);
+        if ($this->analyzingConditionPaused || ! $this->analyzingCondition) {
+            return;
+        }
+
+        Debug::log('🟡 Pausing condition analysis: '.$this->path(), level: 2);
 
         $this->analyzingConditionPaused = true;
         $this->endConditionAnalysis(true);
@@ -284,7 +296,11 @@ class Scope
 
     public function resumeConditionAnalysis(): void
     {
-        Debug::log('🟠 Resuming condition analysis', level: 2);
+        if (! $this->analyzingConditionPaused) {
+            return;
+        }
+
+        Debug::log('🟠 Resuming condition analysis: '.$this->path(), level: 2);
 
         $this->analyzingConditionPaused = false;
         $this->startConditionAnalysis(true);
@@ -307,7 +323,15 @@ class Scope
 
     public function getTemplateTags(): array
     {
-        return $this->templateTags;
+        if (count($this->templateTags) > 0) {
+            return $this->templateTags;
+        }
+
+        if ($this->parent) {
+            return $this->parent->getTemplateTags();
+        }
+
+        return [];
     }
 
     public function getTemplateTag(string $name): ?TemplateTagType
