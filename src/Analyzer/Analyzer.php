@@ -20,7 +20,7 @@ class Analyzer
     public function analyze(string $path)
     {
         if ($path === '') {
-            Debug::log('⚠️  No path provided to analyze.');
+            Debug::log('⚠️ No path provided to analyze.');
 
             return $this;
         }
