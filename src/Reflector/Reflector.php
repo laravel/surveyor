@@ -108,7 +108,6 @@ class Reflector
         }
 
         if ($name === 'get_class_vars') {
-
             $result = app(NodeResolver::class)->from(
                 $node->getArgs()[0]->value,
                 $this->scope,
@@ -138,51 +137,49 @@ class Reflector
     {
         $reflection = $this->reflectClass($class);
 
-        if (! $reflection->hasProperty($name)) {
-            if ($reflection->getDocComment()) {
-                $result = $this->docBlockParser->parseProperties($reflection->getDocComment());
+        if ($reflection->hasProperty($name)) {
+            $propertyReflection = $reflection->getProperty($name);
+
+            if ($propertyReflection->getDocComment()) {
+                $result = $this->docBlockParser->parseVar($propertyReflection->getDocComment());
+
+                if ($result) {
+                    return $result;
+                }
+            }
+
+            if ($propertyReflection->hasType()) {
+                return $this->returnType($propertyReflection->getType());
+            }
+        }
+
+        $reflections = [$reflection, ...$reflection->getTraits()];
+        $current = $reflection;
+
+        while ($current->getParentClass()) {
+            $reflections[] = $current->getParentClass();
+            $current = $current->getParentClass();
+        }
+
+        foreach ($reflections as $ref) {
+            if ($ref->getDocComment()) {
+                $result = $this->docBlockParser->parseProperties($ref->getDocComment());
 
                 if (array_key_exists($name, $result)) {
                     return $result[$name];
                 }
             }
-
-            foreach ($reflection->getTraits() as $trait) {
-                if (! $trait->getDocComment()) {
-                    continue;
-                }
-
-                $result = $this->docBlockParser->parseProperties($trait->getDocComment());
-
-                if (array_key_exists($name, $result)) {
-                    return $result[$name];
-                }
-            }
-
-            if ($reflection->isSubclassOf(Model::class) && $reflection->hasMethod($name)) {
-                return Type::union(...$this->methodReturnType($class, $name));
-            }
-
-            if ($reflection->getName() === 'BackedEnum' && $name === 'value') {
-                return Type::union(Type::string(), Type::int());
-            }
-
-            dd('property doesnt exist', $name, $class, $reflection, $node);
         }
 
-        $propertyReflection = $reflection->getProperty($name);
-
-        if ($propertyReflection->getDocComment()) {
-            $result = $this->docBlockParser->parseVar($propertyReflection->getDocComment());
-
-            if ($result) {
-                return $result;
-            }
+        if ($reflection->isSubclassOf(Model::class) && $reflection->hasMethod($name)) {
+            return Type::union(...$this->methodReturnType($class, $name));
         }
 
-        if ($propertyReflection->hasType()) {
-            return $this->returnType($propertyReflection->getType());
+        if ($reflection->getName() === 'BackedEnum' && $name === 'value') {
+            return Type::union(Type::string(), Type::int());
         }
+
+        Debug::ddAndOpen($node, $reflection, $reflections, Debug::trace(), $name, $class, 'property doesnt exist');
 
         return null;
     }
@@ -222,6 +219,13 @@ class Reflector
                 $returnTypes[] = $this->returnType($methodReflection->getReturnType());
             }
 
+            if ($methodReflection->getDocComment()) {
+                array_push(
+                    $returnTypes,
+                    ...$this->parseDocBlock($methodReflection->getDocComment()),
+                );
+            }
+
             array_push(
                 $returnTypes,
                 ...$this->parseDocBlock($methodReflection->getDocComment(), $node)
@@ -241,6 +245,8 @@ class Reflector
                 ...$this->methodReturnType(Builder::class, $method, $node),
             );
         }
+
+        Debug::ddIfInterested($returnTypes, $class, $method);
 
         if (count($returnTypes) > 0) {
             return $returnTypes;
