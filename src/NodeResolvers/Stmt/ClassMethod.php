@@ -2,7 +2,6 @@
 
 namespace Laravel\Surveyor\NodeResolvers\Stmt;
 
-use Laravel\Surveyor\Analysis\ReturnTypeAnalyzer;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use PhpParser\Node;
@@ -33,16 +32,4 @@ class ClassMethod extends AbstractResolver
     {
         return $this->scope->parent();
     }
-
-    // protected function getAllReturnTypes(Node\Stmt\ClassMethod $node)
-    // {
-    //     $analyzer = new ReturnTypeAnalyzer(
-    //         $this->resolver,
-    //         $this->docBlockParser,
-    //         $this->reflector,
-    //         $this->scope,
-    //     );
-
-    //     return $analyzer->analyze($node, $this->scope);
-    // }
 }
