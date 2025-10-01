@@ -2,13 +2,14 @@
 
 namespace Laravel\Surveyor\Analyzer;
 
+use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Parser\Parser;
 use Laravel\Surveyor\Resolvers\NodeResolver;
 
 class Analyzer
 {
-    protected array $analyzed = [];
+    protected Scope $analyzed;
 
     public function __construct(
         protected Parser $parser,
@@ -37,19 +38,17 @@ class Analyzer
             return $this;
         }
 
-        if (AnalyzedCache::isInProgress($path)) {
-            Debug::log("🔄 Analysis in progress: {$shortPath}");
-
-            return;
-        }
-
-        AnalyzedCache::inProgress($path);
-
         Debug::log("🧠 Analyzing: {$shortPath}");
 
-        $this->analyzed = $this->parser->parse(file_get_contents($path), $path);
+        $analyzed = $this->parser->parse(file_get_contents($path), $path);
 
-        AnalyzedCache::add($path, $this->analyzed);
+        foreach ($analyzed as $result) {
+            if ($result->fullPath() === $path) {
+                $this->analyzed = $result;
+            }
+
+            AnalyzedCache::add($result->fullPath(), $result);
+        }
 
         Debug::removePath($path);
 
