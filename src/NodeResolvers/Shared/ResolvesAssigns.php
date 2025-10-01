@@ -35,8 +35,9 @@ trait ResolvesAssigns
         $pendingDocBlock = $this->scope->getPendingDocBlock();
 
         if ($pendingDocBlock && $result = $this->docBlockParser->parseVar($pendingDocBlock)) {
-            return $result;
+            return $this->scope->state()->add($node->var, $result);
         }
+
         if ($node->var instanceof Node\Expr\ArrayDimFetch) {
             return $this->resolveForDimFetch($node);
         }

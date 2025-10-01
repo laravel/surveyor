@@ -19,7 +19,7 @@ class FuncCall extends AbstractResolver
             $type = $this->scope->state()->getAtLine($node->name)?->type();
 
             if ($type === null) {
-                Debug::ddAndOpen($node, $this->scope->state(), 'no type for func call');
+                Debug::ddAndOpen($node, 'no type for func call');
             }
 
             if (! $type instanceof Types\CallableType) {
