@@ -146,14 +146,17 @@ class StateTracker
 
     public function canHandle(NodeAbstract $node): bool
     {
+        if ($node instanceof Node\Expr\FuncCall) {
+            return $node->name instanceof Node\Expr\Variable || $node->name instanceof Node\Expr\PropertyFetch;
+        }
+
         return $node instanceof Node\Expr\Variable ||
             $node instanceof Node\StaticVar ||
             $node instanceof Node\Arg ||
             $node instanceof Node\Param ||
             $node instanceof Node\Expr\PropertyFetch ||
             $node instanceof Node\PropertyItem ||
-            $node instanceof Node\Expr\StaticPropertyFetch ||
-            $node instanceof Node\Expr\FuncCall;
+            $node instanceof Node\Expr\StaticPropertyFetch;
     }
 
     /**

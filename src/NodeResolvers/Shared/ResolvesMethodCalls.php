@@ -20,7 +20,7 @@ trait ResolvesMethodCalls
 
         $methodName = $this->from($node->name);
 
-        if (! Type::is($methodName, StringType::class)) {
+        if (! Type::is($methodName, StringType::class) || $methodName->value === null) {
             return Type::mixed();
         }
 

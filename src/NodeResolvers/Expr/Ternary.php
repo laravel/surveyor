@@ -28,8 +28,13 @@ class Ternary extends AbstractResolver
                     ->whenFalse(fn ($_, TypeContract $type) => $type->nullable(true));
             }
 
-            $this->scope->state()->add($result->node, $result->apply(), $node->if);
-            $this->scope->state()->add($result->node, $result->toggle()->apply(), $node->else);
+            if ($this->scope->state()->canHandle($node->if)) {
+                $this->scope->state()->add($node->if, $result->apply());
+            }
+
+            if ($this->scope->state()->canHandle($node->else)) {
+                $this->scope->state()->add($node->else, $result->toggle()->apply());
+            }
         }
 
         return Type::union($this->from($node->if), $this->from($node->else));
