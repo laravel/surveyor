@@ -4,6 +4,7 @@ namespace Laravel\Surveyor\NodeResolvers\Expr;
 
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\ClassType;
+use Laravel\Surveyor\Types\Contracts\MultiType;
 use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
 use Laravel\Surveyor\Types\UnionType;
@@ -14,7 +15,7 @@ class StaticCall extends AbstractResolver
     public function resolve(Node\Expr\StaticCall $node)
     {
         $class = $this->from($node->class);
-        $method = $node->name->toString();
+        $method = $node->name instanceof Node\Identifier ? $node->name->name : $this->from($node->name);
 
         if ($class instanceof UnionType) {
             $class = $this->resolveUnion($class);
@@ -26,6 +27,19 @@ class StaticCall extends AbstractResolver
             }
 
             return Type::mixed();
+        }
+
+        if ($method instanceof MultiType) {
+            $returnTypes = [];
+
+            foreach ($method->types as $type) {
+                $returnTypes = array_merge(
+                    $returnTypes,
+                    $this->reflector->methodReturnType($class, $type->value, $node),
+                );
+            }
+
+            return Type::union(...$returnTypes);
         }
 
         $returnTypes = $this->reflector->methodReturnType($class, $method, $node);
