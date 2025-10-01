@@ -33,9 +33,8 @@ class Unset_ extends AbstractResolver
                 }
             }
 
-            if ($dim->value === null) {
+            if (! property_exists($dim, 'value') || $dim->value === null) {
                 // Couldn't figure out the dim, so we can't unset the array key
-                // TODO: May need to circle back on this
                 continue;
             }
 
