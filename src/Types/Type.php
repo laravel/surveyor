@@ -188,7 +188,7 @@ class Type
     {
         $args = self::flattenUnion($args)
             ->filter()
-            ->unique(fn ($type) => $type->toString())
+            ->unique(fn ($type) => is_string($type) ? dd($type) : $type->toString())
             ->values();
 
         $nullType = $args->filter(fn ($type) => $type instanceof NullType);

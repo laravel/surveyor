@@ -25,7 +25,7 @@ class ArrayType extends AbstractType implements Contracts\Type
             return Type::union(Type::string(), Type::int());
         }
 
-        return Type::union(...$types);
+        return Type::union(...array_map(fn ($type) => Type::from($type), $types));
     }
 
     public function valueType(): Contracts\Type
