@@ -21,15 +21,15 @@ class Assign extends AbstractResolver
     {
         $this->fromOutsideOfCondition($node);
 
-        if ($node->var instanceof Node\Expr\Variable) {
-            $result = $this->from($node->expr);
+        if (
+            $node->var instanceof Node\Expr\Variable
+            || $node->var instanceof Node\Expr\PropertyFetch
+            || $node->var instanceof Node\Expr\StaticPropertyFetch
+        ) {
+            $result = $this->from($node->expr) ?? $this->fromOutsideOfCondition($node->expr);
 
             if ($result === null) {
-                $result = $this->fromOutsideOfCondition($node->expr);
-
-                if ($result === null) {
-                    return null;
-                }
+                return null;
             }
 
             return new Condition($node->var, $result);
