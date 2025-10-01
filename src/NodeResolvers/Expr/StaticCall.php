@@ -22,11 +22,7 @@ class StaticCall extends AbstractResolver
         }
 
         if ($class instanceof StringType) {
-            if ($class->value === null) {
-                return null;
-            }
-
-            return Type::mixed();
+            return ($class->value === null) ? null : Type::mixed();
         }
 
         if ($method instanceof MultiType) {
