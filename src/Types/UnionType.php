@@ -4,7 +4,7 @@ namespace Laravel\Surveyor\Types;
 
 use Illuminate\Support\Collection;
 
-class UnionType extends AbstractType implements Contracts\CollapsibleType, Contracts\Type
+class UnionType extends AbstractType implements Contracts\CollapsibleType, Contracts\MultiType, Contracts\Type
 {
     public function __construct(public readonly array $types = [])
     {

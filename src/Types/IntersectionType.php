@@ -2,7 +2,7 @@
 
 namespace Laravel\Surveyor\Types;
 
-class IntersectionType extends AbstractType implements Contracts\Type
+class IntersectionType extends AbstractType implements Contracts\MultiType, Contracts\Type
 {
     public function __construct(public readonly array $types = [])
     {
