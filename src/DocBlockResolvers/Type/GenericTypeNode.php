@@ -25,8 +25,12 @@ class GenericTypeNode extends AbstractResolver
         switch ($node->type->name) {
             case 'array':
             case 'non-empty-array':
-                // TODO: Deal with template tags
                 $baseType = array_shift($genericTypes);
+
+                if ($baseType === null) {
+                    // TODO: Circle back to this
+                    $baseType = Type::mixed();
+                }
 
                 return Type::arrayShape($baseType, Type::union(...$genericTypes));
             case 'list':
@@ -104,6 +108,6 @@ class GenericTypeNode extends AbstractResolver
             return null;
         }
 
-        Debug::ddAndOpen($type, $node, 'unknown generic type');
+        Debug::ddAndOpen($node, 'unknown generic type');
     }
 }
