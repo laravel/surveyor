@@ -179,6 +179,10 @@ class Reflector
 
         $constantValue = $reflection->getConstant($constant);
 
+        if ($reflection->isEnum()) {
+            return Type::from($constantValue->value);
+        }
+
         return Type::from($constantValue);
     }
 
