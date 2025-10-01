@@ -29,7 +29,12 @@ class NodeResolver
         if ($scope->isAnalyzingCondition()) {
             // TODO: Is this right? Might not be
             $newScope = $scope;
-            $resolved = $resolver->resolveForCondition($node);
+
+            if (method_exists($resolver, 'resolveForCondition')) {
+                $resolved = $resolver->resolveForCondition($node);
+            } else {
+                $resolved = null;
+            }
         } else {
             $newScope = $resolver->scope() ?? $scope;
             $resolver->setScope($newScope);

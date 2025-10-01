@@ -22,7 +22,17 @@ class Assign extends AbstractResolver
         $this->fromOutsideOfCondition($node);
 
         if ($node->var instanceof Node\Expr\Variable) {
-            return new Condition($node->var, $this->from($node->expr));
+            $result = $this->from($node->expr);
+
+            if ($result === null) {
+                $result = $this->fromOutsideOfCondition($node->expr);
+
+                if ($result === null) {
+                    return null;
+                }
+            }
+
+            return new Condition($node->var, $result);
         }
 
         if ($node->var instanceof Node\Expr\ArrayDimFetch) {

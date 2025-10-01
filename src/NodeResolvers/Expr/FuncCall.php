@@ -23,7 +23,7 @@ class FuncCall extends AbstractResolver
             }
 
             if (! $type instanceof Types\CallableType) {
-                Debug::ddAndOpen($type, $node, $this->scope->state(), 'non-callable variable for func call');
+                return Type::mixed();
             }
 
             return $type->returnType;

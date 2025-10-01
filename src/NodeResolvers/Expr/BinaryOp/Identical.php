@@ -57,6 +57,10 @@ class Identical extends AbstractResolver
             Debug::ddAndOpen($other[0], $node, 'type is null?');
         }
 
+        if ($type instanceof VariableState) {
+            return new Condition($variable, $type->type());
+        }
+
         return new Condition($variable, $type);
     }
 }

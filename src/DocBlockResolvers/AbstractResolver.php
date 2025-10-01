@@ -5,6 +5,7 @@ namespace Laravel\Surveyor\DocBlockResolvers;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Parser\DocBlockParser;
+use Laravel\Surveyor\Reflector\Reflector;
 use Laravel\Surveyor\Resolvers\DocBlockResolver;
 use Laravel\Surveyor\Resolvers\NodeResolver;
 use PhpParser\Node\Expr\CallLike;
@@ -20,6 +21,7 @@ abstract class AbstractResolver
         protected ?CallLike $referenceNode,
         protected Scope $scope,
         protected NodeResolver $nodeResolver,
+        protected Reflector $reflector,
     ) {
         //
     }

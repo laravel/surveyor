@@ -163,7 +163,7 @@ class Type
                 return $result;
             }
 
-            if (method_exists(self::class, $value)) {
+            if (method_exists(self::class, $value) && $value !== 'from') {
                 return self::$value();
             }
 

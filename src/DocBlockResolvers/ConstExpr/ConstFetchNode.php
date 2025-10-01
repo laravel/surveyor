@@ -2,7 +2,6 @@
 
 namespace Laravel\Surveyor\DocBlockResolvers\ConstExpr;
 
-use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\DocBlockResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\Type;
 use PHPStan\PhpDocParser\Ast;
@@ -23,10 +22,8 @@ class ConstFetchNode extends AbstractResolver
             return $this->scope->getConstant($node->name);
         }
 
-        Debug::ddAndOpen($node, ' got here in doc const fetch node');
+        $className = $this->scope->getUse($node->className);
 
-        // $fqn = $this->scope->getUse($node->className);
-
-        // return $this->reflector->constantType($node->name->name, $fqn, $node);
+        return $this->reflector->constantType($node->name, $className);
     }
 }

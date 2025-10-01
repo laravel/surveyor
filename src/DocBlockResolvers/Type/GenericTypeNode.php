@@ -44,8 +44,12 @@ class GenericTypeNode extends AbstractResolver
         }
     }
 
-    protected function resolveGeneric(TypeContract $type)
+    protected function resolveGeneric(?TypeContract $type)
     {
+        if ($type === null) {
+            return Type::mixed();
+        }
+
         if (! $type instanceof StringType) {
             return $type;
         }
@@ -97,7 +101,7 @@ class GenericTypeNode extends AbstractResolver
                 return $type;
             }
 
-            Debug::ddAndOpen($type, $node, 'unknown type');
+            return null;
         }
 
         Debug::ddAndOpen($type, $node, 'unknown generic type');
