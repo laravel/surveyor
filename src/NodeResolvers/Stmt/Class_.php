@@ -4,6 +4,7 @@ namespace Laravel\Surveyor\NodeResolvers\Stmt;
 
 use Laravel\Surveyor\Analysis\EntityType;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
+use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
 use ReflectionClass;
 
@@ -14,22 +15,20 @@ class Class_ extends AbstractResolver
         $this->scope->setEntityName($node->namespacedName->name);
         $this->scope->setEntityType(EntityType::CLASS_TYPE);
 
+        $this->parseImplements($node);
+
         return null;
     }
 
-    protected function getAllProperties(Node\Stmt\Class_ $node)
+    protected function parseImplements(Node\Stmt\Class_ $node)
     {
-        return array_map(fn ($node) => $this->from($node), $node->getProperties());
-    }
+        foreach ($node->implements as $interface) {
+            $reflection = $this->reflector->reflectClass($interface->toString());
 
-    protected function getAllMethods(Node\Stmt\Class_ $node)
-    {
-        return array_map(fn ($node) => $this->from($node), $node->getMethods());
-    }
-
-    protected function getAllConstants(Node\Stmt\Class_ $node)
-    {
-        return array_map(fn ($node) => $this->from($node), $node->getConstants());
+            foreach ($reflection->getConstants() as $key => $value) {
+                $this->scope->addConstant($key, Type::from($value));
+            }
+        }
     }
 
     protected function getAllExtends(Node\Stmt\Class_ $node)

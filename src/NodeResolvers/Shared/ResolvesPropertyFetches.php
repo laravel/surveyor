@@ -4,6 +4,7 @@ namespace Laravel\Surveyor\NodeResolvers\Shared;
 
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\MultiType;
+use Laravel\Surveyor\Types\MixedType;
 use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
 use Laravel\Surveyor\Types\UnionType;
@@ -30,7 +31,7 @@ trait ResolvesPropertyFetches
             return Type::mixed();
         }
 
-        if ($node->name instanceof Node\Expr\Variable) {
+        if ($node->name instanceof Node\Expr\Variable || $node->name instanceof Node\VarLikeIdentifier) {
             $result = $this->from($node->name);
 
             if (! Type::is($result, StringType::class) || $result->value === null) {
@@ -48,6 +49,10 @@ trait ResolvesPropertyFetches
                     fn ($t) => $this->reflector->propertyType($t->value, $type, $node),
                     $nameType->types,
                 ));
+            }
+
+            if ($nameType instanceof MixedType) {
+                return $nameType;
             }
 
             return $this->reflector->propertyType($nameType->value, $type, $node);

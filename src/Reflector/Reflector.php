@@ -168,16 +168,19 @@ class Reflector
         if ($reflection->hasProperty($name)) {
             $propertyReflection = $reflection->getProperty($name);
 
-            if ($propertyReflection->getDocComment()) {
-                $result = $this->docBlockParser->parseVar($propertyReflection->getDocComment());
-
-                if ($result) {
-                    return $result;
-                }
+            if (
+                $propertyReflection->getDocComment()
+                && $result = $this->docBlockParser->parseVar($propertyReflection->getDocComment())
+            ) {
+                return $result;
             }
 
             if ($propertyReflection->hasType()) {
                 return $this->returnType($propertyReflection->getType());
+            }
+
+            if ($propertyReflection->isStatic() && $propertyReflection->hasDefaultValue()) {
+                return Type::from($propertyReflection->getValue());
             }
         }
 
@@ -379,7 +382,7 @@ class Reflector
         return $result?->toArray() ?? [];
     }
 
-    protected function reflectClass(ClassType|string $class): ReflectionClass
+    public function reflectClass(ClassType|string $class): ReflectionClass
     {
         $className = $class instanceof ClassType ? $class->value : $class;
 

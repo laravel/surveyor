@@ -4,6 +4,7 @@ namespace Laravel\Surveyor\Types;
 
 use Illuminate\Support\Collection;
 use Laravel\Surveyor\Debug\Debug;
+use Laravel\Surveyor\Result\VariableState;
 use Laravel\Surveyor\Support\Util;
 use Laravel\Surveyor\Types\Contracts\CollapsibleType;
 use Throwable;
@@ -201,7 +202,11 @@ class Type
     {
         $args = self::flattenUnion($args)
             ->filter()
-            ->unique(fn ($type) => is_string($type) ? dd($type) : $type->toString())
+            ->map(fn ($type) => match (true) {
+                $type instanceof VariableState => $type->type(),
+                default => $type,
+            })
+            ->unique(fn ($type) => $type->toString())
             ->values();
 
         $nullType = $args->filter(fn ($type) => $type instanceof NullType);

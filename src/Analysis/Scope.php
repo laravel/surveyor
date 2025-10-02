@@ -100,7 +100,8 @@ class Scope
                 return $this->parent->getConstant($constant);
             }
 
-            throw new Exception('Constant '.$constant.' not found');
+            Debug::ddAndOpen($this, $constant, 'constant not found');
+            // throw new Exception('Constant '.$constant.' not found');
         }
 
         return $this->constants[$constant] ?? throw new Exception('Constant '.$constant.' not found');

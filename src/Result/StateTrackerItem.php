@@ -6,6 +6,7 @@ use Illuminate\Support\Arr;
 use InvalidArgumentException;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Support\ShimmedNode;
+use Laravel\Surveyor\Types\ArrayShapeType;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
@@ -220,6 +221,10 @@ class StateTrackerItem
 
         if ($lastValue->type() instanceof ArrayType) {
             return new ArrayType(array_merge($lastValue->type()->value, $newArray));
+        }
+
+        if ($lastValue->type() instanceof ArrayShapeType) {
+            return $lastValue->type()->keyType;
         }
 
         if ($lastValue->type() instanceof UnionType) {
