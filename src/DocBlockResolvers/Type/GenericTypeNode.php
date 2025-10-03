@@ -25,6 +25,7 @@ class GenericTypeNode extends AbstractResolver
         switch ($node->type->name) {
             case 'array':
             case 'non-empty-array':
+            case 'non-empty-list':
                 $baseType = array_shift($genericTypes);
 
                 if ($baseType === null) {

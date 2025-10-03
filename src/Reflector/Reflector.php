@@ -46,6 +46,10 @@ class Reflector
 
     public function functionReturnType(string $name, ?Node $node = null): array
     {
+        if (! function_exists($name)) {
+            return [Type::mixed()];
+        }
+
         $returnTypes = [];
         $reflection = new ReflectionFunction($name);
 
@@ -60,7 +64,7 @@ class Reflector
         }
 
         if ($reflection->getDocComment()) {
-            $templateTags = $this->docBlockParser->parseTemplateTags($reflection->getDocComment());
+            $this->docBlockParser->parseTemplateTags($reflection->getDocComment());
 
             array_push(
                 $returnTypes,
