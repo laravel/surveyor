@@ -25,6 +25,10 @@ class Debug
 
     protected static $paths = [];
 
+    protected static $tracking = [];
+
+    protected static $count = [];
+
     public static function log($message, $data = null, $level = 1)
     {
         if (self::$logLevel < $level) {
@@ -48,6 +52,17 @@ class Debug
         info($indent.'> '.$backtrace[1]['class'].':'.($backtrace[1]['line'] ?? 0).PHP_EOL.$indent.$formattedMessage);
     }
 
+    public static function count(string $key)
+    {
+        self::$count[$key] ??= 0;
+        self::$count[$key]++;
+    }
+
+    public static function getCounts()
+    {
+        return self::$count;
+    }
+
     public static function addPath(string $path)
     {
         self::$paths[$path] = 0;
@@ -57,6 +72,21 @@ class Debug
     public static function removePath(string $path)
     {
         unset(self::$paths[$path]);
+    }
+
+    public static function track(string $key, mixed $value, int $keep = 1)
+    {
+        self::$tracking[$key] ??= [];
+        self::$tracking[$key][] = $value;
+
+        if (count(self::$tracking[$key]) > $keep) {
+            array_shift(self::$tracking[$key]);
+        }
+    }
+
+    public static function getTracked()
+    {
+        return self::$tracking;
     }
 
     protected static function activePath()
