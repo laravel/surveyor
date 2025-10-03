@@ -42,6 +42,12 @@ trait ResolvesAssigns
             return $this->resolveForDimFetch($node);
         }
 
+        if ($node->var instanceof Node\Expr\Variable && $node->var->name instanceof Node\Expr\Variable) {
+            // The ol' double dollar ($$key)
+            // TODO: Deal with this later
+            return;
+        }
+
         if ($node->var instanceof Node\Expr\List_) {
             $result = [];
             $expr = $this->from($node->expr);
