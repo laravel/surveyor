@@ -252,9 +252,7 @@ class StateTrackerItem
             return Type::int();
         }
 
-        Debug::ddAndOpen($lastValue->type(), $key, $type, 'last array key type value is not accounted for');
-
-        return new ArrayType($newArray);
+        return Type::mixed();
     }
 
     public function getAtLine(string $name, NodeAbstract $node): ?VariableState

@@ -88,7 +88,7 @@ trait ResolvesAssigns
         $result = $this->from($node->expr);
 
         if ($result === null) {
-            dd($node);
+            return Type::mixed();
         }
 
         if ($result instanceof VariableState) {

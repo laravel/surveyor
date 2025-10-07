@@ -8,6 +8,7 @@ use Laravel\Surveyor\Result\StateTracker;
 use Laravel\Surveyor\Support\Util;
 use Laravel\Surveyor\Types\Contracts\Type;
 use Laravel\Surveyor\Types\TemplateTagType;
+use Laravel\Surveyor\Types\Type as SurveyorType;
 use PhpParser\Comment\Doc;
 
 class Scope
@@ -100,8 +101,11 @@ class Scope
                 return $this->parent->getConstant($constant);
             }
 
-            Debug::ddAndOpen($this, $constant, 'constant not found');
-            // throw new Exception('Constant '.$constant.' not found');
+            if (str_ends_with($constant, '*')) {
+                return SurveyorType::mixed();
+            }
+
+            return SurveyorType::mixed();
         }
 
         return $this->constants[$constant] ?? throw new Exception('Constant '.$constant.' not found');

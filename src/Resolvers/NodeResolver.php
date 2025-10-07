@@ -6,6 +6,7 @@ use Illuminate\Container\Container;
 use InvalidArgumentException;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Debug\Debug;
+use Laravel\Surveyor\Types\Type;
 use PhpParser\NodeAbstract;
 
 class NodeResolver
@@ -26,19 +27,23 @@ class NodeResolver
 
         $resolver->setScope($scope);
 
-        if ($scope->isAnalyzingCondition()) {
-            // TODO: Is this right? Might not be
-            $newScope = $scope;
+        try {
+            if ($scope->isAnalyzingCondition()) {
+                // TODO: Is this right? Might not be
+                $newScope = $scope;
 
-            if (method_exists($resolver, 'resolveForCondition')) {
-                $resolved = $resolver->resolveForCondition($node);
+                if (method_exists($resolver, 'resolveForCondition')) {
+                    $resolved = $resolver->resolveForCondition($node);
+                } else {
+                    $resolved = null;
+                }
             } else {
-                $resolved = null;
+                $newScope = $resolver->scope() ?? $scope;
+                $resolver->setScope($newScope);
+                $resolved = $resolver->resolve($node);
             }
-        } else {
-            $newScope = $resolver->scope() ?? $scope;
-            $resolver->setScope($newScope);
-            $resolved = $resolver->resolve($node);
+        } catch (\Throwable $th) {
+            return [Type::mixed(), $newScope];
         }
 
         return [$resolved, $newScope];
