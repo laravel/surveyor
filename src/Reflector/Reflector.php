@@ -33,16 +33,17 @@ class Reflector
 {
     protected Scope $scope;
 
-    public function __construct(
-        protected DocBlockParser $docBlockParser,
-    ) {
-        //
+    protected DocBlockParser $docBlockParser;
+
+    protected function docBlockParser()
+    {
+        return $this->docBlockParser ??= app(DocBlockParser::class);
     }
 
     public function setScope(Scope $scope)
     {
         $this->scope = $scope;
-        $this->docBlockParser->setScope($scope);
+        $this->docBlockParser()->setScope($scope);
     }
 
     public function functionReturnType(string $name, ?Node $node = null): array
@@ -65,11 +66,11 @@ class Reflector
         }
 
         if ($reflection->getDocComment()) {
-            $this->docBlockParser->parseTemplateTags($reflection->getDocComment());
+            $this->docBlockParser()->parseTemplateTags($reflection->getDocComment());
 
             array_push(
                 $returnTypes,
-                ...($this->docBlockParser->parseReturn($reflection->getDocComment(), $node) ?? []),
+                ...($this->docBlockParser()->parseReturn($reflection->getDocComment(), $node) ?? []),
             );
         }
 
@@ -175,7 +176,7 @@ class Reflector
 
             if (
                 $propertyReflection->getDocComment()
-                && $result = $this->docBlockParser->parseVar($propertyReflection->getDocComment())
+                && $result = $this->docBlockParser()->parseVar($propertyReflection->getDocComment())
             ) {
                 return $result;
             }
@@ -199,7 +200,7 @@ class Reflector
 
         foreach ($reflections as $ref) {
             if ($ref->getDocComment()) {
-                $result = $this->docBlockParser->parseProperties($ref->getDocComment());
+                $result = $this->docBlockParser()->parseProperties($ref->getDocComment());
 
                 if (array_key_exists($name, $result)) {
                     return $result[$name];
@@ -366,7 +367,7 @@ class Reflector
         $methodReflection = $reflection->getMethod($methodName);
 
         if ($docBlock = $methodReflection->getDocComment()) {
-            $result = $this->docBlockParser->parseParam($docBlock, $node->var->name);
+            $result = $this->docBlockParser()->parseParam($docBlock, $node->var->name);
 
             if ($result) {
                 return $result;
@@ -382,7 +383,7 @@ class Reflector
             return [];
         }
 
-        $result = $this->docBlockParser->parseReturn($docBlock, $node);
+        $result = $this->docBlockParser()->parseReturn($docBlock, $node);
 
         return $result?->toArray() ?? [];
     }
