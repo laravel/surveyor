@@ -24,6 +24,6 @@ class CallableType extends AbstractType
 
     public function id(): string
     {
-        return collect($this->parameters)->toJson();
+        return json_encode($this->parameters);
     }
 }

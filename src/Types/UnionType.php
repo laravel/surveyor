@@ -63,6 +63,6 @@ class UnionType extends AbstractType implements Contracts\CollapsibleType, Contr
 
     public function id(): string
     {
-        return collect($this->types)->toJson();
+        return json_encode($this->types);
     }
 }
