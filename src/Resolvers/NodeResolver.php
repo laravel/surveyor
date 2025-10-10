@@ -3,16 +3,23 @@
 namespace Laravel\Surveyor\Resolvers;
 
 use Illuminate\Container\Container;
-use InvalidArgumentException;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Debug\Debug;
+use Laravel\Surveyor\Parser\DocBlockParser;
+use Laravel\Surveyor\Reflector\Reflector;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\NodeAbstract;
 
 class NodeResolver
 {
+    protected array $resolved = [];
+
+    protected array $resolvers = [];
+
     public function __construct(
         protected Container $app,
+        protected DocBlockParser $docBlockParser,
+        protected Reflector $reflector,
     ) {
         //
     }
@@ -23,7 +30,8 @@ class NodeResolver
 
         Debug::log('🧐 Resolving Node: '.$className.' '.$node->getStartLine(), level: 3);
 
-        $resolver = $this->app->make($className);
+        // Clone cached resolver to avoid state conflicts during recursive calls
+        $resolver = new $className($this, $this->docBlockParser, $this->reflector);
 
         $resolver->setScope($scope);
 
@@ -42,7 +50,7 @@ class NodeResolver
                 $resolver->setScope($newScope);
                 $resolved = $resolver->resolve($node);
             }
-        } catch (\Throwable $th) {
+        } catch (\Throwable $e) {
             return [Type::mixed(), $newScope];
         }
 
@@ -53,9 +61,10 @@ class NodeResolver
     {
         $className = $this->getClassName($node);
 
-        $resolver = $this->app->make($className);
-        $resolver->setScope($scope);
+        // Clone cached resolver to avoid state conflicts during recursive calls
+        $resolver = new $className($this, $this->docBlockParser, $this->reflector);
 
+        $resolver->setScope($scope);
         $resolver->onExit($node);
 
         return $resolver->exitScope();
@@ -68,12 +77,20 @@ class NodeResolver
 
     protected function getClassName(NodeAbstract $node)
     {
-        $className = str(get_class($node))->after('Node\\')->prepend('Laravel\\Surveyor\\NodeResolvers\\')->toString();
+        return $this->resolved[get_class($node)] ??= $this->resolveClass($node);
 
-        if (! class_exists($className)) {
-            throw new InvalidArgumentException("NodeResolver: Class {$className} does not exist");
-        }
+        // if (! class_exists($className)) {
+        //     throw new InvalidArgumentException("NodeResolver: Class {$className} does not exist");
+        // }
 
-        return $className;
+        // return $className;
+    }
+
+    protected function resolveClass(NodeAbstract $node)
+    {
+        return str(get_class($node))
+            ->after('Node\\')
+            ->prepend('Laravel\\Surveyor\\NodeResolvers\\')
+            ->toString();
     }
 }
