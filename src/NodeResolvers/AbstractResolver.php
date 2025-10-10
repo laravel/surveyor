@@ -39,7 +39,7 @@ abstract class AbstractResolver
 
     protected function from(NodeAbstract $node)
     {
-        Debug::log('🔍 Resolving Node: '.$node->getType(), level: 3);
+        Debug::log('🔍 Analyzing Node: '.$node->getType(), level: 3);
 
         return $this->resolver->from($node, $this->scope);
     }
