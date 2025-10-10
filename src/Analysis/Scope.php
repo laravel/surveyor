@@ -3,6 +3,7 @@
 namespace Laravel\Surveyor\Analysis;
 
 use Exception;
+use Illuminate\Support\Arr;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Result\StateTracker;
 use Laravel\Surveyor\Support\Util;
@@ -280,7 +281,7 @@ class Scope
 
     public function methodScope(string $methodName): Scope
     {
-        return array_find(
+        return Arr::first(
             $this->children,
             fn ($child) => $child->methodName() === $methodName,
         );
@@ -358,7 +359,7 @@ class Scope
 
     public function getTemplateTag(string $name): ?TemplateTagType
     {
-        return array_find(
+        return Arr::first(
             $this->templateTags,
             fn ($tag) => $tag->name === $name,
         );

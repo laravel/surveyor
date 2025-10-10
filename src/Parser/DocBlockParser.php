@@ -2,6 +2,7 @@
 
 namespace Laravel\Surveyor\Parser;
 
+use Illuminate\Support\Arr;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Resolvers\DocBlockResolver;
 use Laravel\Surveyor\Types\Type;
@@ -84,7 +85,7 @@ class DocBlockParser
 
         $this->parseTemplateTags($docBlock);
 
-        $value = array_find(
+        $value = Arr::first(
             $paramTags,
             fn ($tag) => ltrim($tag->parameterName, '$') === ltrim($name, '$')
         );

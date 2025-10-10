@@ -2,6 +2,7 @@
 
 namespace Laravel\Surveyor\DocBlockResolvers\Type;
 
+use Illuminate\Support\Arr;
 use Laravel\Surveyor\DocBlockResolvers\AbstractResolver;
 use Laravel\Surveyor\Resolvers\NodeResolver;
 use Laravel\Surveyor\Types\GenericObjectType;
@@ -49,7 +50,7 @@ class ConditionalTypeForParameterNode extends AbstractResolver
 
         $paramName = ltrim($node->parameterName, '$');
 
-        $arg = array_find(
+        $arg = Arr::first(
             $this->referenceNode->getArgs(),
             fn ($arg) => $arg->name?->name === $paramName,
         );

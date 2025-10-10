@@ -17,10 +17,10 @@ class GenericTypeNode extends AbstractResolver
 {
     public function resolve(Ast\Type\GenericTypeNode $node)
     {
-        $genericTypes = collect($node->genericTypes)
-            ->map(fn ($type) => $this->from($type))
-            ->map(fn ($type) => $this->resolveGeneric($type))
-            ->all();
+        $genericTypes = array_map(
+            fn ($type) => $this->resolveGeneric($this->from($type)),
+            $node->genericTypes,
+        );
 
         switch ($node->type->name) {
             case 'array':
