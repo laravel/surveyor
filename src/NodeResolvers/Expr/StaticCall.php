@@ -3,6 +3,7 @@
 namespace Laravel\Surveyor\NodeResolvers\Expr;
 
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
+use Laravel\Surveyor\Support\Util;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\MultiType;
 use Laravel\Surveyor\Types\StringType;
@@ -56,7 +57,7 @@ class StaticCall extends AbstractResolver
             }
 
             if ($type instanceof StringType) {
-                if (class_exists($type->value)) {
+                if (Util::isClassOrInterface($type->value)) {
                     return new ClassType($type->value);
                 }
 

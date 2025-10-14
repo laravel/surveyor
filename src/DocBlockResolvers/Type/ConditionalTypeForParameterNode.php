@@ -5,6 +5,7 @@ namespace Laravel\Surveyor\DocBlockResolvers\Type;
 use Illuminate\Support\Arr;
 use Laravel\Surveyor\Concerns\LazilyLoadsDependencies;
 use Laravel\Surveyor\DocBlockResolvers\AbstractResolver;
+use Laravel\Surveyor\Support\Util;
 use Laravel\Surveyor\Types\Type;
 use PHPStan\PhpDocParser\Ast;
 
@@ -20,7 +21,7 @@ class ConditionalTypeForParameterNode extends AbstractResolver
 
         $targetType = $this->from($node->targetType);
 
-        if ($targetType === 'class-string' && class_exists($argType)) {
+        if ($targetType === 'class-string' && Util::isClassOrInterface($argType)) {
             return $node->negated ? $this->from($node->else) : $this->from($node->if);
         }
 

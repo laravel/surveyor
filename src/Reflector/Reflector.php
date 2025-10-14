@@ -35,6 +35,8 @@ class Reflector
 
     protected array $appBindings;
 
+    protected array $reflectedClasses = [];
+
     public function setScope(Scope $scope)
     {
         $this->scope = $scope;
@@ -389,6 +391,10 @@ class Reflector
     {
         $className = $class instanceof ClassType ? $class->value : $class;
 
+        if (isset($this->reflectedClasses[$className])) {
+            return $this->reflectedClasses[$className];
+        }
+
         if (! Util::isClassOrInterface($className)) {
             $className = $this->scope->getUse($className);
         }
@@ -403,6 +409,8 @@ class Reflector
         if (! Util::isClassOrInterface($className)) {
             Debug::ddAndOpen($className, Debug::trace(), 'class does not exist');
         }
+
+        $this->reflectedClasses[$className] = new ReflectionClass($className);
 
         return new ReflectionClass($className);
     }

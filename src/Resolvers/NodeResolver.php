@@ -79,12 +79,6 @@ class NodeResolver
     protected function getClassName(NodeAbstract $node)
     {
         return $this->resolved[get_class($node)] ??= $this->resolveClass($node);
-
-        // if (! class_exists($className)) {
-        //     throw new InvalidArgumentException("NodeResolver: Class {$className} does not exist");
-        // }
-
-        // return $className;
     }
 
     protected function resolveClass(NodeAbstract $node)

@@ -2,9 +2,7 @@
 
 namespace Laravel\Surveyor\Types;
 
-use Illuminate\Support\Facades\Facade;
 use Laravel\Surveyor\Support\Util;
-use ReflectionClass;
 
 class ClassType extends AbstractType implements Contracts\Type
 {
@@ -33,29 +31,9 @@ class ClassType extends AbstractType implements Contracts\Type
         return $this;
     }
 
-    public function isInterface(): bool
-    {
-        return (new ReflectionClass($this->value))->isInterface();
-    }
-
     public function resolved(): string
     {
-        if (! Util::isClassOrInterface($this->value)) {
-            // TODO: This *shouldn't* happen, but it does. Need to figure out why.
-            return $this->value;
-        }
-
-        $reflection = new ReflectionClass($this->value);
-
-        if ($reflection->isSubclassOf(Facade::class)) {
-            return ltrim(get_class($this->value::getFacadeRoot()), '\\');
-        }
-
-        // if (app()->getBindings()[$this->value] ?? null) {
-        //     return app()->getBindings()[$this->value]->getConcrete();
-        // }
-
-        return $this->value;
+        return Util::resolveClass($this->value);
     }
 
     public function id(): string
