@@ -32,6 +32,6 @@ class Analyze extends Command
             }
         }
 
-        dd($result, Debug::getCounts(), Debug::getTimings());
+        dd(Debug::getCounts(), Debug::getTimings());
     }
 }
