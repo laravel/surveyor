@@ -30,10 +30,11 @@ class NodeResolver
 
         Debug::log('🧐 Resolving Node: '.$className.' '.$node->getStartLine(), level: 3);
 
-        // Clone cached resolver to avoid state conflicts during recursive calls
-        $resolver = new $className($this, $this->docBlockParser, $this->reflector);
+        $this->resolvers[$className] ??= new $className($this, $this->docBlockParser, $this->reflector);
 
-        $resolver->setScope($scope);
+        $this->resolvers[$className]->setScope($scope);
+
+        $resolver = $this->resolvers[$className];
 
         try {
             if ($scope->isAnalyzingCondition()) {

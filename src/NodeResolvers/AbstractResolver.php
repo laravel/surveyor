@@ -25,6 +25,7 @@ abstract class AbstractResolver
     {
         $this->scope = $scope;
         $this->reflector->setScope($scope);
+        $this->docBlockParser->setScope($scope);
     }
 
     public function onExit(NodeAbstract $node)
@@ -47,7 +48,7 @@ abstract class AbstractResolver
     protected function fromOutsideOfCondition(NodeAbstract $node)
     {
         $this->scope->pauseConditionAnalysis();
-        $result = $this->from($node);
+        $result = $this->resolve($node);
         $this->scope->resumeConditionAnalysis();
 
         return $result;
