@@ -9,11 +9,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Application;
 use Laravel\Surveyor\Analysis\Scope;
-use Laravel\Surveyor\Analyzer\Analyzer;
+use Laravel\Surveyor\Concerns\LazilyLoadsDependencies;
 use Laravel\Surveyor\Debug\Debug;
-use Laravel\Surveyor\Parser\DocBlockParser;
 use Laravel\Surveyor\Parser\Parser;
-use Laravel\Surveyor\Resolvers\NodeResolver;
 use Laravel\Surveyor\Support\Util;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
@@ -31,19 +29,16 @@ use Throwable;
 
 class Reflector
 {
+    use LazilyLoadsDependencies;
+
     protected Scope $scope;
 
-    protected DocBlockParser $docBlockParser;
-
-    protected function docBlockParser()
-    {
-        return $this->docBlockParser ??= app(DocBlockParser::class);
-    }
+    protected array $appBindings;
 
     public function setScope(Scope $scope)
     {
         $this->scope = $scope;
-        $this->docBlockParser()->setScope($scope);
+        $this->getDocBlockParser()->setScope($scope);
     }
 
     public function functionReturnType(string $name, ?Node $node = null): array
@@ -66,11 +61,11 @@ class Reflector
         }
 
         if ($reflection->getDocComment()) {
-            $this->docBlockParser()->parseTemplateTags($reflection->getDocComment());
+            $this->getDocBlockParser()->parseTemplateTags($reflection->getDocComment());
 
             array_push(
                 $returnTypes,
-                ...$this->docBlockParser()->parseReturn($reflection->getDocComment(), $node),
+                ...$this->getDocBlockParser()->parseReturn($reflection->getDocComment(), $node),
             );
         }
 
@@ -103,13 +98,13 @@ class Reflector
             $firstArg = $node->getArgs()[0];
 
             if ($firstArg->value instanceof Node\Scalar\String_) {
-                if (app()->getBindings()[$firstArg->value->value] ?? null) {
-                    return app()->getBindings()[$firstArg->value->value]->getConcrete();
+                if ($this->getAppBinding($firstArg->value->value)) {
+                    return $this->getAppBinding($firstArg->value->value)->getConcrete();
                 }
             }
 
             return [
-                app(NodeResolver::class)->from(
+                $this->getNodeResolver()->from(
                     $firstArg->value,
                     $this->scope,
                 ),
@@ -117,7 +112,7 @@ class Reflector
         }
 
         if ($name === 'get_class_vars') {
-            $result = app(NodeResolver::class)->from(
+            $result = $this->getNodeResolver()->from(
                 $node->getArgs()[0]->value,
                 $this->scope,
             );
@@ -176,7 +171,7 @@ class Reflector
 
             if (
                 $propertyReflection->getDocComment()
-                && $result = $this->docBlockParser()->parseVar($propertyReflection->getDocComment())
+                && $result = $this->getDocBlockParser()->parseVar($propertyReflection->getDocComment())
             ) {
                 return $result;
             }
@@ -200,7 +195,7 @@ class Reflector
 
         foreach ($reflections as $ref) {
             if ($ref->getDocComment()) {
-                $result = $this->docBlockParser()->parseProperties($ref->getDocComment());
+                $result = $this->getDocBlockParser()->parseProperties($ref->getDocComment());
 
                 if (array_key_exists($name, $result)) {
                     return $result[$name];
@@ -244,7 +239,7 @@ class Reflector
         $reflection = $this->reflectClass($class);
 
         if ($this->scope->entityName() !== $reflection->getName()) {
-            $analyzed = app(Analyzer::class)->analyze($reflection->getFileName());
+            $analyzed = $this->getAnalyzer()->analyze($reflection->getFileName());
             $scope = $analyzed->analyzed();
 
             if ($scope) {
@@ -301,12 +296,12 @@ class Reflector
         $macros = $reflectionProperty->getValue($reflection);
 
         $funcReflection = new ReflectionFunction($macros[$node->name->name]);
-        $parser = app(Parser::class);
+        $parser = $this->getParser();
 
         // TODO: We're parsing twice here, fix this
         $parsed = $parser->parse($funcReflection, $funcReflection->getFilename());
 
-        $analyzed = app(Analyzer::class)->analyze($funcReflection->getFilename());
+        $analyzed = $this->getAnalyzer()->analyze($funcReflection->getFilename());
 
         $funcNode = $parser->nodeFinder()->findFirst(
             $parsed,
@@ -321,7 +316,7 @@ class Reflector
 
         $methodName = end($methodNodes)->name->name;
 
-        $result = app(NodeResolver::class)->from(
+        $result = $this->getNodeResolver()->from(
             $funcNode,
             $analyzed->scope()->methodScope($methodName),
         );
@@ -371,7 +366,7 @@ class Reflector
         $methodReflection = $reflection->getMethod($methodName);
 
         if ($docBlock = $methodReflection->getDocComment()) {
-            $result = $this->docBlockParser()->parseParam($docBlock, $node->var->name);
+            $result = $this->getDocBlockParser()->parseParam($docBlock, $node->var->name);
 
             if ($result) {
                 return $result;
@@ -387,7 +382,7 @@ class Reflector
             return [];
         }
 
-        return $this->docBlockParser()->parseReturn($docBlock, $node);
+        return $this->getDocBlockParser()->parseReturn($docBlock, $node);
     }
 
     public function reflectClass(ClassType|string $class): ReflectionClass
@@ -419,5 +414,12 @@ class Reflector
         } catch (Throwable $e) {
             return false;
         }
+    }
+
+    protected function getAppBinding($key)
+    {
+        $this->appBindings ??= app()->getBindings();
+
+        return $this->appBindings[$key] ?? null;
     }
 }

@@ -3,33 +3,22 @@
 namespace Laravel\Surveyor\DocBlockResolvers\Type;
 
 use Illuminate\Support\Arr;
+use Laravel\Surveyor\Concerns\LazilyLoadsDependencies;
 use Laravel\Surveyor\DocBlockResolvers\AbstractResolver;
-use Laravel\Surveyor\Resolvers\NodeResolver;
-use Laravel\Surveyor\Types\GenericObjectType;
 use Laravel\Surveyor\Types\Type;
 use PHPStan\PhpDocParser\Ast;
 
 class ConditionalTypeForParameterNode extends AbstractResolver
 {
+    use LazilyLoadsDependencies;
+
     public function resolve(Ast\Type\ConditionalTypeForParameterNode $node)
     {
         $arg = $this->getArgForConditional($node);
 
-        $argType = $arg ? app(NodeResolver::class)->from($arg->value, $this->scope) : Type::null();
+        $argType = $arg ? $this->getNodeResolver()->from($arg->value, $this->scope) : Type::null();
 
         $targetType = $this->from($node->targetType);
-
-        if ($targetType instanceof GenericObjectType) {
-            if ($targetType->base === 'class-string') {
-                $returnTypeTarget = $node->negated ? $this->from($node->else) : $this->from($node->if);
-
-                foreach ($targetType->types as $genericType) {
-                    if (Type::isSame($returnTypeTarget, $genericType)) {
-                        return $argType;
-                    }
-                }
-            }
-        }
 
         if ($targetType === 'class-string' && class_exists($argType)) {
             return $node->negated ? $this->from($node->else) : $this->from($node->if);

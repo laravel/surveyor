@@ -29,6 +29,27 @@ class Debug
 
     protected static $count = [];
 
+    protected static $currentlyTiming = [];
+
+    protected static $timings = [];
+
+    public static function startTiming(string $label)
+    {
+        self::$currentlyTiming[$label] = microtime(true);
+    }
+
+    public static function stopTiming(string $label)
+    {
+        self::$timings[$label] ??= [];
+        self::$timings[$label][] = microtime(true) - self::$currentlyTiming[$label];
+        unset(self::$currentlyTiming[$label]);
+    }
+
+    public static function getTimings()
+    {
+        return self::$timings;
+    }
+
     public static function log($message, $data = null, $level = 1)
     {
         if (self::$logLevel < $level) {

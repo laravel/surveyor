@@ -2,7 +2,7 @@
 
 namespace Laravel\Surveyor\NodeResolvers\Expr;
 
-use Laravel\Surveyor\Analyzer\Analyzer;
+use Laravel\Surveyor\Concerns\LazilyLoadsDependencies;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
@@ -10,6 +10,8 @@ use PhpParser\Node;
 
 class Include_ extends AbstractResolver
 {
+    use LazilyLoadsDependencies;
+
     public function resolve(Node\Expr\Include_ $node)
     {
         $result = $this->from($node->expr);
@@ -22,7 +24,7 @@ class Include_ extends AbstractResolver
             return Type::mixed();
         }
 
-        $analyzer = app(Analyzer::class)->analyze($result->value);
+        $analyzer = $this->getAnalyzer()->analyze($result->value);
         $types = array_map(fn ($return) => $return['type'], $analyzer->analyzed()->returnTypes());
 
         return Type::union(...$types);
