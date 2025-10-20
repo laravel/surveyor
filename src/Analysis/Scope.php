@@ -44,6 +44,12 @@ class Scope
 
     protected $pendingDocBlock = null;
 
+    protected array $extends = [];
+
+    protected array $implements = [];
+
+    protected array $parameters = [];
+
     /**
      * @var PHPStan\PhpDocParser\Ast\PhpDoc\TemplateTagValueNode[]
      */
@@ -54,9 +60,44 @@ class Scope
         $this->stateTracker = new StateTracker;
     }
 
+    public function extends(): array
+    {
+        return $this->extends;
+    }
+
+    public function implements(): array
+    {
+        return $this->implements;
+    }
+
+    public function traits(): array
+    {
+        return $this->traits;
+    }
+
+    public function addExtend(string $extend): void
+    {
+        $this->extends[] = $extend;
+    }
+
+    public function addImplement(string $implement): void
+    {
+        $this->implements[] = $implement;
+    }
+
     public function setPath(string $path): void
     {
         $this->path = $path;
+    }
+
+    public function entityType(): ?EntityType
+    {
+        return $this->entityType;
+    }
+
+    public function constants(): array
+    {
+        return $this->constants;
     }
 
     public function fullPath(): ?string
@@ -217,9 +258,24 @@ class Scope
         $this->traits[] = $trait;
     }
 
+    public function addParameter(string $name, Type $type): void
+    {
+        $this->parameters[$name] = $type;
+    }
+
+    public function parameters(): array
+    {
+        return $this->parameters;
+    }
+
     public function addUse(string $use, ?string $alias = null): void
     {
         $this->uses[$alias ?? $use] = $use;
+    }
+
+    public function uses(): array
+    {
+        return $this->uses;
     }
 
     public function getUse(string $candidate): string

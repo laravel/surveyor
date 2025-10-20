@@ -6,7 +6,6 @@ use Laravel\Surveyor\Analysis\EntityType;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
-use ReflectionClass;
 
 class Class_ extends AbstractResolver
 {
@@ -16,6 +15,7 @@ class Class_ extends AbstractResolver
         $this->scope->setEntityType(EntityType::CLASS_TYPE);
 
         $this->parseImplements($node);
+        $this->parseExtends($node);
 
         return null;
     }
@@ -23,6 +23,8 @@ class Class_ extends AbstractResolver
     protected function parseImplements(Node\Stmt\Class_ $node)
     {
         foreach ($node->implements as $interface) {
+            $this->scope->addImplement($interface->toString());
+
             $reflection = $this->reflector->reflectClass($interface->toString());
 
             foreach ($reflection->getConstants() as $key => $value) {
@@ -31,25 +33,25 @@ class Class_ extends AbstractResolver
         }
     }
 
-    protected function getAllExtends(Node\Stmt\Class_ $node)
+    protected function parseExtends(Node\Stmt\Class_ $node)
     {
         if (! $node->extends) {
-            return [];
+            return;
         }
 
         $extends = [$node->extends->toString()];
-        $extendsClass = $node->extends->toString();
+        $extendsClass = $this->reflector->reflectClass($node->extends->toString());
 
         do {
-            $reflection = new ReflectionClass($extendsClass);
-
-            $extendsClass = $reflection->getParentClass();
+            $extendsClass = $extendsClass->getParentClass();
 
             if ($extendsClass) {
                 $extends[] = $extendsClass->getName();
             }
         } while ($extendsClass);
 
-        return $extends;
+        foreach ($extends as $extend) {
+            $this->scope->addExtend($extend);
+        }
     }
 }

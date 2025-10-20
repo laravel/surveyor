@@ -2,7 +2,9 @@
 
 namespace Laravel\Surveyor\Analyzer;
 
+use Laravel\Surveyor\Analysis\EntityType;
 use Laravel\Surveyor\Analysis\Scope;
+use Laravel\Surveyor\Analyzed\ClassResult;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Parser\Parser;
 use Laravel\Surveyor\Resolvers\NodeResolver;
@@ -63,8 +65,22 @@ class Analyzer
         return $this;
     }
 
-    public function analyzed()
+    public function analyzed(): ?Scope
     {
-        return $this->analyzed ?? [];
+        return $this->analyzed ?? null;
+    }
+
+    public function result()
+    {
+        switch ($this->analyzed->entityType()) {
+            case EntityType::CLASS_TYPE:
+                return ClassResult::fromScope($this->analyzed);
+                // case EntityType::METHOD_TYPE:
+                //     return new MethodResult($this->analyzed);
+                // case EntityType::PROPERTY_TYPE:
+                //     return new PropertyResult($this->analyzed);
+                // case EntityType::CONSTANT_TYPE:
+                //     return new ConstantResult($this->analyzed);
+        }
     }
 }
