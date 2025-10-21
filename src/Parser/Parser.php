@@ -56,7 +56,6 @@ class Parser
         string|ReflectionClass|ReflectionFunction|ReflectionMethod|SplFileInfo $code,
         string $path,
     ): array {
-        // try {
         $code = match (true) {
             is_string($code) => $code,
             $code instanceof SplFileInfo => file_get_contents($code->getPathname()),
@@ -66,13 +65,6 @@ class Parser
         $this->typeResolver->newScope($path);
 
         return $this->nodeTraverser->traverse($this->parser->parse($code));
-        // } catch (Throwable $e) {
-        //     // Debug::log("Error parsing code: {$e->getMessage()}", [
-        //     //     'code' => $code,
-        //     // ]);
-
-        //     return [];
-        // }
     }
 
     public function nodeFinder()
