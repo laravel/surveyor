@@ -35,7 +35,7 @@ class Reflector
 
     protected array $appBindings;
 
-    protected array $reflectedClasses = [];
+    protected array $cached = [];
 
     public function setScope(Scope $scope)
     {
@@ -391,7 +391,7 @@ class Reflector
     {
         $className = $class instanceof ClassType ? $class->value : $class;
 
-        return $this->reflectedClasses[$className] ??= $this->resolveReflectedClass($className);
+        return $this->cached[$className] ??= $this->resolveReflectedClass($className);
     }
 
     protected function resolveReflectedClass(string $className): ReflectionClass

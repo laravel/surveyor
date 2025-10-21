@@ -30,7 +30,7 @@ class DocBlockParser
 
     protected Scope $scope;
 
-    protected array $parseCache = [];
+    protected array $cached = [];
 
     public function __construct(
         protected DocBlockResolver $typeResolver,
@@ -159,14 +159,14 @@ class DocBlockParser
 
     protected function parse(string $docBlock): PhpDocNode
     {
-        if (isset($this->parseCache[$docBlock])) {
-            return $this->parseCache[$docBlock];
+        if (isset($this->cached[$docBlock])) {
+            return $this->cached[$docBlock];
         }
 
         $tokens = new TokenIterator($this->lexer->tokenize($docBlock));
         $this->parsed = $this->phpDocParser->parse($tokens);
 
-        $this->parseCache[$docBlock] = $this->parsed;
+        $this->cached[$docBlock] = $this->parsed;
 
         return $this->parsed;
     }
