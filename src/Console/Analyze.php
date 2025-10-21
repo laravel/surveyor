@@ -33,6 +33,7 @@ class Analyze extends Command
         }
 
         dd([
+            'results' => $result,
             'counts' => Debug::getCounts(),
             'timings' => Debug::getTimings(),
             'tracked' => Debug::getTracked(),
