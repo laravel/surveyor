@@ -2,9 +2,6 @@
 
 namespace Laravel\Surveyor\Analyzed;
 
-use Laravel\Surveyor\Analysis\EntityType;
-use Laravel\Surveyor\Analysis\Scope;
-
 class ClassResult
 {
     /** @var array<string, PropertyResult> */
@@ -36,52 +33,7 @@ class ClassResult
 
     public function addMethod(MethodResult $method): void
     {
-        $this->methods[$method->name] = $method;
-    }
-
-    /**
-     * @param  array<Scope>  $children
-     */
-    protected static function mapMethods(array $children): array
-    {
-        $results = [];
-
-        foreach ($children as $child) {
-            if ($child->entityType() === EntityType::METHOD_TYPE) {
-                $results[$child->methodName()] = MethodResult::fromScope($child);
-            }
-        }
-
-        return $results;
-    }
-
-    protected static function mapConstants(array $constants): array
-    {
-        $results = [];
-
-        foreach ($constants as $name => $constant) {
-            $results[$name] = new ConstantResult(
-                name: $name,
-                type: $constant,
-            );
-        }
-
-        return $results;
-    }
-
-    protected static function mapProperties(array $properties): array
-    {
-        $results = [];
-
-        foreach ($properties as $name => $propertyStates) {
-            $results[$name] = new PropertyResult(
-                name: $name,
-                type: $propertyStates[0]->type(),
-                fromDocBlock: $propertyStates[0]->isFromDocBlock(),
-            );
-        }
-
-        return $results;
+        $this->methods[$method->name()] = $method;
     }
 
     public function extends(...$extends): array|bool

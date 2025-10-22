@@ -5,6 +5,7 @@ namespace Laravel\Surveyor\Analysis;
 use Exception;
 use Illuminate\Support\Arr;
 use Laravel\Surveyor\Analyzed\ClassResult;
+use Laravel\Surveyor\Analyzed\MethodResult;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Result\StateTracker;
 use Laravel\Surveyor\Support\Util;
@@ -21,7 +22,7 @@ class Scope
 
     protected StateTracker $stateTracker;
 
-    protected ?ClassResult $result = null;
+    protected ClassResult|MethodResult|null $result = null;
 
     protected array $uses = [];
 
@@ -61,12 +62,12 @@ class Scope
         $this->stateTracker = new StateTracker;
     }
 
-    public function attachResult(ClassResult $result): void
+    public function attachResult(ClassResult|MethodResult $result): void
     {
         $this->result = $result;
     }
 
-    public function result(): ?ClassResult
+    public function result(): ClassResult|MethodResult|null
     {
         return $this->result;
     }

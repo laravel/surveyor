@@ -3,7 +3,6 @@
 namespace Laravel\Surveyor\Types;
 
 use Illuminate\Support\Collection;
-use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Result\VariableState;
 use Laravel\Surveyor\Support\Util;
 use Laravel\Surveyor\Types\Contracts\CollapsibleType;
@@ -184,7 +183,9 @@ class Type
             return self::string($value);
         }
 
-        Debug::ddAndOpen(Debug::trace(), $value, 'something else from');
+        if (! is_string($value)) {
+            return self::mixed();
+        }
 
         return self::string($value);
     }

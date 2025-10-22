@@ -2,27 +2,31 @@
 
 namespace Laravel\Surveyor\Analyzed;
 
-use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Type;
 
 class MethodResult
 {
+    /** @var array<string, TypeContract> */
+    protected array $parameters = [];
+
+    /** @var array<array{type: TypeContract, lineNumber: int}> */
+    protected array $returnTypes = [];
+
     public function __construct(
-        public readonly string $name,
-        public readonly array $parameters,
-        public readonly array $returnTypes,
+        protected readonly string $name,
     ) {
         //
     }
 
-    public static function fromScope(Scope $scope): self
+    public function name(): string
     {
-        return new static(
-            name: $scope->methodName(),
-            parameters: $scope->parameters(),
-            returnTypes: self::mapReturnTypes($scope->returnTypes()),
-        );
+        return $this->name;
+    }
+
+    public function parameters(): array
+    {
+        return $this->parameters;
     }
 
     public function returnType(): TypeContract
@@ -30,17 +34,16 @@ class MethodResult
         return Type::union(...$this->returnTypes);
     }
 
-    /**
-     * @param  array<array{type: Type, lineNumber: int}>  $returnTypes
-     */
-    protected static function mapReturnTypes(array $returnTypes): array
+    public function addReturnType(TypeContract $type, int $lineNumber): void
     {
-        $results = [];
+        $this->returnTypes[] = [
+            'type' => $type,
+            'lineNumber' => $lineNumber,
+        ];
+    }
 
-        foreach ($returnTypes as $returnType) {
-            $results[] = $returnType['type'];
-        }
-
-        return $results;
+    public function addParameter(string $name, TypeContract $type): void
+    {
+        $this->parameters[$name] = $type;
     }
 }

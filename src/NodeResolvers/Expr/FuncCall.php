@@ -3,7 +3,6 @@
 namespace Laravel\Surveyor\NodeResolvers\Expr;
 
 use Laravel\Surveyor\Analysis\Condition;
-use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Types;
 use Laravel\Surveyor\Types\Type;
@@ -18,11 +17,7 @@ class FuncCall extends AbstractResolver
         if ($this->scope->state()->canHandle($node->name)) {
             $type = $this->scope->state()->getAtLine($node->name)?->type();
 
-            if ($type === null) {
-                Debug::ddAndOpen($node, 'no type for func call');
-            }
-
-            if (! $type instanceof Types\CallableType) {
+            if ($type === null || ! $type instanceof Types\CallableType) {
                 return Type::mixed();
             }
 

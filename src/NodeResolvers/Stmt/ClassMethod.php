@@ -15,6 +15,12 @@ class ClassMethod extends AbstractResolver
         $this->scope->setMethodName($node->name);
         $this->scope->setEntityType(EntityType::METHOD_TYPE);
 
+        $result = new MethodResult(
+            name: $this->scope->methodName(),
+        );
+
+        $this->scope->attachResult($result);
+
         if ($node->returnType) {
             $returnTypes = $this->from($node->returnType);
 
@@ -33,13 +39,17 @@ class ClassMethod extends AbstractResolver
 
     public function exitScope(): Scope
     {
-        $result = new MethodResult(
-            name: $this->scope->methodName(),
-            parameters: $this->scope->parameters(),
-            returnTypes: $this->scope->returnTypes(),
-        );
+        foreach ($this->scope->parameters() as $parameter) {
+            $this->scope->result()->addParameter($parameter->name, $parameter->type);
+        }
 
-        $this->scope->parent()->result()?->addMethod($result);
+        foreach ($this->scope->returnTypes() as $returnType) {
+            $this->scope->result()->addReturnType($returnType['type'], $returnType['lineNumber']);
+        }
+
+        $this->scope->parent()->result()->addMethod(
+            $this->scope->result(),
+        );
 
         return $this->scope->parent();
     }
