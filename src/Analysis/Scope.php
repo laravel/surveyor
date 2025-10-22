@@ -62,6 +62,10 @@ class Scope
 
     public function extends(): array
     {
+        if (empty($this->extends) && $this->parent) {
+            return $this->parent->extends();
+        }
+
         return $this->extends;
     }
 
