@@ -13,6 +13,7 @@ use Laravel\Surveyor\Concerns\LazilyLoadsDependencies;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Parser\Parser;
 use Laravel\Surveyor\Support\Util;
+use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Type;
@@ -76,6 +77,18 @@ class Reflector
 
     protected function tryKnownFunctions(string $name, ?CallLike $node = null): ?array
     {
+        if ($name === 'array_merge') {
+            $arr = collect($node->getArgs())->map(
+                fn ($arg) => $this->getNodeResolver()->from($arg->value, $this->scope),
+            )->filter(fn ($arg) => Type::is($arg, ArrayType::class))->flatMap(fn ($arg) => $arg->value);
+
+            // dump([collect($node->getArgs())->map(
+            //     fn($arg) => $this->getNodeResolver()->from($arg->value, $this->scope),
+            // )->all(), $arr->all(), $node->getArgs()]);
+
+            return [Type::array($arr->all())];
+        }
+
         if ($name === 'compact') {
             $arr = collect($node->getArgs())->flatMap(function ($arg) {
                 if ($arg->value instanceof Node\Scalar\String_) {
