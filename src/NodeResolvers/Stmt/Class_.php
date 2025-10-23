@@ -3,8 +3,8 @@
 namespace Laravel\Surveyor\NodeResolvers\Stmt;
 
 use Laravel\Surveyor\Analysis\EntityType;
-use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Analyzed\ClassResult;
+use Laravel\Surveyor\Analyzed\MethodResult;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
@@ -19,24 +19,6 @@ class Class_ extends AbstractResolver
         $this->parseImplements($node);
         $this->parseExtends($node);
 
-        if ($node->getDocComment()) {
-            $properties = $this->docBlockParser->parseProperties($node->getDocComment());
-
-            foreach ($properties as $name => $type) {
-                $this->scope->state()->addDocBlockProperty($name, $type);
-            }
-
-            // TODO: When I add this, we run out of memory. Would like to add this.
-            // $methods = $this->docBlockParser->parseMethods($node->getDocComment());
-
-            // foreach ($methods as $name => $type) {
-            //     $scope = $this->scope->newChildScope();
-            //     $scope->setMethodName($name);
-            //     $scope->setEntityType(EntityType::METHOD_TYPE);
-            //     $scope->addReturnType($type, 0);
-            // }
-        }
-
         $result = new ClassResult(
             name: $this->scope->entityName(),
             namespace: $this->scope->namespace(),
@@ -46,6 +28,37 @@ class Class_ extends AbstractResolver
         );
 
         $this->scope->attachResult($result);
+
+        if ($node->getDocComment()) {
+            $properties = $this->docBlockParser->parseProperties($node->getDocComment());
+
+            foreach ($properties as $name => $type) {
+                $this->scope->state()->addDocBlockProperty($name, $type);
+            }
+
+            $methods = $this->docBlockParser->parseMethods($node->getDocComment());
+
+            foreach ($methods as $name => $type) {
+                $scope = $this->scope->newChildScope();
+                $scope->setMethodName($name);
+                $scope->setEntityType(EntityType::METHOD_TYPE);
+                $scope->addReturnType($type, 0);
+
+                $methodResult = new MethodResult(
+                    name: $scope->methodName(),
+                );
+
+                foreach ($scope->parameters() as $parameter) {
+                    $methodResult->addParameter($parameter->name, $parameter->type);
+                }
+
+                foreach ($scope->returnTypes() as $returnType) {
+                    $methodResult->addReturnType($returnType['type'], $returnType['lineNumber']);
+                }
+
+                $result->addMethod($methodResult);
+            }
+        }
 
         return null;
     }
