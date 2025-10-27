@@ -15,7 +15,7 @@ class Param extends AbstractResolver
             $type = Type::arrayShape(Type::int(), $type);
         }
 
-        $this->scope->result()->addParameter($node->var->name, $type);
+        $this->scope->result()?->addParameter($node->var->name, $type);
 
         $this->scope->state()->add(
             $node,
