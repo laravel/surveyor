@@ -46,7 +46,7 @@ class StaticCall extends AbstractResolver
 
     public function resolveForCondition(Node\Expr\StaticCall $node)
     {
-        return $this->fromOutsideOfCondition($node);
+        return $this->resolve($node);
     }
 
     protected function resolveUnion(UnionType $union)

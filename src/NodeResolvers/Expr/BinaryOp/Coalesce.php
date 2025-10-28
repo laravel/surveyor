@@ -18,6 +18,6 @@ class Coalesce extends AbstractResolver
 
     public function resolveForCondition(Node\Expr\BinaryOp\Coalesce $node)
     {
-        return $this->fromOutsideOfCondition($node);
+        return $this->resolve($node);
     }
 }

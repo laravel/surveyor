@@ -34,7 +34,7 @@ class AssignRef extends AbstractResolver
 
     public function resolveForCondition(Node\Expr\AssignRef $node)
     {
-        $this->fromOutsideOfCondition($node);
+        $this->resolve($node);
 
         if ($node->var instanceof Node\Expr\Variable) {
             return new Condition($node->var, $this->from($node->expr));

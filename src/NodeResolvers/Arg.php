@@ -10,9 +10,4 @@ class Arg extends AbstractResolver
     {
         return null;
     }
-
-    public function resolveForCondition(Node\Arg $node)
-    {
-        return $this->fromOutsideOfCondition($node);
-    }
 }

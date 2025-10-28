@@ -33,6 +33,6 @@ class ArrayDimFetch extends AbstractResolver
 
     public function resolveForCondition(Node\Expr\ArrayDimFetch $node)
     {
-        return new Condition($node->var, $this->fromOutsideOfCondition($node));
+        return new Condition($node->var, $this->resolve($node));
     }
 }

@@ -42,6 +42,6 @@ class Ternary extends AbstractResolver
 
     public function resolveForCondition(Node\Expr\Ternary $node)
     {
-        return $this->fromOutsideOfCondition($node);
+        return $this->resolve($node);
     }
 }

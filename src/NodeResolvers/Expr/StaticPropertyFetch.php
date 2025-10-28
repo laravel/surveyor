@@ -17,6 +17,6 @@ class StaticPropertyFetch extends AbstractResolver
 
     public function resolveForCondition(Node\Expr\StaticPropertyFetch $node)
     {
-        return $this->fromOutsideOfCondition($node);
+        return $this->resolve($node);
     }
 }

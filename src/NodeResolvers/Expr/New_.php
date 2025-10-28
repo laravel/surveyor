@@ -30,6 +30,6 @@ class New_ extends AbstractResolver
 
     public function resolveForCondition(Node\Expr\New_ $node)
     {
-        return $this->fromOutsideOfCondition($node);
+        return $this->resolve($node);
     }
 }

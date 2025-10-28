@@ -19,7 +19,9 @@ class Assign extends AbstractResolver
 
     public function resolveForCondition(Node\Expr\Assign $node)
     {
-        $this->fromOutsideOfCondition($node);
+        $this->scope->analyzingConditionPaused(true);
+        $this->resolve($node);
+        $this->scope->analyzingConditionPaused(false);
 
         if (
             $node->var instanceof Node\Expr\Variable

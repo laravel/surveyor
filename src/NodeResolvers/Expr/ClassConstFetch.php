@@ -46,6 +46,6 @@ class ClassConstFetch extends AbstractResolver
 
     public function resolveForCondition(Node\Expr\ClassConstFetch $node)
     {
-        return $this->fromOutsideOfCondition($node);
+        return $this->resolve($node);
     }
 }

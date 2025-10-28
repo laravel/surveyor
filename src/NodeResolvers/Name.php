@@ -26,6 +26,6 @@ class Name extends AbstractResolver
 
     public function resolveForCondition(Node\Name $node)
     {
-        return $this->fromOutsideOfCondition($node);
+        return $this->resolve($node);
     }
 }
