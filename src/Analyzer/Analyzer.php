@@ -2,12 +2,11 @@
 
 namespace Laravel\Surveyor\Analyzer;
 
-use Laravel\Surveyor\Analysis\EntityType;
 use Laravel\Surveyor\Analysis\Scope;
-use Laravel\Surveyor\Analyzed\ClassResult;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Parser\Parser;
 use Laravel\Surveyor\Resolvers\NodeResolver;
+use ReflectionClass;
 
 class Analyzer
 {
@@ -18,6 +17,11 @@ class Analyzer
         protected NodeResolver $resolver,
     ) {
         //
+    }
+
+    public function analyzeClass(string $className)
+    {
+        return $this->analyze(new ReflectionClass(($className))->getFileName());
     }
 
     public function analyze(string $path)

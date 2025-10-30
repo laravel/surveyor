@@ -9,6 +9,7 @@ class PropertyResult
     public function __construct(
         public readonly string $name,
         public readonly ?Type $type,
+        public readonly string $visibility = 'public',
         public readonly bool $fromDocBlock = false,
     ) {
         //

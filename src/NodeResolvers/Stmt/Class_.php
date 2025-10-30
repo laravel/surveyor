@@ -25,6 +25,7 @@ class Class_ extends AbstractResolver
             extends: $this->scope->extends(),
             implements: $this->scope->implements(),
             uses: $this->scope->uses(),
+            filePath: $this->scope->fullPath(),
         );
 
         $this->scope->attachResult($result);

@@ -5,6 +5,7 @@ namespace Laravel\Surveyor\NodeResolvers\Stmt;
 use Laravel\Surveyor\Analysis\EntityType;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Analyzed\MethodResult;
+use Laravel\Surveyor\Analyzed\PropertyResult;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use PhpParser\Node;
 
@@ -26,6 +27,27 @@ class ClassMethod extends AbstractResolver
 
             if ($returnTypes) {
                 $this->scope->addReturnType($returnTypes, $node->getStartLine());
+            }
+        }
+
+        if ($node->name == '__construct') {
+            foreach ($node->params as $param) {
+                if (! $param->isPromoted()) {
+                    continue;
+                }
+
+                $this->scope->parent()->result()->addProperty(
+                    $param->var->name,
+                    new PropertyResult(
+                        name: $param->var->name,
+                        type: $this->from($param->type),
+                        visibility: match (true) {
+                            $param->isProtected() => 'protected',
+                            $param->isPrivate() => 'private',
+                            default => 'public',
+                        },
+                    ),
+                );
             }
         }
 

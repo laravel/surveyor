@@ -13,4 +13,13 @@ class StringType extends AbstractType implements Contracts\Type
     {
         return $this->value === null ? 'null' : $this->value;
     }
+
+    public function isMoreSpecificThan(Contracts\Type $type): bool
+    {
+        if (! $type instanceof StringType) {
+            return false;
+        }
+
+        return $type->value === null;
+    }
 }
