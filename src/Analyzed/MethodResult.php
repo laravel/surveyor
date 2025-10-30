@@ -31,7 +31,7 @@ class MethodResult
 
     public function returnType(): TypeContract
     {
-        return Type::union(...$this->returnTypes);
+        return Type::union(...array_column($this->returnTypes, 'type'));
     }
 
     public function addReturnType(TypeContract $type, int $lineNumber): void
