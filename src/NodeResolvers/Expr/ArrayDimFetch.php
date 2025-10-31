@@ -16,6 +16,10 @@ class ArrayDimFetch extends AbstractResolver
         $var = $this->from($node->var);
         $dim = $node->dim === null ? Type::int() : $this->from($node->dim);
 
+        if ($var instanceof Condition) {
+            $var = $var->type;
+        }
+
         if (! Type::is($var, ArrayType::class, ArrayShapeType::class)) {
             return Type::mixed();
         }
