@@ -388,8 +388,7 @@ class StateTrackerItem
     protected function addTypes(string $name, NodeAbstract $node, array $states): void
     {
         try {
-            $previousValue = $this->getAtLine($name, $node);
-            if ($previousValue) {
+            if ($previousValue = $this->getAtLine($name, $node)) {
                 array_unshift($states, $previousValue);
             }
         } catch (InvalidArgumentException $e) {
