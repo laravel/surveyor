@@ -66,6 +66,15 @@ class Debug
         self::log('🚨 Error ['.$message.']', $data, $level);
     }
 
+    public static function throwOr(Throwable $e, callable $callback)
+    {
+        if (self::$throw) {
+            throw $e;
+        }
+
+        return $callback();
+    }
+
     public static function log($message, $data = null, $level = 1)
     {
         if (self::$logLevel < $level) {
