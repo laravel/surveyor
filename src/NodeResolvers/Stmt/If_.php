@@ -6,6 +6,7 @@ use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\NodeResolvers\Shared\CapturesConditionalChanges;
 use PhpParser\Node;
 use PhpParser\NodeAbstract;
+use Throwable;
 
 class If_ extends AbstractResolver
 {
@@ -13,12 +14,17 @@ class If_ extends AbstractResolver
 
     public function resolve(Node\Stmt\If_ $node)
     {
-        $this->startCapturing($node);
+        try {
+            $this->startCapturing($node);
 
-        // Analyze the condition for type narrowing
-        $this->scope->startConditionAnalysis();
-        $this->from($node->cond);
-        $this->scope->endConditionAnalysis();
+            // Analyze the condition for type narrowing
+            $this->scope->startConditionAnalysis();
+            $this->from($node->cond);
+            $this->scope->endConditionAnalysis();
+        } catch (Throwable $e) {
+            // Make sure to always end the condition analysis no matter what
+            $this->scope->endConditionAnalysis();
+        }
     }
 
     public function resolveForCondition(Node\Stmt\If_ $node)
