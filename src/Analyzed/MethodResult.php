@@ -13,6 +13,8 @@ class MethodResult
     /** @var array<array{type: TypeContract, lineNumber: int}> */
     protected array $returnTypes = [];
 
+    protected bool $modelRelation = false;
+
     public function __construct(
         protected readonly string $name,
     ) {
@@ -32,6 +34,16 @@ class MethodResult
     public function returnType(): TypeContract
     {
         return Type::union(...array_column($this->returnTypes, 'type'));
+    }
+
+    public function flagAsModelRelation(): void
+    {
+        $this->modelRelation = true;
+    }
+
+    public function isModelRelation(): bool
+    {
+        return $this->modelRelation;
     }
 
     public function addReturnType(TypeContract $type, int $lineNumber): void

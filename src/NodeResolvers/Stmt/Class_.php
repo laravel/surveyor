@@ -2,12 +2,15 @@
 
 namespace Laravel\Surveyor\NodeResolvers\Stmt;
 
+use Illuminate\Database\Eloquent\Model;
 use Laravel\Surveyor\Analysis\EntityType;
 use Laravel\Surveyor\Analyzed\ClassResult;
 use Laravel\Surveyor\Analyzed\MethodResult;
+use Laravel\Surveyor\Analyzer\ModelAnalyzer;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
+use Throwable;
 
 class Class_ extends AbstractResolver
 {
@@ -31,6 +34,14 @@ class Class_ extends AbstractResolver
         $this->scope->attachResult($result);
 
         $this->parseDocBlock($node, $result);
+
+        if (in_array(Model::class, $this->scope->extends())) {
+            try {
+                app(ModelAnalyzer::class)->mergeIntoResult($result->name(), $result, $this->scope);
+            } catch (Throwable $e) {
+                // Unable to inspect model, possibly due to missing database connection
+            }
+        }
 
         return null;
     }

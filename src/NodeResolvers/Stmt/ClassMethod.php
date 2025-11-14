@@ -37,7 +37,6 @@ class ClassMethod extends AbstractResolver
                 }
 
                 $this->scope->parent()->result()->addProperty(
-                    $param->var->name,
                     new PropertyResult(
                         name: $param->var->name,
                         type: $this->from($param->type),

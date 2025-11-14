@@ -67,7 +67,7 @@ class ClassResult
             return $this->implements;
         }
 
-        return in_array($implements, $this->implements);
+        return count(array_intersect($implements, $this->implements)) > 0;
     }
 
     public function hasMethod(string $name): bool
@@ -90,6 +90,17 @@ class ClassResult
         return $this->properties[$name];
     }
 
+    /**
+     * @return list<MethodResult>
+     */
+    public function publicMethods(): array
+    {
+        return $this->methods;
+    }
+
+    /**
+     * @return list<PropertyResult>
+     */
     public function publicProperties(): array
     {
         return array_values(
@@ -100,9 +111,9 @@ class ClassResult
         );
     }
 
-    public function addProperty(string $name, PropertyResult $property): void
+    public function addProperty(PropertyResult $property): void
     {
-        $this->properties[$name] = $property;
+        $this->properties[$property->name] = $property;
     }
 
     public function hasConstant(string $name): bool

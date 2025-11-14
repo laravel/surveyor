@@ -34,7 +34,6 @@ class Property extends AbstractResolver
             );
 
             $this->scope->result()->addProperty(
-                $prop->name,
                 new PropertyResult(
                     name: $prop->name,
                     type: $unionType,
