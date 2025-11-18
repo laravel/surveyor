@@ -35,10 +35,10 @@ class ModelAnalyzer
             $type->nullable($attribute['nullable'] ?? false);
 
             $result->addProperty(new PropertyResult($attribute['name'], $type, modelAttribute: true));
+            $scope->state()->properties()->addManually($attribute['name'], $type, 0, 0, 0, 0);
         }
 
         foreach ($info['relations'] as $relation) {
-
             $isCollection = in_array($relation['type'], [
                 'HasMany',
                 'HasManyThrough',
@@ -48,17 +48,13 @@ class ModelAnalyzer
             ]);
 
             if ($isCollection) {
-                $result->addProperty(new PropertyResult(
-                    $relation['name'],
-                    Type::arrayShape(Type::int(), new ClassType($relation['related'])),
-                    modelRelation: true,
-                ));
+                $type = Type::arrayShape(Type::int(), new ClassType($relation['related']));
+                $result->addProperty(new PropertyResult($relation['name'], $type, modelRelation: true));
+                $scope->state()->properties()->addManually($relation['name'], $type, 0, 0, 0, 0);
             } else {
-                $result->addProperty(new PropertyResult(
-                    $relation['name'],
-                    new ClassType($relation['related']),
-                    modelRelation: true,
-                ));
+                $type = new ClassType($relation['related']);
+                $result->addProperty(new PropertyResult($relation['name'], $type, modelRelation: true));
+                $scope->state()->properties()->addManually($relation['name'], $type, 0, 0, 0, 0);
             }
 
             $classType = new ClassType($relation['related']);
