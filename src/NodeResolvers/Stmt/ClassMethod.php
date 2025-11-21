@@ -64,6 +64,10 @@ class ClassMethod extends AbstractResolver
             $this->scope->result()->addReturnType($returnType['type'], $returnType['lineNumber']);
         }
 
+        foreach ($this->scope->validationRules() as $key => $rules) {
+            $this->scope->result()->addValidationRule($key, $rules);
+        }
+
         $this->scope->parent()->result()->addMethod(
             $this->scope->result(),
         );

@@ -299,9 +299,8 @@ class Reflector
 
         if ($this->scope->entityName() !== $reflection->getName()) {
             $analyzed = $this->getAnalyzer()->analyze($reflection->getFileName());
-            $scope = $analyzed->analyzed();
 
-            if ($scope) {
+            if ($scope = $analyzed->analyzed()) {
                 $this->setScope($scope);
             }
         }

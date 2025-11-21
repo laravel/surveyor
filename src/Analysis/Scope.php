@@ -38,6 +38,8 @@ class Scope
 
     protected array $returnTypes = [];
 
+    protected array $validationRules = [];
+
     protected string $path;
 
     protected EntityType $entityType;
@@ -145,6 +147,16 @@ class Scope
     public function addConstant(string $constant, Type $type): void
     {
         $this->constants[$constant] = $type;
+    }
+
+    public function addValidationRule(string $key, array $rules): void
+    {
+        $this->validationRules[$key] = $rules;
+    }
+
+    public function validationRules(): array
+    {
+        return $this->validationRules;
     }
 
     public function getConstant(string $constant): ?Type

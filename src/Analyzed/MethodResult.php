@@ -13,6 +13,9 @@ class MethodResult
     /** @var array<array{type: TypeContract, lineNumber: int}> */
     protected array $returnTypes = [];
 
+    /** @var array<string, array<string, array>> */
+    protected array $validationRules = [];
+
     protected bool $modelRelation = false;
 
     public function __construct(
@@ -31,6 +34,11 @@ class MethodResult
         return $this->parameters;
     }
 
+    public function validationRules(): array
+    {
+        return $this->validationRules;
+    }
+
     public function returnType(): TypeContract
     {
         return Type::union(...array_column($this->returnTypes, 'type'));
@@ -44,6 +52,11 @@ class MethodResult
     public function isModelRelation(): bool
     {
         return $this->modelRelation;
+    }
+
+    public function addValidationRule(string $key, array $rules): void
+    {
+        $this->validationRules[$key] = $rules;
     }
 
     public function addReturnType(TypeContract $type, int $lineNumber): void
