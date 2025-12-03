@@ -160,7 +160,7 @@ class DocBlockParser
     protected function parse(string $docBlock): PhpDocNode
     {
         if (isset($this->cached[$docBlock])) {
-            return $this->cached[$docBlock];
+            return $this->parsed = $this->cached[$docBlock];
         }
 
         $tokens = new TokenIterator($this->lexer->tokenize($docBlock));
