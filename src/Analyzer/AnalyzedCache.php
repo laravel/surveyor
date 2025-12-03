@@ -114,7 +114,16 @@ class AnalyzedCache
             return null;
         }
 
-        return unserialize($data['scope']);
+        $serialized = $data['scope'];
+        unset($data);
+
+        $scope = unserialize($serialized);
+        unset($serialized);
+
+        static::$cached[$path] = $scope;
+        static::$fileTimes[$path] = $currentModifiedTime;
+
+        return $scope;
     }
 
     public static function invalidate(string $path): void
@@ -172,30 +181,6 @@ class AnalyzedCache
         ];
 
         file_put_contents($cacheFile, serialize($data));
-    }
-
-    protected static function loadFromDisk(string $path, int $currentMtime): ?Scope
-    {
-        $cacheFile = static::getCacheFilePath($path);
-
-        if (! file_exists($cacheFile)) {
-            return null;
-        }
-
-        $data = unserialize(file_get_contents($cacheFile));
-
-        if (! is_array($data) || ! isset($data['mtime'], $data['scope'])) {
-            return null;
-        }
-
-        // Check if file has been modified since cache was created
-        if ($data['mtime'] !== $currentMtime) {
-            unlink($cacheFile);
-
-            return null;
-        }
-
-        return unserialize($data['scope']);
     }
 
     protected static function getCacheFilePath(string $path): string
