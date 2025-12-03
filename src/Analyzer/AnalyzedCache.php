@@ -117,13 +117,12 @@ class AnalyzedCache
         $serialized = $data['scope'];
         unset($data);
 
-        $scope = unserialize($serialized);
-        unset($serialized);
-
-        static::$cached[$path] = $scope;
+        static::$cached[$path] = unserialize($serialized);
         static::$fileTimes[$path] = $currentModifiedTime;
 
-        return $scope;
+        unset($serialized);
+
+        return static::$cached[$path];
     }
 
     public static function invalidate(string $path): void
