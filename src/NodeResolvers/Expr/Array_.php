@@ -11,9 +11,8 @@ class Array_ extends AbstractResolver
 {
     public function resolve(Node\Expr\Array_ $node)
     {
-        $isList = Arr::first($node->items, fn ($item) => $item->key === null) !== null;
-
-        if ($isList) {
+        if (Arr::first($node->items, fn ($item) => $item->key === null) !== null) {
+            // Array is a list
             return Type::array(
                 array_map(fn ($item) => $this->from($item->value), $node->items),
             );
