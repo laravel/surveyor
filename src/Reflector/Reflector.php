@@ -312,6 +312,10 @@ class Reflector
             }
         }
 
+        if ($reflection->isSubclassOf(Model::class) && $this->scope->result()->hasProperty($method)) {
+            return [$this->scope->result()->getProperty($method)->type];
+        }
+
         $returnTypes = [];
 
         if ($reflection->hasMethod($method)) {
