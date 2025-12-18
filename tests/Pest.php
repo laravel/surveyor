@@ -17,7 +17,11 @@ use Orchestra\Testbench\TestCase;
 |
 */
 
-uses(TestCase::class)->in('Feature', 'Unit');
+uses(TestCase::class)
+    ->beforeEach(function () {
+        $this->app->register(SurveyorServiceProvider::class);
+    })
+    ->in('Feature', 'Unit');
 
 /*
 |--------------------------------------------------------------------------
@@ -30,10 +34,6 @@ uses(TestCase::class)->in('Feature', 'Unit');
 |
 */
 
-// expect()->extend('toBeOne', function () {
-//     return $this->toBe(1);
-// });
-
 /*
 |--------------------------------------------------------------------------
 | Functions
@@ -44,18 +44,6 @@ uses(TestCase::class)->in('Feature', 'Unit');
 | global functions to help you to reduce the amount of code duplication.
 |
 */
-
-// function getPackageProviders($app)
-// {
-//     return [
-//         SurveyorServiceProvider::class,
-//     ];
-// }
-
-// function getEnvironmentSetUp($app)
-// {
-//     // Setup test environment
-// }
 
 function analyzeFile(string $path)
 {
@@ -96,11 +84,11 @@ function getParser(): Laravel\Surveyor\Parser\Parser
 }
 
 /**
- * Parse PHP code and return the AST
+ * Parse PHP code and return the Scope results
  */
-function parseCode(string $code): array
+function parseCode(string $code, string $path = '/tmp/test.php'): array
 {
     $parser = getParser();
 
-    return $parser->parse("<?php\n\n".$code);
+    return $parser->parse("<?php\n\n".$code, $path);
 }
