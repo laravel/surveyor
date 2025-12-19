@@ -166,8 +166,6 @@ class ModelAnalyzer
             return Type::from($this->resolveClassCast($cast));
         }
 
-        dd($cast, 'unknown cast type');
-
         return $cast;
     }
 

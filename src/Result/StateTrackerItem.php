@@ -115,7 +115,6 @@ class StateTrackerItem
             $newType = Type::mixed();
         } else {
             $newType = $currentType;
-            // dd('current type is not a union type and not the same as the type to remove??', $currentType, $type);
         }
 
         $this->add($name, $newType, $node);
@@ -234,7 +233,6 @@ class StateTrackerItem
                 );
             } catch (Throwable $e) {
                 Debug::error($e, 'Merging union types');
-                Debug::ddAndOpen($key, $type, $existingTypes, $this, $e->getMessage(), 't->value is null??');
             }
         }
 

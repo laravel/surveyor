@@ -38,7 +38,7 @@ class Debug
     {
         self::$currentlyTiming[$label] = microtime(true);
 
-        return fn() => self::stopTiming($label);
+        return fn () => self::stopTiming($label);
     }
 
     public static function stopTiming(string $label)
@@ -64,7 +64,7 @@ class Debug
         table(
             ['Label', 'Count', 'Total (s)', 'Average (s)', 'Min (s)', 'Max (s)'],
             array_map(
-                fn($label, $data) => [
+                fn ($label, $data) => [
                     $label,
                     $data['count'],
                     number_format($data['total'], 4),
@@ -82,7 +82,7 @@ class Debug
 
     public static function error(Throwable $e, $message, $data = null, $level = 1)
     {
-        self::log('🚨 ' . $message . ' [' . $e->getMessage() . '] at ' . $e->getFile() . ':' . $e->getLine(), $data, $level);
+        self::log('🚨 '.$message.' ['.$e->getMessage().'] at '.$e->getFile().':'.$e->getLine(), $data, $level);
     }
 
     public static function throwOr(Throwable $e, callable $callback)
@@ -106,7 +106,7 @@ class Debug
             $data = implode(
                 PHP_EOL,
                 array_map(
-                    fn($line) => $indent . $line,
+                    fn ($line) => $indent.$line,
                     explode(PHP_EOL, json_encode($data, JSON_PRETTY_PRINT)),
                 ),
             );
@@ -115,12 +115,12 @@ class Debug
         $formattedMessage = (is_string($message) ? $message : json_encode($message));
 
         if ($data) {
-            $formattedMessage .= PHP_EOL . $data;
+            $formattedMessage .= PHP_EOL.$data;
         }
 
         $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
 
-        info($indent . '> ' . $backtrace[1]['class'] . ':' . ($backtrace[1]['line'] ?? 0) . PHP_EOL . $indent . $formattedMessage);
+        info($indent.'> '.$backtrace[1]['class'].':'.($backtrace[1]['line'] ?? 0).PHP_EOL.$indent.$formattedMessage);
     }
 
     public static function count(string $key)
@@ -179,10 +179,10 @@ class Debug
         $memory = memory_get_usage(true);
         $memory = $memory / 1024 / 1024;
         $memory = round($memory, 2);
-        $memory = $memory . 'MB';
+        $memory = $memory.'MB';
 
         if ($print) {
-            info('Memory Usage: ' . $memory);
+            info('Memory Usage: '.$memory);
         }
 
         return $memory;
@@ -228,13 +228,13 @@ class Debug
     {
         if (self::$dump) {
             $trace = debug_backtrace(limit: 1);
-            $marker = $trace[0]['file'] . ':' . $trace[0]['line'];
+            $marker = $trace[0]['file'].':'.$trace[0]['line'];
 
-            array_unshift($args, 'DEBUG START: ' . $marker);
-            array_push($args, 'DEBUG END: ' . $marker);
+            array_unshift($args, 'DEBUG START: '.$marker);
+            array_push($args, 'DEBUG END: '.$marker);
 
             $command = match (self::$ide) {
-                default => self::$ide . ' --goto --reuse-window ' . $trace[0]['file'] . ':' . $trace[0]['line'],
+                default => self::$ide.' --goto --reuse-window '.$trace[0]['file'].':'.$trace[0]['line'],
             };
 
             exec($command);
@@ -248,7 +248,7 @@ class Debug
         if (self::$dump && self::$currentlyInterested) {
             $trace = debug_backtrace(limit: 1);
 
-            dump($trace[0]['file'] . ':' . $trace[0]['line'], ...array_map(function ($a) {
+            dump($trace[0]['file'].':'.$trace[0]['line'], ...array_map(function ($a) {
                 if ($a instanceof NodeAbstract) {
                     $a->setAttribute('parent', null);
                 }
@@ -256,7 +256,7 @@ class Debug
                 return $a;
             }, $args));
 
-            echo PHP_EOL . str_repeat('-', 80) . PHP_EOL . PHP_EOL;
+            echo PHP_EOL.str_repeat('-', 80).PHP_EOL.PHP_EOL;
         }
     }
 
@@ -265,7 +265,7 @@ class Debug
         if (self::$dump && self::$currentlyInterested) {
             $trace = debug_backtrace(limit: 1);
 
-            dd($trace[0]['file'] . ':' . $trace[0]['line'], ...array_map(function ($a) {
+            dd($trace[0]['file'].':'.$trace[0]['line'], ...array_map(function ($a) {
                 if ($a instanceof NodeAbstract) {
                     $a->setAttribute('parent', null);
                 }
@@ -277,7 +277,7 @@ class Debug
 
     public static function trace($limit = 10)
     {
-        return array_map(fn($t) => [
+        return array_map(fn ($t) => [
             'file' => $t['file'] ?? null,
             'line' => $t['line'] ?? null,
         ], debug_backtrace(limit: $limit));

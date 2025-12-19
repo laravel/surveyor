@@ -3,7 +3,6 @@
 namespace Laravel\Surveyor\NodeResolvers\Expr;
 
 use Laravel\Surveyor\Analysis\Condition;
-use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\NodeResolvers\Shared\ResolvesAssigns;
 use Laravel\Surveyor\Result\VariableState;
@@ -39,7 +38,5 @@ class AssignRef extends AbstractResolver
         if ($node->var instanceof Node\Expr\Variable) {
             return new Condition($node->var, $this->from($node->expr));
         }
-
-        Debug::ddAndOpen($node, 'assign ref: variable but not a variable??');
     }
 }

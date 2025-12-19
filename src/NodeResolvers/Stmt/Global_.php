@@ -2,7 +2,6 @@
 
 namespace Laravel\Surveyor\NodeResolvers\Stmt;
 
-use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use PhpParser\Node;
 
@@ -12,7 +11,7 @@ class Global_ extends AbstractResolver
     {
         foreach ($node->vars as $var) {
             if (! $var instanceof Node\Expr\Variable) {
-                Debug::ddAndOpen($var, 'global: variable but not a variable??');
+                continue;
             }
 
             $scope = $this->scope;
@@ -23,8 +22,6 @@ class Global_ extends AbstractResolver
 
             if ($scope) {
                 $this->scope->state()->add($var, $scope->state()->get($var->name), $node);
-            } else {
-                Debug::ddAndOpen($var, $this->scope, 'global: variable not found in scope');
             }
         }
 

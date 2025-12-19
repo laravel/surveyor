@@ -90,7 +90,6 @@ class Scope
 
     public function macro(string $class, string $name): ?Type
     {
-        // dd($this->macros, $class, $name);
         return $this->macros[$class][$name] ?? null;
     }
 

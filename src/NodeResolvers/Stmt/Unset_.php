@@ -2,7 +2,6 @@
 
 namespace Laravel\Surveyor\NodeResolvers\Stmt;
 
-use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\Contracts\MultiType;
 use Laravel\Surveyor\Types\StringType;
@@ -20,7 +19,7 @@ class Unset_ extends AbstractResolver
             }
 
             if ($var->dim === null) {
-                Debug::ddAndOpen($node, $var, 'unset: array dim fetch but dim is null??');
+                continue;
             }
 
             $dim = $this->from($var->dim);

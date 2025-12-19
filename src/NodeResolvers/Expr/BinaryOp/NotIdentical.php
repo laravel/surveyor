@@ -3,7 +3,6 @@
 namespace Laravel\Surveyor\NodeResolvers\Expr\BinaryOp;
 
 use Laravel\Surveyor\Analysis\Condition;
-use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
@@ -46,7 +45,7 @@ class NotIdentical extends AbstractResolver
                 $type = $this->fromOutsideOfCondition($o);
 
                 if ($type === null) {
-                    Debug::ddAndOpen($o, $node, 'type is null?');
+                    return;
                 }
 
                 return new Condition($variable, $type);

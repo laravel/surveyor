@@ -2,7 +2,6 @@
 
 namespace Laravel\Surveyor\DocBlockResolvers\Type;
 
-use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\DocBlockResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\ArrayShapeType;
 use Laravel\Surveyor\Types\ClassType;
@@ -110,7 +109,5 @@ class GenericTypeNode extends AbstractResolver
 
             return null;
         }
-
-        Debug::ddAndOpen($node, 'unknown generic type');
     }
 }

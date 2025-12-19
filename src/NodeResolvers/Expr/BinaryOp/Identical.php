@@ -3,7 +3,6 @@
 namespace Laravel\Surveyor\NodeResolvers\Expr\BinaryOp;
 
 use Laravel\Surveyor\Analysis\Condition;
-use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Result\VariableState;
 use Laravel\Surveyor\Types\Type;
@@ -53,7 +52,6 @@ class Identical extends AbstractResolver
         $type = $this->fromOutsideOfCondition($other[0]);
 
         if ($type === null) {
-            // Debug::ddAndOpen($other[0], $node, 'type is null?');
             return null;
         }
 
