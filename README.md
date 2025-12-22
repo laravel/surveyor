@@ -340,27 +340,18 @@ $variables = $stateTracker->variables();
 $properties = $stateTracker->properties();
 ```
 
-## Artisan Command
+## Contributing
 
-Surveyor includes an Artisan command for quick analysis:
+Thank you for considering contributing to Ranger! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
 
-```bash
-# Analyze a file
-php artisan analyze --path=app/Http/Controllers/UserController.php
+## Code of Conduct
 
-# Enable caching
-php artisan analyze --path=app/Models/User.php --cache
+In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
 
-# Specify cache directory
-php artisan analyze --path=app/Models/User.php --cache --cache-dir=storage/surveyor
+## Security Vulnerabilities
 
-# Verbose output (use -v, -vv, or -vvv)
-php artisan analyze --path=app/Models/User.php --vvv
-
-# Dump detailed output
-php artisan analyze --path=app/Models/User.php --dump
-```
+Please review [our security policy](https://github.com/laravel/ranger/security/policy) on how to report security vulnerabilities.
 
 ## License
 
-Laravel Surveyor is open-sourced software licensed under the [MIT license](LICENSE.md).
+Laravel Ranger is open-sourced software licensed under the [MIT license](LICENSE.md).
