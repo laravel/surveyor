@@ -28,7 +28,7 @@ composer require laravel/surveyor
 
 ### Not Strictly Static Analysis
 
-While Surveyor is _mostly_ static analysis, it does attempty to inspect your models (which means a brief database connection) and also inspects your app bindings to get more detailed information in the analysis.
+While Surveyor is _mostly_ static analysis, it does attempt to inspect your models (which means a brief database connection) and also inspects your app bindings to get more detailed information in the analysis.
 
 ### Performance
 
