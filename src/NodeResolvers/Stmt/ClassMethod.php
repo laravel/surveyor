@@ -91,9 +91,10 @@ class ClassMethod extends AbstractResolver
             }
         }
 
-        $this->scope->parent()->result()->addMethod(
-            $this->scope->result(),
-        );
+        if (($parentResult = $this->scope->parent()?->result())
+            && ($scopeResult = $this->scope->result()) instanceof MethodResult) {
+            $parentResult->addMethod($scopeResult);
+        }
 
         return $this->scope->parent();
     }
