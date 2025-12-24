@@ -138,7 +138,7 @@ class ModelAnalyzer
                     return $data[1];
                 }
 
-                if (str_contains($test, '/') && preg_match($test, $attribute['type']) === 1) {
+                if (str_contains($test, '/') && preg_match($test, $attribute['type']) === 1) { // @phpstan-ignore regexp.pattern
                     return $data[1];
                 }
             }
