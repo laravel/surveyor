@@ -42,8 +42,9 @@ describe('factory methods', function () {
     });
 
     it('creates float type', function () {
-        $type = Type::float();
+        $type = Type::float(12.4);
         expect($type)->toBeInstanceOf(FloatType::class);
+        expect($type->value)->toBe(12.4);
     });
 
     it('creates bool type', function () {
