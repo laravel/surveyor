@@ -201,7 +201,7 @@ class StateTrackerItem
     {
         $variables = $this->variables[$name] ?? [];
 
-        return $variables[$name][count($variables[$name]) - 1] ?? null;
+        return $variables[count($variables) - 1] ?? null;
     }
 
     public function get(string $name): ?TypeContract
