@@ -199,7 +199,9 @@ class StateTrackerItem
 
     public function getLastValue(string $name): ?VariableState
     {
-        return $this->variables[$name][count($this->variables[$name]) - 1] ?? null;
+        $variables = $this->variables[$name] ?? [];
+
+        return $variables[$name][count($variables[$name]) - 1] ?? null;
     }
 
     public function get(string $name): ?TypeContract
