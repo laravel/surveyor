@@ -20,7 +20,7 @@ class Include_ extends AbstractResolver
             return Type::mixed();
         }
 
-        if (! file_exists($result->value)) {
+        if (is_null($result->value) || ! file_exists($result->value)) {
             return Type::mixed();
         }
 
