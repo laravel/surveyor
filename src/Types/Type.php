@@ -72,9 +72,9 @@ class Type
         return new ObjectType;
     }
 
-    public static function number(int|float|null $value = null): Contracts\Type
+    public static function number(): Contracts\Type
     {
-        return new NumberType($value);
+        return new NumberType();
     }
 
     public static function bool(?bool $bool = null): Contracts\Type
@@ -102,9 +102,9 @@ class Type
         return new NeverType;
     }
 
-    public static function float(): Contracts\Type
+    public static function float(?float $value = null): Contracts\Type
     {
-        return new FloatType;
+        return new FloatType($value);
     }
 
     public static function void(): Contracts\Type
@@ -155,29 +155,11 @@ class Type
                 'string' => self::string(),
                 'bool' => self::bool(),
                 'null' => self::null(),
-                'callable' => self::callable([]),
                 default => null,
             };
 
             if ($result) {
                 return $result;
-            }
-
-            $typeMethods = [
-                'int',
-                'float',
-                'bool',
-                'string',
-                'null',
-                'callable',
-                'array',
-                'object',
-                'void',
-                'mixed',
-            ];
-
-            if (method_exists(self::class, $value) && in_array($value, $typeMethods)) {
-                return self::$value();
             }
 
             return self::string($value);
