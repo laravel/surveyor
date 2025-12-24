@@ -24,7 +24,7 @@ class NodeResolver
     }
 
     /**
-     * @return array{0: \Laravel\Surveyor\Types\Contracts\Type, 1: Scope}
+     * @return array{0: \Laravel\Surveyor\Types\Contracts\Type|null, 1: \Laravel\Surveyor\Analysis\Scope|null}
      */
     public function fromWithScope(NodeAbstract $node, Scope $scope)
     {
@@ -49,6 +49,9 @@ class NodeResolver
         return [$resolved, $newScope];
     }
 
+    /**
+     * @return \Laravel\Surveyor\Analysis\Scope
+     */
     public function exitNode(NodeAbstract $node, Scope $scope)
     {
         $resolver = $this->resolveClassInstance($node);
@@ -59,6 +62,9 @@ class NodeResolver
         return $resolver->exitScope();
     }
 
+    /**
+     * @return \Laravel\Surveyor\NodeResolvers\AbstractResolver
+     */
     protected function resolveClassInstance(NodeAbstract $node)
     {
         $className = $this->getClassName($node);
@@ -68,16 +74,25 @@ class NodeResolver
         return new $className($this, $this->docBlockParser, $this->reflector);
     }
 
+    /**
+     * @return \Laravel\Surveyor\Types\Contracts\Type|null
+     */
     public function from(NodeAbstract $node, Scope $scope)
     {
         return $this->fromWithScope($node, $scope)[0];
     }
 
+    /**
+     * @return class-string<\Laravel\Surveyor\NodeResolvers\AbstractResolver>
+     */
     protected function getClassName(NodeAbstract $node)
     {
         return $this->resolved[get_class($node)] ??= $this->resolveClass($node);
     }
 
+    /**
+     * @return class-string<\Laravel\Surveyor\NodeResolvers\AbstractResolver>
+     */
     protected function resolveClass(NodeAbstract $node)
     {
         return str(get_class($node))
