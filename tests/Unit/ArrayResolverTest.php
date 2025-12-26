@@ -318,8 +318,8 @@ class AssignedArrayTest
     });
 });
 
-describe('array spread operator', function () {
-    it('handles spread operator in keyed array', function () {
+describe('array unpacking', function () {
+    it('handles unpacking in keyed array', function () {
         $fixture = createPhpFixture('
 namespace App;
 
@@ -357,7 +357,7 @@ class SpreadTest
         unlink($fixture);
     });
 
-    it('handles spread operator in list array', function () {
+    it('handles unpacking in list array', function () {
         $fixture = createPhpFixture('
 namespace App;
 
@@ -393,7 +393,7 @@ class SpreadListTest
         unlink($fixture);
     });
 
-    it('handles multiple spread operators in list array', function () {
+    it('handles multiple unpacking in list array', function () {
         $fixture = createPhpFixture('
 namespace App;
 
@@ -428,7 +428,7 @@ class MultiSpreadTest
         unlink($fixture);
     });
 
-    it('handles spread operator with only spreads in keyed array', function () {
+    it('handles unpacking with only unpacked arrays in keyed array', function () {
         $fixture = createPhpFixture('
 namespace App;
 
