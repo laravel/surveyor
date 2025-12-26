@@ -67,6 +67,14 @@ class MethodResult
         ];
     }
 
+    /**
+     * @return array<array{type: TypeContract, lineNumber: int}>
+     */
+    public function returnTypes(): array
+    {
+        return $this->returnTypes;
+    }
+
     public function addParameter(string $name, TypeContract $type): void
     {
         $this->parameters[$name] = $type;

@@ -57,8 +57,8 @@ class ModelAnalyzer
                 $scope->state()->properties()->addManually($relation['name'], $type, 0, 0, 0, 0);
             }
 
-            $classType = new ClassType($relation['related']);
-            $classType->setGenericTypes([
+            $relationType = new ClassType('Illuminate\\Database\\Eloquent\\Relations\\'.$relation['type']);
+            $relationType->setGenericTypes([
                 'TRelatedModel' => new ClassType($relation['related']),
                 'TDeclaringModel' => new ClassType($model),
             ]);
@@ -67,7 +67,7 @@ class ModelAnalyzer
                 $relation['name'],
             );
             $methodResult->flagAsModelRelation();
-            $methodResult->addReturnType($classType, 0);
+            $methodResult->addReturnType($relationType, 0);
 
             $result->addMethod($methodResult);
         }

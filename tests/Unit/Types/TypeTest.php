@@ -313,4 +313,74 @@ describe('ClassType', function () {
 
         expect($type)->toBeInstanceOf(ClassType::class);
     });
+
+    it('returns generic types via getter', function () {
+        $type = new ClassType('Collection');
+        $genericType = new ClassType('User');
+        $type->setGenericTypes(['T' => $genericType]);
+
+        $generics = $type->genericTypes();
+        expect($generics)->toHaveKey('T');
+        expect($generics['T'])->toBe($genericType);
+    });
+
+    it('includes generics in id', function () {
+        $typeWithoutGenerics = new ClassType('HasMany');
+        $typeWithGenerics = new ClassType('HasMany');
+        $typeWithGenerics->setGenericTypes([
+            'TRelatedModel' => new ClassType('Post'),
+        ]);
+
+        expect($typeWithoutGenerics->id())->toBe('HasMany');
+        expect($typeWithGenerics->id())->toBe('HasMany<Post>');
+    });
+
+    it('is more specific when it has generics and other does not', function () {
+        $typeWithoutGenerics = new ClassType('HasMany');
+        $typeWithGenerics = new ClassType('HasMany');
+        $typeWithGenerics->setGenericTypes([
+            'TRelatedModel' => new ClassType('Post'),
+        ]);
+
+        expect($typeWithGenerics->isMoreSpecificThan($typeWithoutGenerics))->toBeTrue();
+        expect($typeWithoutGenerics->isMoreSpecificThan($typeWithGenerics))->toBeFalse();
+    });
+
+    it('is not more specific than different class', function () {
+        $hasMany = new ClassType('HasMany');
+        $hasMany->setGenericTypes(['T' => new ClassType('Post')]);
+
+        $belongsTo = new ClassType('BelongsTo');
+
+        expect($hasMany->isMoreSpecificThan($belongsTo))->toBeFalse();
+    });
+});
+
+describe('Type::union() with ClassType generics', function () {
+    it('keeps the more specific type with generics', function () {
+        $typeWithoutGenerics = new ClassType('HasMany');
+        $typeWithGenerics = new ClassType('HasMany');
+        $typeWithGenerics->setGenericTypes([
+            'TRelatedModel' => new ClassType('Post'),
+        ]);
+
+        $union = Type::union($typeWithoutGenerics, $typeWithGenerics);
+
+        expect($union)->toBeInstanceOf(ClassType::class);
+        expect($union->genericTypes())->toHaveCount(1);
+        expect($union->genericTypes()['TRelatedModel']->value)->toBe('Post');
+    });
+
+    it('keeps the more specific type regardless of order', function () {
+        $typeWithoutGenerics = new ClassType('HasMany');
+        $typeWithGenerics = new ClassType('HasMany');
+        $typeWithGenerics->setGenericTypes([
+            'TRelatedModel' => new ClassType('Post'),
+        ]);
+
+        $union = Type::union($typeWithGenerics, $typeWithoutGenerics);
+
+        expect($union)->toBeInstanceOf(ClassType::class);
+        expect($union->genericTypes())->toHaveCount(1);
+    });
 });
