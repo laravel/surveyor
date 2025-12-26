@@ -38,6 +38,34 @@ class ClassType extends AbstractType implements Contracts\Type
 
     public function id(): string
     {
-        return $this->resolved();
+        $id = $this->resolved();
+
+        if (! empty($this->genericTypes)) {
+            $genericIds = array_map(
+                fn ($type) => $type->id(),
+                $this->genericTypes
+            );
+            $id .= '<'.implode(',', $genericIds).'>';
+        }
+
+        return $id;
+    }
+
+    public function genericTypes(): array
+    {
+        return $this->genericTypes;
+    }
+
+    public function isMoreSpecificThan(Contracts\Type $type): bool
+    {
+        if (! $type instanceof ClassType) {
+            return false;
+        }
+
+        if ($this->resolved() !== $type->resolved()) {
+            return false;
+        }
+
+        return ! empty($this->genericTypes) && empty($type->genericTypes());
     }
 }

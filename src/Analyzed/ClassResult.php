@@ -4,6 +4,7 @@ namespace Laravel\Surveyor\Analyzed;
 
 use Illuminate\Contracts\Support\Arrayable;
 use JsonSerializable;
+use Laravel\Surveyor\Types\Type;
 
 class ClassResult
 {
@@ -82,6 +83,20 @@ class ClassResult
 
     public function addMethod(MethodResult $method): void
     {
+        if (isset($this->methods[$method->name()])) {
+            $existing = $this->methods[$method->name()];
+
+            if ($existing->isModelRelation()) {
+                $method->flagAsModelRelation();
+            }
+
+            $existingTypes = array_column($existing->returnTypes(), 'type');
+            $newTypes = array_column($method->returnTypes(), 'type');
+            $mergedType = Type::union(...$existingTypes, ...$newTypes);
+
+            $method->addReturnType($mergedType, 0);
+        }
+
         $this->methods[$method->name()] = $method;
     }
 
