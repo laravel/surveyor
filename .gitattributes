@@ -11,3 +11,4 @@ phpunit.xml       export-ignore
 README.md         export-ignore
 testbench.yaml    export-ignore
 tests/            export-ignore
+workbench/        export-ignore
