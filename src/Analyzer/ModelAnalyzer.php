@@ -83,6 +83,11 @@ class ModelAnalyzer
             return $this->resolveCast($attribute['cast']);
         }
 
+        return $this->resolveNonCast($attribute['type']);
+    }
+
+    protected function resolveNonCast(string $attributeType): TypeContract
+    {
         $typeMapping = [
             [
                 ['/^boolean(\\((0|1)\\))?/', '/^tinyint( unsigned)?(\\(\\d+\\))?$/', 'bool', 'boolean'],
@@ -134,18 +139,18 @@ class ModelAnalyzer
 
         foreach ($typeMapping as $data) {
             foreach ($data[0] as $test) {
-                if ($test === $attribute['type']) {
+                if ($test === $attributeType) {
                     return $data[1];
                 }
 
                 // @phpstan-ignore-next-line
-                if (str_contains($test, '/') && preg_match($test, $attribute['type']) === 1) {
+                if (str_contains($test, '/') && preg_match($test, $attributeType) === 1) {
                     return $data[1];
                 }
             }
         }
 
-        return Type::from($attribute['type']);
+        return Type::from($attributeType);
     }
 
     protected function resolveCast(string $cast): TypeContract
@@ -167,7 +172,7 @@ class ModelAnalyzer
             return Type::from($this->resolveClassCast($cast));
         }
 
-        return $cast;
+        return $this->resolveNonCast($cast);
     }
 
     protected function resolveClassCast(string $cast): TypeContract
