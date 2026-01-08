@@ -33,6 +33,7 @@ function resetCacheDirectory(): void
 function createCacheDir(): string
 {
     $dir = sys_get_temp_dir().'/surveyor-test-cache-'.uniqid();
+
     if (! is_dir($dir)) {
         mkdir($dir, 0755, true);
     }
@@ -46,6 +47,13 @@ function cleanupCacheDir(string $dir): void
         foreach (glob($dir.'/*.cache') as $file) {
             unlink($file);
         }
+
+        $gitignore = $dir.'/.gitignore';
+
+        if (file_exists($gitignore)) {
+            unlink($gitignore);
+        }
+
         rmdir($dir);
     }
 }
@@ -138,7 +146,7 @@ describe('disk caching', function () {
 
         expect(is_dir($dir))->toBeTrue();
 
-        rmdir($dir);
+        cleanupCacheDir($dir);
     });
 
     it('throws exception when enabling without setting directory', function () {
