@@ -104,6 +104,7 @@ trait ResolvesAssigns
 
         $dim = $dimFetch->dim === null ? Type::int() : $this->from($dimFetch->dim);
         $validDim = Type::is($dim, StringType::class, IntType::class) && $dim->value !== null;
+        $result = $this->from($node->expr);
 
         if ($validDim) {
             [$varToLookFor, $keys] = $this->resolveArrayVarAndKeys($dimFetch);
@@ -111,9 +112,11 @@ trait ResolvesAssigns
             $this->scope->state()->updateArrayKey(
                 $varToLookFor,
                 $keys,
-                $this->from($node->expr),
+                $result,
                 $node,
             );
         }
+        
+        return $result;
     }
 }
