@@ -116,7 +116,7 @@ trait ResolvesAssigns
                 $node,
             );
         }
-        
+
         return $result;
     }
 }

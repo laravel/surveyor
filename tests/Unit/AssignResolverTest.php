@@ -29,13 +29,13 @@ class ArrayDimAssignTest
     }
 }
 ');
-        
+
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyze($fixture)->result();
-        
+
         $method = $result->getMethod('test');
         $returnType = $method->returnType();
-        
+
         expect($returnType)->toBeInstanceOf(IntType::class);
         expect($returnType->value)->toBe(1);
     });
