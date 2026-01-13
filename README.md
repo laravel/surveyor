@@ -342,7 +342,7 @@ $properties = $stateTracker->properties();
 
 ## Contributing
 
-Thank you for considering contributing to Ranger! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Thank you for considering contributing to Surveyor! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
 
 ## Code of Conduct
 
@@ -350,8 +350,8 @@ In order to ensure that the Laravel community is welcoming to all, please review
 
 ## Security Vulnerabilities
 
-Please review [our security policy](https://github.com/laravel/ranger/security/policy) on how to report security vulnerabilities.
+Please review [our security policy](https://github.com/laravel/surveyor/security/policy) on how to report security vulnerabilities.
 
 ## License
 
-Laravel Ranger is open-sourced software licensed under the [MIT license](LICENSE.md).
+Laravel Surveyor is open-sourced software licensed under the [MIT license](LICENSE.md).
