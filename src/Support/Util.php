@@ -43,7 +43,9 @@ class Util
 
     protected static function resolveClassInternal(string $value): string
     {
-        if (! self::isClassOrInterface($value)) {
+        // Only attempt Reflection on actual classes/interfaces/traits/enums.
+        // Do not treat functions or defined constants (e.g. `true`, `false`) as classes.
+        if (! (class_exists($value) || interface_exists($value) || trait_exists($value) || enum_exists($value))) {
             return $value;
         }
 
