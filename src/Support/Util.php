@@ -14,12 +14,16 @@ class Util
 
     public static function isClassOrInterface(string $value): bool
     {
-        return self::$isClassOrInterface[$value] ??= class_exists($value)
+        // Check function_exists() and defined() before class_exists() to prevent
+        // the class autoloader from being triggered for namespaced functions that
+        // were already loaded via Composer's "autoload.files", which would cause
+        // a fatal "cannot redeclare function" error.
+        return self::$isClassOrInterface[$value] ??= function_exists($value)
+            || defined($value)
+            || class_exists($value)
             || interface_exists($value)
             || trait_exists($value)
-            || enum_exists($value)
-            || function_exists($value)
-            || defined($value);
+            || enum_exists($value);
     }
 
     public static function resolveValidClass(string $value, Scope $scope): string
