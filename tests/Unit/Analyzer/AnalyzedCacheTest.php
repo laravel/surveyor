@@ -167,6 +167,17 @@ describe('disk caching', function () {
         $cacheFiles = glob($dir.'/*.cache');
         expect($cacheFiles)->toHaveCount(1);
 
+        $content = file_get_contents($cacheFiles[0]);
+        if (str_contains($content, ':')) {
+            $parts = explode(':', $content, 2);
+            $serialized = $parts[1];
+        } else {
+            $serialized = $content;
+        }
+
+        $cacheData = unserialize($serialized);
+        expect($cacheData)->toBeArray();
+
         unlink($fixture);
         cleanupCacheDir($dir);
     });
@@ -329,7 +340,15 @@ describe('dependency tracking', function () {
         $cacheFiles = glob($dir.'/*.cache');
         expect($cacheFiles)->toHaveCount(1);
 
-        $cacheData = unserialize(file_get_contents($cacheFiles[0]));
+        $content = file_get_contents($cacheFiles[0]);
+        if (str_contains($content, ':')) {
+            $parts = explode(':', $content, 2);
+            $serialized = $parts[1];
+        } else {
+            $serialized = $content;
+        }
+
+        $cacheData = unserialize($serialized);
         expect($cacheData)->toHaveKey('dependencies');
         expect(count($cacheData['dependencies']))->toBeGreaterThanOrEqual(1);
 
