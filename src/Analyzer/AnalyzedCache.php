@@ -21,6 +21,13 @@ class AnalyzedCache
 
     protected static array $dependencies = [];
 
+    protected static ?string $key = null;
+
+    public static function setKey(string $key): void
+    {
+        static::$key = $key;
+    }
+
     public static function addDependency(string $path): void
     {
         static::$dependencies[] = $path;
@@ -116,7 +123,27 @@ class AnalyzedCache
             return null;
         }
 
-        $data = unserialize(file_get_contents($cacheFile));
+        $content = file_get_contents($cacheFile);
+
+        if (static::$key) {
+            if (! str_contains($content, ':')) {
+                static::invalidate($path);
+
+                return null;
+            }
+
+            [$signature, $serialized] = explode(':', $content, 2);
+
+            if (! hash_equals($signature, hash_hmac('sha256', $serialized, static::$key))) {
+                static::invalidate($path);
+
+                return null;
+            }
+        } else {
+            $serialized = $content;
+        }
+
+        $data = unserialize($serialized);
 
         if (! is_array($data) || ! isset($data['mtime'], $data['scope'])) {
             return null;
@@ -205,7 +232,13 @@ class AnalyzedCache
             'scope' => $analyzed,
         ];
 
-        file_put_contents($cacheFile, serialize($data));
+        $serialized = serialize($data);
+
+        if (static::$key) {
+            $serialized = hash_hmac('sha256', $serialized, static::$key).':'.$serialized;
+        }
+
+        file_put_contents($cacheFile, $serialized);
     }
 
     protected static function getCacheFilePath(string $path): string
