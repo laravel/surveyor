@@ -9,7 +9,9 @@ class MoneyDTO implements Arrayable
     public function __construct(
         public readonly int $amount,
         public readonly string $currency,
-    ) {}
+    ) {
+        //
+    }
 
     public function toArray(): array
     {

@@ -10,6 +10,7 @@ use Laravel\Surveyor\Analyzer\ModelAnalyzer;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
+use PhpParser\NodeAbstract;
 use Throwable;
 
 class Class_ extends AbstractResolver
@@ -38,7 +39,7 @@ class Class_ extends AbstractResolver
         return null;
     }
 
-    public function onExit(\PhpParser\NodeAbstract $node): void
+    public function onExit(NodeAbstract $node): void
     {
         $result = $this->scope->result();
 

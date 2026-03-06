@@ -219,9 +219,7 @@ class ModelAnalyzer
             // (e.g. Attribute::make(get: fn(): string => ...) → Attribute<string>)
             if ($result->hasMethod($method)) {
                 foreach ($result->getMethod($method)->returnTypes() as $analyzedReturnType) {
-                    $extractedType = $this->extractAttributeGenericType($analyzedReturnType['type']);
-
-                    if ($extractedType) {
+                    if ($extractedType = $this->extractAttributeGenericType($analyzedReturnType['type'])) {
                         return $this->resolveArrayableType($extractedType) ?? $extractedType;
                     }
                 }

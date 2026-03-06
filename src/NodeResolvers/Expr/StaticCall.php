@@ -62,17 +62,15 @@ class StaticCall extends AbstractResolver
             $class = $class->type;
         }
 
-        if ($method === 'make'
+        if (
+            $method === 'make'
             && $class instanceof ClassType
-            && $class->resolved() === Attribute::class) {
+            && $class->resolved() === Attribute::class
+        ) {
             $attributeType = new ClassType(Attribute::class);
 
-            $getArg = $this->findGetArgument($node->args);
-
-            if ($getArg) {
-                $getType = $this->resolveClosureReturnType($getArg->value);
-
-                if ($getType) {
+            if ($getArg = $this->findGetArgument($node->args)) {
+                if ($getType = $this->resolveClosureReturnType($getArg->value)) {
                     $attributeType->setGenericTypes([$getType]);
                 }
             }

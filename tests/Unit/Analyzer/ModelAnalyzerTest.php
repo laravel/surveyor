@@ -1,6 +1,5 @@
 <?php
 
-use App\DTOs\MoneyDTO;
 use App\Models\Post;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelInspector;
