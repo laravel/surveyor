@@ -46,6 +46,11 @@ class SurveyorServiceProvider extends ServiceProvider
         if (env('SURVEYOR_CACHE_ENABLED', false)) {
             $cacheDir = env('SURVEYOR_CACHE_DIR', storage_path('surveyor-cache'));
             AnalyzedCache::setCacheDirectory($cacheDir);
+
+            if ($key = env('SURVEYOR_CACHE_KEY', $this->app['config']['app.key'] ?? '')) {
+                AnalyzedCache::setKey($key);
+            }
+
             AnalyzedCache::enable();
         }
     }

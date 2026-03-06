@@ -21,6 +21,13 @@ class AnalyzedCache
 
     protected static array $dependencies = [];
 
+    protected static ?string $key = null;
+
+    public static function setKey(string $key): void
+    {
+        static::$key = $key;
+    }
+
     public static function addDependency(string $path): void
     {
         static::$dependencies[] = $path;
@@ -116,7 +123,13 @@ class AnalyzedCache
             return null;
         }
 
-        $data = unserialize(file_get_contents($cacheFile));
+        $serialized = self::getCacheFilePayload($cacheFile, $path);
+
+        if ($serialized === null) {
+            return null;
+        }
+
+        $data = unserialize($serialized);
 
         if (! is_array($data) || ! isset($data['mtime'], $data['scope'])) {
             return null;
@@ -144,6 +157,31 @@ class AnalyzedCache
         static::$fileTimes[$path] = $currentModifiedTime;
 
         return static::$cached[$path];
+    }
+
+    protected static function getCacheFilePayload(string $cacheFile, string $path): ?string
+    {
+        $content = file_get_contents($cacheFile);
+
+        if (! static::$key) {
+            return $content;
+        }
+
+        if (! str_contains($content, ':')) {
+            static::invalidate($path);
+
+            return null;
+        }
+
+        [$signature, $serialized] = explode(':', $content, 2);
+
+        if (! hash_equals($signature, hash_hmac('sha256', $serialized, static::$key))) {
+            static::invalidate($path);
+
+            return null;
+        }
+
+        return $serialized;
     }
 
     public static function invalidate(string $path): void
@@ -205,7 +243,13 @@ class AnalyzedCache
             'scope' => $analyzed,
         ];
 
-        file_put_contents($cacheFile, serialize($data));
+        $serialized = serialize($data);
+
+        if (static::$key) {
+            $serialized = hash_hmac('sha256', $serialized, static::$key).':'.$serialized;
+        }
+
+        file_put_contents($cacheFile, $serialized);
     }
 
     protected static function getCacheFilePath(string $path): string
