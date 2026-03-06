@@ -28,6 +28,9 @@ function resetCacheDirectory(): void
 
     $depsProp = $reflection->getProperty('dependencies');
     $depsProp->setValue(null, []);
+
+    $keyProp = $reflection->getProperty('key');
+    $keyProp->setValue(null, null);
 }
 
 function createCacheDir(): string
@@ -56,6 +59,15 @@ function cleanupCacheDir(string $dir): void
 
         rmdir($dir);
     }
+}
+
+function getCacheFilePayload(string $content): string
+{
+    if (strlen($content) > 65 && ctype_xdigit(substr($content, 0, 64)) && $content[64] === ':') {
+        return substr($content, 65);
+    }
+
+    return $content;
 }
 
 describe('memory caching', function () {
@@ -168,14 +180,7 @@ describe('disk caching', function () {
         expect($cacheFiles)->toHaveCount(1);
 
         $content = file_get_contents($cacheFiles[0]);
-        if (str_contains($content, ':')) {
-            $parts = explode(':', $content, 2);
-            $serialized = $parts[1];
-        } else {
-            $serialized = $content;
-        }
-
-        $cacheData = unserialize($serialized);
+        $cacheData = unserialize(getCacheFilePayload($content));
         expect($cacheData)->toBeArray();
 
         unlink($fixture);
@@ -273,6 +278,77 @@ describe('disk caching', function () {
     });
 });
 
+describe('signed cache', function () {
+    it('signs and verifies cache data when key is set', function () {
+        $dir = createCacheDir();
+        AnalyzedCache::enableDiskCache($dir);
+        AnalyzedCache::setKey('base-secret-key');
+
+        $fixture = createTestClassFixture('TestClass', 'public function test() {}');
+        $scope = new Scope;
+        $scope->setPath($fixture);
+        AnalyzedCache::add($fixture, $scope);
+
+        AnalyzedCache::clearMemory();
+
+        $cached = AnalyzedCache::get($fixture);
+        expect($cached)->not->toBeNull()
+            ->and($cached->path())->toBe($fixture);
+
+        unlink($fixture);
+        cleanupCacheDir($dir);
+    });
+
+    it('rejects cache with invalid signature and deletes file', function () {
+        $dir = createCacheDir();
+        AnalyzedCache::enableDiskCache($dir);
+        AnalyzedCache::setKey('base-secret-key');
+
+        $fixture = createTestClassFixture('TestClass', 'public function test() {}');
+        $scope = new Scope;
+        $scope->setPath($fixture);
+        AnalyzedCache::add($fixture, $scope);
+
+        $cacheFiles = glob($dir.'/*.cache');
+        expect($cacheFiles)->toHaveCount(1);
+        $cacheFile = $cacheFiles[0];
+
+        $content = file_get_contents($cacheFile);
+        $parts = explode(':', $content, 2);
+        $tampered = $parts[0].':'.$parts[1].'tampered';
+        file_put_contents($cacheFile, $tampered);
+
+        AnalyzedCache::clearMemory();
+
+        $cached = AnalyzedCache::get($fixture);
+        expect($cached)->toBeNull();
+        expect(file_exists($cacheFile))->toBeFalse();
+
+        unlink($fixture);
+        cleanupCacheDir($dir);
+    });
+
+    it('rejects cache when key changes', function () {
+        $dir = createCacheDir();
+        AnalyzedCache::enableDiskCache($dir);
+        AnalyzedCache::setKey('base-secret-key');
+
+        $fixture = createTestClassFixture('TestClass', 'public function test() {}');
+        $scope = new Scope;
+        $scope->setPath($fixture);
+        AnalyzedCache::add($fixture, $scope);
+
+        AnalyzedCache::clearMemory();
+        AnalyzedCache::setKey('different-secret-key');
+
+        $cached = AnalyzedCache::get($fixture);
+        expect($cached)->toBeNull();
+
+        unlink($fixture);
+        cleanupCacheDir($dir);
+    });
+});
+
 describe('in-progress tracking', function () {
     it('tracks files being analyzed', function () {
         $path = '/some/file.php';
@@ -341,14 +417,7 @@ describe('dependency tracking', function () {
         expect($cacheFiles)->toHaveCount(1);
 
         $content = file_get_contents($cacheFiles[0]);
-        if (str_contains($content, ':')) {
-            $parts = explode(':', $content, 2);
-            $serialized = $parts[1];
-        } else {
-            $serialized = $content;
-        }
-
-        $cacheData = unserialize($serialized);
+        $cacheData = unserialize(getCacheFilePayload($content));
         expect($cacheData)->toHaveKey('dependencies');
         expect(count($cacheData['dependencies']))->toBeGreaterThanOrEqual(1);
 

@@ -123,24 +123,10 @@ class AnalyzedCache
             return null;
         }
 
-        $content = file_get_contents($cacheFile);
+        $serialized = self::getCacheFilePayload($cacheFile, $path);
 
-        if (static::$key) {
-            if (! str_contains($content, ':')) {
-                static::invalidate($path);
-
-                return null;
-            }
-
-            [$signature, $serialized] = explode(':', $content, 2);
-
-            if (! hash_equals($signature, hash_hmac('sha256', $serialized, static::$key))) {
-                static::invalidate($path);
-
-                return null;
-            }
-        } else {
-            $serialized = $content;
+        if ($serialized === null) {
+            return null;
         }
 
         $data = unserialize($serialized);
@@ -171,6 +157,31 @@ class AnalyzedCache
         static::$fileTimes[$path] = $currentModifiedTime;
 
         return static::$cached[$path];
+    }
+
+    protected static function getCacheFilePayload(string $cacheFile, string $path): ?string
+    {
+        $content = file_get_contents($cacheFile);
+
+        if (! static::$key) {
+            return $content;
+        }
+
+        if (! str_contains($content, ':')) {
+            static::invalidate($path);
+
+            return null;
+        }
+
+        [$signature, $serialized] = explode(':', $content, 2);
+
+        if (! hash_equals($signature, hash_hmac('sha256', $serialized, static::$key))) {
+            static::invalidate($path);
+
+            return null;
+        }
+
+        return $serialized;
     }
 
     public static function invalidate(string $path): void
