@@ -5,6 +5,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\ModelInspector;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
+use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\ClassType;
 
 uses()->group('integration');
@@ -160,7 +161,7 @@ describe('ModelAnalyzer computed attributes', function () {
         expect($property->type->isNullable())->toBeTrue();
     });
 
-    it('falls back to Attribute return type when no generic PHPDoc', function () {
+    it('extracts type from getter closure return type hint when no PHPDoc', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(User::class)->result();
 
@@ -176,8 +177,166 @@ describe('ModelAnalyzer computed attributes', function () {
         expect($result->hasProperty('without_doc_block'))->toBeTrue();
 
         $property = $result->getProperty('without_doc_block');
-        // Without a @return PHPDoc with generics, falls back to the method return type
-        expect($property->type->id())->toBe('Illuminate\Database\Eloquent\Casts\Attribute');
+        // Closure has fn (): string => ... so we should extract string, not Attribute
+        expect($property->type->id())->toBe('string');
+    });
+
+    it('extracts int type from getter closure return type hint when no PHPDoc', function () {
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyzeClass(User::class)->result();
+
+        $inspector = app(ModelInspector::class);
+        $info = $inspector->inspect(User::class);
+
+        $attributes = $info['attributes']->keyBy('name');
+
+        if (! $attributes->has('money_in_cents')) {
+            $this->markTestSkipped('Model does not have money_in_cents computed attribute');
+        }
+
+        expect($result->hasProperty('money_in_cents'))->toBeTrue();
+
+        $property = $result->getProperty('money_in_cents');
+        // Closure has fn (): int => ... so we should extract int
+        expect($property->type->id())->toBe('int');
+    });
+
+    it('resolves DTO toArray() shape when getter returns an Arrayable DTO', function () {
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyzeClass(User::class)->result();
+
+        $inspector = app(ModelInspector::class);
+        $info = $inspector->inspect(User::class);
+
+        $attributes = $info['attributes']->keyBy('name');
+
+        if (! $attributes->has('money')) {
+            $this->markTestSkipped('Model does not have money computed attribute');
+        }
+
+        expect($result->hasProperty('money'))->toBeTrue();
+
+        $property = $result->getProperty('money');
+
+        // MoneyDTO implements Arrayable, so Surveyor should resolve toArray() shape
+        expect($property->type)->toBeInstanceOf(ArrayType::class);
+        expect($property->type->keys())->toContain('amount');
+        expect($property->type->keys())->toContain('currency');
+        expect($property->type->keys())->toContain('currency_amount');
+    });
+
+    it('extracts type from regular closure return type hint when no PHPDoc', function () {
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyzeClass(User::class)->result();
+
+        $inspector = app(ModelInspector::class);
+        $info = $inspector->inspect(User::class);
+
+        if (! $info['attributes']->keyBy('name')->has('without_doc_block_closure')) {
+            $this->markTestSkipped('Model does not have without_doc_block_closure computed attribute');
+        }
+
+        $property = $result->getProperty('without_doc_block_closure');
+        expect($property->type->id())->toBe('string');
+    });
+
+    it('resolves DTO toArray() shape when getter is a regular closure returning an Arrayable DTO', function () {
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyzeClass(User::class)->result();
+
+        $inspector = app(ModelInspector::class);
+        $info = $inspector->inspect(User::class);
+
+        if (! $info['attributes']->keyBy('name')->has('money_closure')) {
+            $this->markTestSkipped('Model does not have money_closure computed attribute');
+        }
+
+        $property = $result->getProperty('money_closure');
+        expect($property->type)->toBeInstanceOf(ArrayType::class);
+        expect($property->type->keys())->toContain('amount');
+        expect($property->type->keys())->toContain('currency');
+        expect($property->type->keys())->toContain('currency_amount');
+    });
+
+    it('infers DTO type from untyped arrow function body', function () {
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyzeClass(User::class)->result();
+
+        $inspector = app(ModelInspector::class);
+        $info = $inspector->inspect(User::class);
+
+        if (! $info['attributes']->keyBy('name')->has('money')) {
+            $this->markTestSkipped('Model does not have money computed attribute');
+        }
+
+        $property = $result->getProperty('money');
+        expect($property->type)->toBeInstanceOf(ArrayType::class);
+        expect($property->type->keys())->toContain('amount');
+        expect($property->type->keys())->toContain('currency');
+        expect($property->type->keys())->toContain('currency_amount');
+    });
+
+    it('infers DTO type from untyped regular closure body', function () {
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyzeClass(User::class)->result();
+
+        $inspector = app(ModelInspector::class);
+        $info = $inspector->inspect(User::class);
+
+        if (! $info['attributes']->keyBy('name')->has('money_closure_untyped')) {
+            $this->markTestSkipped('Model does not have money_closure_untyped computed attribute');
+        }
+
+        $property = $result->getProperty('money_closure_untyped');
+        expect($property->type)->toBeInstanceOf(ArrayType::class);
+        expect($property->type->keys())->toContain('amount');
+        expect($property->type->keys())->toContain('currency');
+        expect($property->type->keys())->toContain('currency_amount');
+    });
+
+    it('resolves DTO field types within the toArray() shape', function () {
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyzeClass(User::class)->result();
+
+        $inspector = app(ModelInspector::class);
+        $info = $inspector->inspect(User::class);
+
+        $attributes = $info['attributes']->keyBy('name');
+
+        if (! $attributes->has('money')) {
+            $this->markTestSkipped('Model does not have money computed attribute');
+        }
+
+        $property = $result->getProperty('money');
+        $arrayType = $property->type;
+
+        expect($arrayType)->toBeInstanceOf(ArrayType::class);
+
+        expect($arrayType->value['amount']->id())->toBe('int');
+        expect($arrayType->value['currency']->id())->toBe('string');
+        // currency_amount is a concatenation of currency and amount — resolves to string
+        expect($arrayType->value['currency_amount']->id())->toBe('string');
+    });
+
+    it('resolves jsonSerialize() shape when getter returns a JsonSerializable DTO', function () {
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyzeClass(User::class)->result();
+
+        $inspector = app(ModelInspector::class);
+        $info = $inspector->inspect(User::class);
+
+        if (! $info['attributes']->keyBy('name')->has('price')) {
+            $this->markTestSkipped('Model does not have price computed attribute');
+        }
+
+        $property = $result->getProperty('price');
+        expect($property->type)->toBeInstanceOf(ArrayType::class);
+        expect($property->type->keys())->toContain('amount');
+        expect($property->type->keys())->toContain('currency');
+        expect($property->type->keys())->toContain('currency_amount');
+        expect($property->type->value['amount']->id())->toBe('int');
+        expect($property->type->value['currency']->id())->toBe('string');
+        expect($property->type->value['currency_amount']->id())->toBe('string');
     });
 });
 

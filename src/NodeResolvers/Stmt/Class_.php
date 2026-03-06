@@ -10,6 +10,7 @@ use Laravel\Surveyor\Analyzer\ModelAnalyzer;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
+use PhpParser\NodeAbstract;
 use Throwable;
 
 class Class_ extends AbstractResolver
@@ -35,6 +36,17 @@ class Class_ extends AbstractResolver
 
         $this->parseDocBlock($node, $result);
 
+        return null;
+    }
+
+    public function onExit(NodeAbstract $node): void
+    {
+        $result = $this->scope->result();
+
+        if (! $result instanceof ClassResult) {
+            return;
+        }
+
         if (in_array(Model::class, $this->scope->extends())) {
             try {
                 app(ModelAnalyzer::class)->mergeIntoResult($result->name(), $result, $this->scope);
@@ -42,8 +54,6 @@ class Class_ extends AbstractResolver
                 // Unable to inspect model, possibly due to missing database connection
             }
         }
-
-        return null;
     }
 
     protected function parseDocBlock(Node\Stmt\Class_ $node, ClassResult $result)

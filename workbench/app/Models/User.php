@@ -3,6 +3,8 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\DTOs\MoneyDTO;
+use App\DTOs\PriceDTO;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -77,6 +79,66 @@ class User extends Authenticatable
     {
         return Attribute::make(
             get: fn (): string => 'no doc',
+        );
+    }
+
+    protected function moneyInCents(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): int => (int) ($this->attributes['amount'] * 100),
+        );
+    }
+
+    protected function money(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => new MoneyDTO(
+                amount: (int) ($this->attributes['amount'] ?? 0),
+                currency: $this->attributes['currency'] ?? 'USD',
+            ),
+        );
+    }
+
+    protected function withoutDocBlockClosure(): Attribute
+    {
+        return Attribute::make(
+            get: function (): string {
+                return 'no doc closure';
+            },
+        );
+    }
+
+    protected function moneyClosure(): Attribute
+    {
+        return Attribute::make(
+            get: function (): MoneyDTO {
+                return new MoneyDTO(
+                    amount: (int) ($this->attributes['amount'] ?? 0),
+                    currency: $this->attributes['currency'] ?? 'USD',
+                );
+            },
+        );
+    }
+
+    protected function moneyClosureUntyped(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                return new MoneyDTO(
+                    amount: (int) ($this->attributes['amount'] ?? 0),
+                    currency: $this->attributes['currency'] ?? 'USD',
+                );
+            },
+        );
+    }
+
+    protected function price(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => new PriceDTO(
+                amount: (int) ($this->attributes['amount'] ?? 0),
+                currency: $this->attributes['currency'] ?? 'USD',
+            ),
         );
     }
 }
