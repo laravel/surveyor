@@ -4,9 +4,14 @@ use Laravel\Surveyor\Analyzed\ClassResult;
 use Laravel\Surveyor\Analyzed\MethodResult;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
+use Laravel\Surveyor\Types\ArrayShapeType;
+use Laravel\Surveyor\Types\ArrayType;
+use Laravel\Surveyor\Types\BoolType;
 use Laravel\Surveyor\Types\ClassType;
+use Laravel\Surveyor\Types\IntType;
 use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
+use Laravel\Surveyor\Types\UnionType;
 use Laravel\Surveyor\Types\VoidType;
 
 uses()->group('integration');
@@ -185,19 +190,19 @@ class DefaultValueClass
 
         expect($result->hasProperty('with'))->toBeTrue();
         $withProp = $result->getProperty('with');
-        expect($withProp->type)->toBeInstanceOf(\Laravel\Surveyor\Types\ArrayType::class);
+        expect($withProp->type)->toBeInstanceOf(ArrayType::class);
 
         expect($result->hasProperty('items'))->toBeTrue();
         $itemsProp = $result->getProperty('items');
-        expect($itemsProp->type)->toBeInstanceOf(\Laravel\Surveyor\Types\ArrayType::class);
+        expect($itemsProp->type)->toBeInstanceOf(ArrayType::class);
 
         expect($result->hasProperty('counter'))->toBeTrue();
         $counterProp = $result->getProperty('counter');
-        expect($counterProp->type)->toBeInstanceOf(\Laravel\Surveyor\Types\IntType::class);
+        expect($counterProp->type)->toBeInstanceOf(IntType::class);
 
         expect($result->hasProperty('enabled'))->toBeTrue();
         $enabledProp = $result->getProperty('enabled');
-        expect($enabledProp->type)->toBeInstanceOf(\Laravel\Surveyor\Types\BoolType::class);
+        expect($enabledProp->type)->toBeInstanceOf(BoolType::class);
 
         unlink($fixture);
     });
@@ -218,10 +223,10 @@ class ExplicitTypeClass
         $result = $analyzer->analyze($fixture)->result();
 
         $counterProp = $result->getProperty('counter');
-        expect($counterProp->type)->toBeInstanceOf(\Laravel\Surveyor\Types\IntType::class);
+        expect($counterProp->type)->toBeInstanceOf(IntType::class);
 
         $tagsProp = $result->getProperty('tags');
-        expect($tagsProp->type)->toBeInstanceOf(\Laravel\Surveyor\Types\ArrayShapeType::class);
+        expect($tagsProp->type)->toBeInstanceOf(ArrayShapeType::class);
 
         unlink($fixture);
     });
@@ -319,7 +324,7 @@ class ReturnClass
         $returnType = $method->returnType();
 
         expect(Type::is($returnType, StringType::class)
-            || (Type::is($returnType, \Laravel\Surveyor\Types\UnionType::class)))->toBeTrue();
+            || (Type::is($returnType, UnionType::class)))->toBeTrue();
 
         unlink($fixture);
     });

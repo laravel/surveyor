@@ -5,13 +5,14 @@ namespace Laravel\Surveyor\NodeResolvers\Expr;
 use Laravel\Surveyor\Analysis\Condition;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\ClassType;
+use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
 
 class Instanceof_ extends AbstractResolver
 {
     public function resolve(Node\Expr\Instanceof_ $node)
     {
-        return \Laravel\Surveyor\Types\Type::bool();
+        return Type::bool();
     }
 
     public function resolveForCondition(Node\Expr\Instanceof_ $node)
