@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Laravel\Surveyor\Analyzer\Analyzer;
+use Laravel\Surveyor\Parser\Parser;
 use Laravel\Surveyor\SurveyorServiceProvider;
 use Orchestra\Testbench\TestCase;
 
@@ -78,9 +79,9 @@ class {$className}
 /**
  * Get the parser instance for testing
  */
-function getParser(): Laravel\Surveyor\Parser\Parser
+function getParser(): Parser
 {
-    return app(Laravel\Surveyor\Parser\Parser::class);
+    return app(Parser::class);
 }
 
 /**

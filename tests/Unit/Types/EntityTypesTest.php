@@ -4,6 +4,7 @@ use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Entities\InertiaRender;
 use Laravel\Surveyor\Types\Entities\View;
 use Laravel\Surveyor\Types\Type;
+use Laravel\Surveyor\Types\UnionType;
 
 describe('View', function () {
     it('properly initializes parent ClassType value', function () {
@@ -24,7 +25,7 @@ describe('View', function () {
 
         $union = Type::union($view, $classType);
 
-        expect($union)->toBeInstanceOf(Laravel\Surveyor\Types\UnionType::class);
+        expect($union)->toBeInstanceOf(UnionType::class);
     });
 });
 
@@ -47,6 +48,6 @@ describe('InertiaRender', function () {
 
         $union = Type::union($inertia, $classType);
 
-        expect($union)->toBeInstanceOf(Laravel\Surveyor\Types\UnionType::class);
+        expect($union)->toBeInstanceOf(UnionType::class);
     });
 });

@@ -5,6 +5,7 @@ namespace Laravel\Surveyor\Resolvers;
 use Illuminate\Container\Container;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Debug\Debug;
+use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Parser\DocBlockParser;
 use Laravel\Surveyor\Reflector\Reflector;
 use Laravel\Surveyor\Types\Type;
@@ -24,7 +25,7 @@ class NodeResolver
     }
 
     /**
-     * @return array{0: \Laravel\Surveyor\Types\Contracts\Type|null, 1: \Laravel\Surveyor\Analysis\Scope|null}
+     * @return array{0: \Laravel\Surveyor\Types\Contracts\Type|null, 1: Scope|null}
      */
     public function fromWithScope(NodeAbstract $node, Scope $scope)
     {
@@ -50,7 +51,7 @@ class NodeResolver
     }
 
     /**
-     * @return \Laravel\Surveyor\Analysis\Scope
+     * @return Scope
      */
     public function exitNode(NodeAbstract $node, Scope $scope)
     {
@@ -63,7 +64,7 @@ class NodeResolver
     }
 
     /**
-     * @return \Laravel\Surveyor\NodeResolvers\AbstractResolver
+     * @return AbstractResolver
      */
     protected function resolveClassInstance(NodeAbstract $node)
     {
@@ -83,7 +84,7 @@ class NodeResolver
     }
 
     /**
-     * @return class-string<\Laravel\Surveyor\NodeResolvers\AbstractResolver>
+     * @return class-string<AbstractResolver>
      */
     protected function getClassName(NodeAbstract $node)
     {
@@ -91,7 +92,7 @@ class NodeResolver
     }
 
     /**
-     * @return class-string<\Laravel\Surveyor\NodeResolvers\AbstractResolver>
+     * @return class-string<AbstractResolver>
      */
     protected function resolveClass(NodeAbstract $node)
     {
