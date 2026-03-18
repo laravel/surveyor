@@ -12,14 +12,31 @@ class Util
 
     protected static array $isClassOrInterface = [];
 
+    /**
+     * PHP built-in constants that should never be treated as class/interface names.
+     */
+    protected static array $builtInConstants = [
+        'null', 'true', 'false', 'inf', 'nan',
+        'php_int_max', 'php_int_min', 'php_int_size',
+        'php_float_max', 'php_float_min', 'php_float_dig', 'php_float_epsilon', 'php_float_inf', 'php_float_nan',
+        'php_eol', 'php_maxpathlen', 'php_os', 'php_os_family',
+        'php_sapi', 'php_major_version', 'php_minor_version', 'php_release_version', 'php_version', 'php_version_id',
+        'directory_separator', 'path_separator',
+        'stdin', 'stdout', 'stderr',
+    ];
+
     public static function isClassOrInterface(string $value): bool
     {
         // Check function_exists() and defined() before class_exists() to prevent
         // the class autoloader from being triggered for namespaced functions that
         // were already loaded via Composer's "autoload.files", which would cause
         // a fatal "cannot redeclare function" error.
+        //
+        // We must exclude PHP built-in constants (NULL, TRUE, FALSE, INF, etc.)
+        // from the defined() check, as they are not classes and would cause
+        // ReflectionClass to throw when used downstream.
         return self::$isClassOrInterface[$value] ??= function_exists($value)
-            || defined($value)
+            || (defined($value) && ! in_array(strtolower($value), self::$builtInConstants, true))
             || class_exists($value)
             || interface_exists($value)
             || trait_exists($value)
@@ -53,7 +70,11 @@ class Util
             return $value;
         }
 
-        $reflection = new ReflectionClass($value);
+        try {
+            $reflection = new ReflectionClass($value);
+        } catch (\ReflectionException) {
+            return $value;
+        }
 
         if ($reflection->isSubclassOf(Facade::class)) {
             return ltrim(get_class($value::getFacadeRoot()), '\\');
