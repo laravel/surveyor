@@ -6,6 +6,7 @@ use Illuminate\Support\ServiceProvider;
 use Laravel\Surveyor\Analysis\Resolver;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
+use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
 use Laravel\Surveyor\Parser\DocBlockParser;
 use Laravel\Surveyor\Resolvers\DocBlockResolver;
 use Laravel\Surveyor\Resolvers\NodeResolver;
@@ -25,6 +26,7 @@ class SurveyorServiceProvider extends ServiceProvider
         $this->app->singleton(NodeResolver::class);
         $this->app->singleton(DocBlockResolver::class);
         $this->app->singleton(Analyzer::class);
+        $this->app->singleton(ResourceAnalyzer::class);
         $this->app->singleton(Resolver::class);
         $this->app->singleton(PhpParserParser::class, function () {
             return (new ParserFactory)->createForHostVersion();

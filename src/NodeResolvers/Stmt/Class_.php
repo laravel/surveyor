@@ -3,10 +3,13 @@
 namespace Laravel\Surveyor\NodeResolvers\Stmt;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Http\Resources\Json\ResourceCollection;
 use Laravel\Surveyor\Analysis\EntityType;
 use Laravel\Surveyor\Analyzed\ClassResult;
 use Laravel\Surveyor\Analyzed\MethodResult;
 use Laravel\Surveyor\Analyzer\ModelAnalyzer;
+use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
@@ -36,6 +39,14 @@ class Class_ extends AbstractResolver
 
         $this->parseDocBlock($node, $result);
 
+        if ($this->extendsResource()) {
+            try {
+                app(ResourceAnalyzer::class)->injectModelProperties($result->name(), $result, $this->scope);
+            } catch (Throwable $e) {
+                // Model resolution failed
+            }
+        }
+
         return null;
     }
 
@@ -54,6 +65,22 @@ class Class_ extends AbstractResolver
                 // Unable to inspect model, possibly due to missing database connection
             }
         }
+
+        if ($this->extendsResource()) {
+            try {
+                app(ResourceAnalyzer::class)->resolveDataShape($result->name(), $result, $this->scope);
+            } catch (Throwable $e) {
+                // Unable to resolve resource data shape
+            }
+        }
+    }
+
+    protected function extendsResource(): bool
+    {
+        return (bool) array_intersect(
+            [JsonResource::class, ResourceCollection::class],
+            $this->scope->extends(),
+        );
     }
 
     protected function parseDocBlock(Node\Stmt\Class_ $node, ClassResult $result)

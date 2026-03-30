@@ -3,8 +3,10 @@
 namespace Laravel\Surveyor\NodeResolvers\Expr;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Surveyor\Analysis\Condition;
+use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\NodeResolvers\Shared\AddsValidationRules;
 use Laravel\Surveyor\NodeResolvers\Shared\ResolvesClosureReturnTypes;
@@ -17,6 +19,7 @@ use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
 use Laravel\Surveyor\Types\UnionType;
 use PhpParser\Node;
+use Throwable;
 
 class StaticCall extends AbstractResolver
 {
@@ -98,11 +101,38 @@ class StaticCall extends AbstractResolver
 
     protected function handleEntities(ClassType $class, string $method, Node\Expr\StaticCall $node): array
     {
-        return match ($class->value) {
+        $result = match ($class->value) {
             'Inertia\Inertia' => $this->handleInertiaEntity($method, $node),
             'Illuminate\Support\Facades\View' => $this->handleViewEntity($method, $node),
             default => [],
         };
+
+        if (empty($result) && $method === 'collection') {
+            $result = $this->handleResourceCollection($class, $node);
+        }
+
+        return $result;
+    }
+
+    protected function handleResourceCollection(ClassType $class, Node\Expr\StaticCall $node): array
+    {
+        $resolved = $class->resolved();
+
+        if (! class_exists($resolved) || ! is_subclass_of($resolved, JsonResource::class)) {
+            return [];
+        }
+
+        try {
+            $resourceResponse = app(ResourceAnalyzer::class)->buildResourceResponse($resolved, isCollection: true);
+
+            if ($resourceResponse) {
+                return [$resourceResponse];
+            }
+        } catch (Throwable $e) {
+            // Unable to resolve resource collection
+        }
+
+        return [];
     }
 
     protected function handleInertiaEntity(string $method, Node\Expr\StaticCall $node): array
