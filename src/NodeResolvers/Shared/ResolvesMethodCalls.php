@@ -13,7 +13,7 @@ use PhpParser\Node;
 
 trait ResolvesMethodCalls
 {
-    use AddsValidationRules, LazilyLoadsDependencies;
+    use AddsValidationRules, LazilyLoadsDependencies, ResolvesResourceConditionals;
 
     protected function resolveMethodCall(Node\Expr\MethodCall|Node\Expr\NullsafeMethodCall $node)
     {
@@ -26,6 +26,15 @@ trait ResolvesMethodCalls
         $methodName = $this->from($node->name);
 
         if (! Type::is($methodName, StringType::class) || $methodName->value === null) {
+            // Method names that happen to match PHP function names resolve as ClassType
+            // due to Util::isClassOrInterface(). Handle resource conditionals here before
+            // returning mixed, since methods like when() collide with Laravel's when() helper.
+            if ($methodName instanceof ClassType && $methodName->value !== null
+                && in_array($methodName->value, static::$conditionalMethods)
+                && $this->isJsonResource($var)) {
+                return $this->resolveResourceConditional($var, $methodName->value, $node);
+            }
+
             return Type::mixed();
         }
 
@@ -40,6 +49,10 @@ trait ResolvesMethodCalls
                     return $requestUserType;
                 }
                 break;
+        }
+
+        if (in_array($methodName->value, static::$conditionalMethods) && $this->isJsonResource($var)) {
+            return $this->resolveResourceConditional($var, $methodName->value, $node);
         }
 
         return Type::union(
