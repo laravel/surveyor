@@ -4,6 +4,7 @@ namespace Laravel\Surveyor\Analyzer;
 
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Resources\Json\ResourceCollection;
+use Illuminate\Http\Resources\JsonApi\JsonApiResource;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Analyzed\ClassResult;
 use Laravel\Surveyor\Analyzed\PropertyResult;
@@ -12,6 +13,7 @@ use Laravel\Surveyor\Reflector\Reflector;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
+use Laravel\Surveyor\Types\Entities\JsonApiResourceResponse;
 use Laravel\Surveyor\Types\Entities\ResourceResponse;
 use Laravel\Surveyor\Types\Type;
 use ReflectionClass;
@@ -71,6 +73,12 @@ class ResourceAnalyzer
     {
         $this->reflector->setScope($scope);
 
+        if ($this->isJsonApiResource($resource)) {
+            $this->resolveJsonApiDataShape($resource, $result, $scope);
+
+            return;
+        }
+
         $data = $this->extractToArrayShape($resource, $result);
 
         if (! $data) {
@@ -95,10 +103,17 @@ class ResourceAnalyzer
     /**
      * Build a ResourceResponse for a resource class that has already been analyzed.
      */
-    public function buildResourceResponse(string $resourceClass, bool $isCollection = false): ?ResourceResponse
+    /**
+     * @return ResourceResponse|JsonApiResourceResponse|null
+     */
+    public function buildResourceResponse(string $resourceClass, bool $isCollection = false): ResourceResponse|JsonApiResourceResponse|null
     {
         if (! class_exists($resourceClass)) {
             return null;
+        }
+
+        if ($this->isJsonApiResource($resourceClass)) {
+            return $this->buildJsonApiResourceResponse($resourceClass, $isCollection);
         }
 
         if (AnalyzedCache::isInProgress((new ReflectionClass($resourceClass))->getFileName())) {
@@ -340,6 +355,180 @@ class ResourceAnalyzer
             }
         } catch (Throwable $e) {
             // Unable to resolve collected resource
+        }
+
+        return null;
+    }
+
+    // ──────────────────────────────────────────────
+    // JSON:API Resource Support
+    // ──────────────────────────────────────────────
+
+    protected function isJsonApiResource(string $resource): bool
+    {
+        return class_exists($resource) && is_subclass_of($resource, JsonApiResource::class);
+    }
+
+    protected function resolveJsonApiDataShape(string $resource, ClassResult $result, Scope $scope): void
+    {
+        $attributes = $this->resolveJsonApiAttributes($resource, $result, $scope);
+        $relationships = $this->resolveJsonApiRelationships($resource, $result);
+        $links = $this->resolveJsonApiMethodShape($result, 'toLinks');
+        $meta = $this->resolveJsonApiMethodShape($result, 'toMeta');
+
+        $response = new JsonApiResourceResponse(
+            resourceClass: $resource,
+            attributes: $attributes,
+            relationships: $relationships,
+            links: $links,
+            meta: $meta,
+            isCollection: false,
+        );
+
+        $result->setResourceResponse($response);
+    }
+
+    protected function resolveJsonApiAttributes(string $resource, ClassResult $result, Scope $scope): ?TypeContract
+    {
+        // 1. Check for $attributes property (list of field names)
+        try {
+            $reflection = new ReflectionClass($resource);
+
+            if ($reflection->hasProperty('attributes') && $reflection->getProperty('attributes')->getDeclaringClass()->getName() === $resource) {
+                $attrProperty = $reflection->getProperty('attributes');
+                $attrValue = $attrProperty->getDefaultValue();
+
+                if (is_array($attrValue) && ! empty($attrValue)) {
+                    return $this->resolveAttributeListToTypes($attrValue, $scope);
+                }
+            }
+        } catch (Throwable $e) {
+            // Fall through to method-based resolution
+        }
+
+        // 2. Check toAttributes() method return type
+        if ($result->hasMethod('toAttributes')) {
+            $returnType = $result->getMethod('toAttributes')->returnType();
+
+            if ($returnType instanceof ArrayType) {
+                return $returnType;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Resolve a list of attribute names (e.g. ['title', 'body']) to typed attributes
+     * by looking up each name in the model's properties on the scope.
+     */
+    protected function resolveAttributeListToTypes(array $attributeNames, Scope $scope): ArrayType
+    {
+        $typed = [];
+
+        foreach ($attributeNames as $name) {
+            $property = $scope->state()->properties()->get($name);
+            $typed[$name] = $property ?? Type::mixed();
+        }
+
+        return new ArrayType($typed);
+    }
+
+    protected function resolveJsonApiRelationships(string $resource, ClassResult $result): ?TypeContract
+    {
+        // 1. Check for $relationships property
+        try {
+            $reflection = new ReflectionClass($resource);
+
+            if ($reflection->hasProperty('relationships') && $reflection->getProperty('relationships')->getDeclaringClass()->getName() === $resource) {
+                $relProperty = $reflection->getProperty('relationships');
+                $relValue = $relProperty->getDefaultValue();
+
+                if (is_array($relValue) && ! empty($relValue)) {
+                    return $this->resolveRelationshipListToTypes($relValue);
+                }
+            }
+        } catch (Throwable $e) {
+            // Fall through
+        }
+
+        // 2. Check toRelationships() method return type
+        if ($result->hasMethod('toRelationships')) {
+            $returnType = $result->getMethod('toRelationships')->returnType();
+
+            if ($returnType instanceof ArrayType) {
+                return $returnType;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Resolve a relationship list to types. In JSON:API, relationship output is always
+     * { data: { id: string, type: string } | null } for each relationship identifier.
+     */
+    protected function resolveRelationshipListToTypes(array $relationships): ArrayType
+    {
+        $typed = [];
+
+        foreach ($relationships as $key => $value) {
+            // Could be ['author'] (indexed) or ['author' => UserResource::class] (keyed)
+            $name = is_int($key) ? $value : $key;
+            // Relationship identifiers always have the same shape in JSON:API
+            $typed[$name] = Type::mixed();
+        }
+
+        return new ArrayType($typed);
+    }
+
+    protected function resolveJsonApiMethodShape(ClassResult $result, string $method): ?TypeContract
+    {
+        if (! $result->hasMethod($method)) {
+            return null;
+        }
+
+        $returnType = $result->getMethod($method)->returnType();
+
+        if ($returnType instanceof ArrayType && ! empty($returnType->value)) {
+            return $returnType;
+        }
+
+        return null;
+    }
+
+    public function buildJsonApiResourceResponse(string $resourceClass, bool $isCollection = false): ?JsonApiResourceResponse
+    {
+        if (! class_exists($resourceClass)) {
+            return null;
+        }
+
+        if (AnalyzedCache::isInProgress((new ReflectionClass($resourceClass))->getFileName())) {
+            return null;
+        }
+
+        $analyzed = $this->analyzer->analyzeClass($resourceClass);
+        $result = $analyzed->result();
+
+        if (! $result instanceof ClassResult) {
+            return null;
+        }
+
+        $existing = $result->resourceResponse();
+
+        if ($existing instanceof JsonApiResourceResponse) {
+            if ($isCollection && ! $existing->isCollection) {
+                return new JsonApiResourceResponse(
+                    resourceClass: $existing->resourceClass,
+                    attributes: $existing->attributes,
+                    relationships: $existing->relationships,
+                    links: $existing->links,
+                    meta: $existing->meta,
+                    isCollection: true,
+                );
+            }
+
+            return $existing;
         }
 
         return null;
