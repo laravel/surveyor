@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Resources\ChildApiResource;
 use App\Http\Resources\CustomWrapResource;
 use App\Http\Resources\PostResource;
 use App\Http\Resources\UnwrappedResource;
@@ -125,5 +126,16 @@ describe('ResourceAnalyzer', function () {
         $response = $resourceAnalyzer->buildResourceResponse(PostResource::class, isCollection: true);
         expect($response)->toBeInstanceOf(ResourceResponse::class);
         expect($response->isCollection)->toBeTrue();
+    });
+
+    it('detects resource through intermediate parent class', function () {
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyzeClass(ChildApiResource::class)->result();
+
+        $resourceResponse = $result->resourceResponse();
+        expect($resourceResponse)->not->toBeNull();
+        expect($resourceResponse->data)->toBeInstanceOf(ArrayType::class);
+        expect($resourceResponse->data->keys())->toContain('id');
+        expect($resourceResponse->data->keys())->toContain('title');
     });
 });
