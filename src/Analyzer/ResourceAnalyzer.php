@@ -21,8 +21,6 @@ use Throwable;
 
 class ResourceAnalyzer
 {
-    protected ?string $resolvedModelClass = null;
-
     public function __construct(
         protected Reflector $reflector,
         protected Analyzer $analyzer,
@@ -46,8 +44,6 @@ class ResourceAnalyzer
         if (! $modelClass || ! class_exists($modelClass)) {
             return;
         }
-
-        $this->resolvedModelClass = $modelClass;
 
         $analyzed = $this->analyzer->analyzeClass($modelClass);
         $modelResult = $analyzed->result();
