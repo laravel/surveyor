@@ -1,11 +1,14 @@
 <?php
 
 use App\Http\Resources\ChildApiResource;
+use App\Http\Resources\ConditionalLabelResource;
 use App\Http\Resources\CustomWrapResource;
+use App\Http\Resources\PlainLabelResource;
 use App\Http\Resources\PostResource;
 use App\Http\Resources\UnwrappedResource;
 use App\Http\Resources\UserCollection;
 use App\Http\Resources\UserResource;
+use App\Models\Tag;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
 use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
@@ -137,5 +140,26 @@ describe('ResourceAnalyzer', function () {
         expect($resourceResponse->data)->toBeInstanceOf(ArrayType::class);
         expect($resourceResponse->data->keys())->toContain('id');
         expect($resourceResponse->data->keys())->toContain('title');
+    });
+
+    // Regression: conditional helpers (when, mergeWhen, ...) used to mutate the
+    // shared model property type instance, leaking optionality across resources
+    // that share a model. ConditionalLabelResource wraps Tag::$label in when(),
+    // PlainLabelResource then reads $this->label directly — it must still be required.
+    it('does not leak optionality across resources sharing a model', function () {
+        $analyzer = app(Analyzer::class);
+
+        $analyzer->analyzeClass(ConditionalLabelResource::class);
+
+        $tagResult = $analyzer->analyzeClass(Tag::class)->result();
+        $labelProperty = collect($tagResult->publicProperties())->firstWhere('name', 'label');
+        expect($labelProperty)->not->toBeNull();
+        expect($labelProperty->type->isOptional())->toBeFalse();
+
+        $plain = $analyzer->analyzeClass(PlainLabelResource::class)->result();
+        $data = $plain->resourceResponse()->data;
+
+        expect($data->value)->toHaveKey('label');
+        expect($data->value['label']->isOptional())->toBeFalse();
     });
 });
