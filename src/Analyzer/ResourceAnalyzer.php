@@ -475,11 +475,26 @@ class ResourceAnalyzer
         foreach ($relationships as $key => $value) {
             // Could be ['author'] (indexed) or ['author' => UserResource::class] (keyed)
             $name = is_int($key) ? $value : $key;
-            // Relationship identifiers always have the same shape in JSON:API
-            $typed[$name] = Type::mixed();
+            $typed[$name] = $this->jsonApiRelationshipIdentifier();
         }
 
         return new ArrayType($typed);
+    }
+
+    /**
+     * The fixed JSON:API relationship identifier shape: { data: { id: string, type: string } | null }.
+     */
+    protected function jsonApiRelationshipIdentifier(): ArrayType
+    {
+        $identifier = new ArrayType([
+            'id' => Type::string(),
+            'type' => Type::string(),
+        ]);
+        $identifier->nullable(true);
+
+        return new ArrayType([
+            'data' => $identifier,
+        ]);
     }
 
     protected function resolveJsonApiMethodShape(ClassResult $result, string $method): ?TypeContract
