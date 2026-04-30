@@ -17,7 +17,10 @@ class Type
 
     public static function array($value): Contracts\Type
     {
-        return new ArrayType($value);
+        return new ArrayType(array_map(
+            fn ($v) => $v instanceof VariableState ? $v->type() : $v,
+            $value,
+        ));
     }
 
     public static function collapse(Contracts\Type $type): Contracts\Type

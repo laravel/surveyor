@@ -3,7 +3,6 @@
 namespace Laravel\Surveyor\NodeResolvers\Expr;
 
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
-use Laravel\Surveyor\Result\VariableState;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
@@ -58,14 +57,14 @@ class Array_ extends AbstractResolver
 
                 if ($spreadValue instanceof ArrayType) {
                     foreach ($spreadValue->value as $value) {
-                        $result[] = $this->unwrapVariableState($value);
+                        $result[] = $value;
                     }
                 }
 
                 continue;
             }
 
-            $result[] = $this->unwrapVariableState($this->from($item->value));
+            $result[] = $this->from($item->value);
         }
 
         return Type::array($result);
@@ -85,21 +84,16 @@ class Array_ extends AbstractResolver
 
                 if ($spreadValue instanceof ArrayType) {
                     foreach ($spreadValue->value as $key => $value) {
-                        $result[$key] = $this->unwrapVariableState($value);
+                        $result[$key] = $value;
                     }
                 }
 
                 continue;
             }
 
-            $result[$item->key->value ?? null] = $this->unwrapVariableState($this->from($item->value));
+            $result[$item->key->value ?? null] = $this->from($item->value);
         }
 
         return Type::array($result);
-    }
-
-    protected function unwrapVariableState(mixed $value): mixed
-    {
-        return $value instanceof VariableState ? $value->type() : $value;
     }
 }
