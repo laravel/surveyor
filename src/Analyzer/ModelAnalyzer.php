@@ -3,7 +3,6 @@
 namespace Laravel\Surveyor\Analyzer;
 
 use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
-use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\ModelInspector;
 use Laravel\Surveyor\Analysis\Scope;
@@ -11,7 +10,6 @@ use Laravel\Surveyor\Analyzed\ClassResult;
 use Laravel\Surveyor\Analyzed\MethodResult;
 use Laravel\Surveyor\Analyzed\PropertyResult;
 use Laravel\Surveyor\Reflector\Reflector;
-use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Type;
@@ -22,6 +20,7 @@ class ModelAnalyzer
         protected ModelInspector $modelInspector,
         protected Reflector $reflector,
         protected Analyzer $analyzer,
+        protected ArrayableResolver $arrayableResolver,
     ) {
         //
     }
@@ -220,7 +219,7 @@ class ModelAnalyzer
             if ($result->hasMethod($method)) {
                 foreach ($result->getMethod($method)->returnTypes() as $analyzedReturnType) {
                     if ($extractedType = $this->extractAttributeGenericType($analyzedReturnType['type'])) {
-                        return $this->resolveArrayableType($extractedType) ?? $extractedType;
+                        return $this->arrayableResolver->resolve($extractedType) ?? $extractedType;
                     }
                 }
             }
@@ -236,7 +235,7 @@ class ModelAnalyzer
                 $extractedType = $this->extractAttributeGenericType($returnType);
 
                 if ($extractedType) {
-                    return $this->resolveArrayableType($extractedType) ?? $extractedType;
+                    return $this->arrayableResolver->resolve($extractedType) ?? $extractedType;
                 }
             }
 
@@ -244,43 +243,6 @@ class ModelAnalyzer
         }
 
         return Type::mixed();
-    }
-
-    protected function resolveArrayableType(TypeContract $type): ?TypeContract
-    {
-        if (! $type instanceof ClassType) {
-            return null;
-        }
-
-        $className = $type->resolved();
-
-        if (! class_exists($className)) {
-            return null;
-        }
-
-        $analyzed = $this->analyzer->analyzeClass($className)->result();
-
-        if ($analyzed === null) {
-            return null;
-        }
-
-        if ($analyzed->isArrayable()) {
-            $toArray = $analyzed->asArray();
-
-            if ($toArray && ($returnType = $toArray->returnType()) instanceof ArrayType) {
-                return $returnType;
-            }
-        }
-
-        if ($analyzed->isJsonSerializable()) {
-            $jsonSerialize = $analyzed->asJson();
-
-            if ($jsonSerialize && ($returnType = $jsonSerialize->returnType()) instanceof ArrayType) {
-                return $returnType;
-            }
-        }
-
-        return null;
     }
 
     protected function extractAttributeGenericType(TypeContract $type): ?TypeContract
