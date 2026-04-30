@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Resources\UserResource;
 use Laravel\Surveyor\Analyzed\ClassResult;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
@@ -61,7 +62,7 @@ class MakeController
         expect($response)->not->toBeNull();
         expect($response)->toBeInstanceOf(ResourceResponse::class);
         expect($response->isCollection)->toBeFalse();
-        expect($response->resourceClass)->toBe(\App\Http\Resources\UserResource::class);
+        expect($response->resourceClass)->toBe(UserResource::class);
         expect($response->data->keys())->toContain('id');
         expect($response->data->keys())->toContain('name');
 
@@ -91,7 +92,7 @@ class CollectionController
 
         expect($response)->not->toBeNull();
         expect($response->isCollection)->toBeTrue();
-        expect($response->resourceClass)->toBe(\App\Http\Resources\UserResource::class);
+        expect($response->resourceClass)->toBe(UserResource::class);
 
         unlink($fixture);
     });
