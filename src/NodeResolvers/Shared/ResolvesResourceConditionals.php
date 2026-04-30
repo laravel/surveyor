@@ -54,7 +54,9 @@ trait ResolvesResourceConditionals
             default => Type::mixed(),
         };
 
-        return $type->optional();
+        // Clone before mutating: $type may be a shared instance held by the scope's
+        // property store and the model's PropertyResult (see resolveWhenHas / resolveWhenLoaded).
+        return (clone $type)->optional();
     }
 
     /**
@@ -188,11 +190,12 @@ trait ResolvesResourceConditionals
         $resolved = $this->from($valueExpr);
 
         if ($resolved instanceof ArrayType) {
-            // Mark each value in the array as optional
+            // Mark each value in the array as optional. Clone first — these may be
+            // shared instances from the scope's property store.
             $optionalValues = [];
             foreach ($resolved->value as $key => $value) {
                 if ($value instanceof TypeContract) {
-                    $optionalValues[$key] = $value->optional();
+                    $optionalValues[$key] = (clone $value)->optional();
                 } else {
                     $optionalValues[$key] = $value;
                 }
