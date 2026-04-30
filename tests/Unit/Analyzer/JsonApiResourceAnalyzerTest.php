@@ -41,6 +41,19 @@ describe('JSON:API ResourceAnalyzer', function () {
         expect($response)->toBeInstanceOf(JsonApiResourceResponse::class);
         expect($response->relationships)->toBeInstanceOf(ArrayType::class);
         expect($response->relationships->keys())->toContain('user');
+
+        // Each relationship resolves to the JSON:API identifier shape:
+        // { data: { id: string, type: string } | null }
+        $user = $response->relationships->value['user'];
+        expect($user)->toBeInstanceOf(ArrayType::class);
+        expect($user->keys())->toEqual(['data']);
+
+        $data = $user->value['data'];
+        expect($data)->toBeInstanceOf(ArrayType::class);
+        expect($data->isNullable())->toBeTrue();
+        expect($data->keys())->toEqual(['id', 'type']);
+        expect($data->value['id'])->toBeInstanceOf(\Laravel\Surveyor\Types\StringType::class);
+        expect($data->value['type'])->toBeInstanceOf(\Laravel\Surveyor\Types\StringType::class);
     });
 
     it('detects JSON:API resource with toAttributes() method', function () {
