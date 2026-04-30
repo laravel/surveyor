@@ -8,6 +8,7 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 use Illuminate\Http\Resources\JsonApi\JsonApiResource;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Analyzed\ClassResult;
+use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Parser\DocBlockParser;
 use Laravel\Surveyor\Reflector\Reflector;
 use Laravel\Surveyor\Types\ArrayType;
@@ -217,7 +218,7 @@ class ResourceAnalyzer
                 }
             }
         } catch (Throwable $e) {
-            // Unable to parse docblock
+            // No usable @mixin docblock; fall through to next strategy.
         }
 
         return null;
@@ -245,7 +246,7 @@ class ResourceAnalyzer
                 }
             }
         } catch (Throwable $e) {
-            // Unable to reflect constructor
+            // No constructor-typed model param; fall through to next strategy.
         }
 
         return null;
@@ -293,7 +294,7 @@ class ResourceAnalyzer
                 }
             }
         } catch (Throwable $e) {
-            // Unable to read $wrap property
+            Debug::error($e, 'Reading $wrap property on resource');
         }
 
         return 'data';
@@ -347,7 +348,7 @@ class ResourceAnalyzer
                 }
             }
         } catch (Throwable $e) {
-            // Unable to resolve collected resource
+            Debug::error($e, 'Resolving collected resource');
         }
 
         return null;
@@ -396,7 +397,7 @@ class ResourceAnalyzer
                 }
             }
         } catch (Throwable $e) {
-            // Fall through to method-based resolution
+            // No usable $attributes property; fall through to toAttributes() method.
         }
 
         // 2. Check toAttributes() method return type
@@ -442,7 +443,7 @@ class ResourceAnalyzer
                 }
             }
         } catch (Throwable $e) {
-            // Fall through
+            // No usable $relationships property; fall through to toRelationships() method.
         }
 
         // 2. Check toRelationships() method return type
