@@ -3,8 +3,10 @@
 namespace Laravel\Surveyor\NodeResolvers\Shared;
 
 use Illuminate\Http\Resources\Json\JsonResource;
+use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
+use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
 use Throwable;
@@ -88,7 +90,7 @@ trait ResolvesResourceConditionals
 
         $attrName = $this->from($args[0]->value);
 
-        if ($attrName instanceof \Laravel\Surveyor\Types\StringType && $attrName->value !== null) {
+        if ($attrName instanceof StringType && $attrName->value !== null) {
             $property = $this->scope->state()->properties()->get($attrName->value);
 
             if ($property) {
@@ -134,7 +136,7 @@ trait ResolvesResourceConditionals
         // Otherwise, look up the relation type from model properties
         $relationName = $this->from($args[0]->value);
 
-        if ($relationName instanceof \Laravel\Surveyor\Types\StringType && $relationName->value !== null) {
+        if ($relationName instanceof StringType && $relationName->value !== null) {
             $property = $this->scope->state()->properties()->get($relationName->value);
 
             if ($property) {
@@ -185,7 +187,7 @@ trait ResolvesResourceConditionals
 
         $resolved = $this->from($valueExpr);
 
-        if ($resolved instanceof \Laravel\Surveyor\Types\ArrayType) {
+        if ($resolved instanceof ArrayType) {
             // Mark each value in the array as optional
             $optionalValues = [];
             foreach ($resolved->value as $key => $value) {
@@ -196,7 +198,7 @@ trait ResolvesResourceConditionals
                 }
             }
 
-            return new \Laravel\Surveyor\Types\ArrayType($optionalValues);
+            return new ArrayType($optionalValues);
         }
 
         return $resolved ?? Type::mixed();

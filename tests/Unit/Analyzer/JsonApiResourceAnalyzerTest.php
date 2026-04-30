@@ -2,11 +2,13 @@
 
 use App\Http\Resources\JsonApi\PostApiResource;
 use App\Http\Resources\JsonApi\UserApiResource;
+use App\Http\Resources\PostResource;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
 use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\Entities\JsonApiResourceResponse;
+use Laravel\Surveyor\Types\Entities\ResourceResponse;
 
 uses()->group('integration');
 
@@ -116,10 +118,10 @@ describe('JSON:API ResourceAnalyzer', function () {
 
     it('does not interfere with standard JsonResource analysis', function () {
         $analyzer = app(Analyzer::class);
-        $result = $analyzer->analyzeClass(\App\Http\Resources\PostResource::class)->result();
+        $result = $analyzer->analyzeClass(PostResource::class)->result();
 
         $response = $result->resourceResponse();
-        expect($response)->toBeInstanceOf(\Laravel\Surveyor\Types\Entities\ResourceResponse::class);
+        expect($response)->toBeInstanceOf(ResourceResponse::class);
         expect($response)->not->toBeInstanceOf(JsonApiResourceResponse::class);
     });
 });
