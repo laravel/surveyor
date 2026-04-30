@@ -2,10 +2,11 @@
 
 namespace App\Http\Resources\JsonApi;
 
+use App\Models\Post;
 use Illuminate\Http\Resources\JsonApi\JsonApiResource;
 
 /**
- * @mixin \App\Models\Post
+ * @mixin Post
  */
 class PostApiResource extends JsonApiResource
 {
