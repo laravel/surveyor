@@ -107,14 +107,14 @@ class StaticCall extends AbstractResolver
             default => [],
         };
 
-        if (empty($result) && $method === 'collection') {
-            $result = $this->handleResourceCollection($class, $node);
+        if (empty($result) && in_array($method, ['collection', 'make'], true)) {
+            $result = $this->handleResourceStaticCall($class, isCollection: $method === 'collection');
         }
 
         return $result;
     }
 
-    protected function handleResourceCollection(ClassType $class, Node\Expr\StaticCall $node): array
+    protected function handleResourceStaticCall(ClassType $class, bool $isCollection): array
     {
         $resolved = $class->resolved();
 
@@ -123,13 +123,13 @@ class StaticCall extends AbstractResolver
         }
 
         try {
-            $resourceResponse = app(ResourceAnalyzer::class)->buildResourceResponse($resolved, isCollection: true);
+            $resourceResponse = app(ResourceAnalyzer::class)->buildResourceResponse($resolved, isCollection: $isCollection);
 
             if ($resourceResponse) {
                 return [$resourceResponse];
             }
         } catch (Throwable $e) {
-            // Unable to resolve resource collection
+            // Unable to resolve resource
         }
 
         return [];
