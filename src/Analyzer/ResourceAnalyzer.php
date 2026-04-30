@@ -2,12 +2,12 @@
 
 namespace Laravel\Surveyor\Analyzer;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use Illuminate\Http\Resources\JsonApi\JsonApiResource;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Analyzed\ClassResult;
-use Laravel\Surveyor\Analyzed\PropertyResult;
 use Laravel\Surveyor\Parser\DocBlockParser;
 use Laravel\Surveyor\Reflector\Reflector;
 use Laravel\Surveyor\Types\ArrayType;
@@ -102,9 +102,6 @@ class ResourceAnalyzer
 
     /**
      * Build a ResourceResponse for a resource class that has already been analyzed.
-     */
-    /**
-     * @return ResourceResponse|JsonApiResourceResponse|null
      */
     public function buildResourceResponse(string $resourceClass, bool $isCollection = false): ResourceResponse|JsonApiResourceResponse|null
     {
@@ -218,7 +215,7 @@ class ResourceAnalyzer
                 if ($mixin instanceof ClassType) {
                     $resolved = $mixin->resolved();
 
-                    if (class_exists($resolved) && is_subclass_of($resolved, \Illuminate\Database\Eloquent\Model::class)) {
+                    if (class_exists($resolved) && is_subclass_of($resolved, Model::class)) {
                         return $resolved;
                     }
                 }
@@ -246,7 +243,7 @@ class ResourceAnalyzer
                 if ($type instanceof \ReflectionNamedType && ! $type->isBuiltin()) {
                     $typeName = $type->getName();
 
-                    if (class_exists($typeName) && is_subclass_of($typeName, \Illuminate\Database\Eloquent\Model::class)) {
+                    if (class_exists($typeName) && is_subclass_of($typeName, Model::class)) {
                         return $typeName;
                     }
                 }
@@ -279,7 +276,7 @@ class ResourceAnalyzer
         ];
 
         foreach ($candidates as $candidate) {
-            if (class_exists($candidate) && is_subclass_of($candidate, \Illuminate\Database\Eloquent\Model::class)) {
+            if (class_exists($candidate) && is_subclass_of($candidate, Model::class)) {
                 return $candidate;
             }
         }
