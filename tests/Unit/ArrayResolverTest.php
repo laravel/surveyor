@@ -459,3 +459,65 @@ class OnlySpreadTest
         unlink($fixture);
     });
 });
+
+describe('inline assignment expressions as array values', function () {
+    it('resolves keyed array inline assignments to their underlying type', function () {
+        $fixture = createPhpFixture('
+namespace App;
+
+class KeyedInlineAssignTest
+{
+    public function test(): array
+    {
+        return [
+            "stats" => $stats = ["a" => 1, "b" => 2],
+            "first" => $stats["a"],
+        ];
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        $method = $result->getMethod('test');
+        $returnType = $method->returnType();
+
+        expect($returnType)->toBeInstanceOf(ArrayType::class);
+        expect($returnType->value['stats'])->toBeInstanceOf(ArrayType::class);
+        expect($returnType->value['stats']->value['a'])->toBeInstanceOf(IntType::class);
+        expect($returnType->value['stats']->value['a']->value)->toBe(1);
+        expect($returnType->value['stats']->value['b']->value)->toBe(2);
+        expect($returnType->value['first'])->toBeInstanceOf(IntType::class);
+        expect($returnType->value['first']->value)->toBe(1);
+
+        unlink($fixture);
+    });
+
+    it('resolves list array inline assignments to their underlying type', function () {
+        $fixture = createPhpFixture('
+namespace App;
+
+class ListInlineAssignTest
+{
+    public function test(): array
+    {
+        return [$a = "hello", $a];
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        $method = $result->getMethod('test');
+        $returnType = $method->returnType();
+
+        expect($returnType)->toBeInstanceOf(ArrayType::class);
+        expect($returnType->isList())->toBeTrue();
+        expect($returnType->value[0])->toBeInstanceOf(StringType::class);
+        expect($returnType->value[0]->value)->toBe('hello');
+        expect($returnType->value[1])->toBeInstanceOf(StringType::class);
+        expect($returnType->value[1]->value)->toBe('hello');
+
+        unlink($fixture);
+    });
+});
