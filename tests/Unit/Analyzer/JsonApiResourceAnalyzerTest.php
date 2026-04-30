@@ -9,6 +9,7 @@ use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\Entities\JsonApiResourceResponse;
 use Laravel\Surveyor\Types\Entities\ResourceResponse;
+use Laravel\Surveyor\Types\StringType;
 
 uses()->group('integration');
 
@@ -54,8 +55,8 @@ describe('JSON:API ResourceAnalyzer', function () {
         expect($data)->toBeInstanceOf(ArrayType::class);
         expect($data->isNullable())->toBeTrue();
         expect($data->keys())->toEqual(['id', 'type']);
-        expect($data->value['id'])->toBeInstanceOf(\Laravel\Surveyor\Types\StringType::class);
-        expect($data->value['type'])->toBeInstanceOf(\Laravel\Surveyor\Types\StringType::class);
+        expect($data->value['id'])->toBeInstanceOf(StringType::class);
+        expect($data->value['type'])->toBeInstanceOf(StringType::class);
     });
 
     it('detects JSON:API resource with toAttributes() method', function () {
