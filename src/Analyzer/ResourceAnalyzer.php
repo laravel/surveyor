@@ -11,6 +11,7 @@ use Laravel\Surveyor\Analyzed\ClassResult;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Parser\DocBlockParser;
 use Laravel\Surveyor\Reflector\Reflector;
+use Laravel\Surveyor\Types\ArrayShapeType;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
@@ -366,7 +367,7 @@ class ResourceAnalyzer
     protected function resolveJsonApiDataShape(string $resource, ClassResult $result, Scope $scope): void
     {
         $attributes = $this->resolveJsonApiAttributes($resource, $result, $scope);
-        $relationships = $this->resolveJsonApiRelationships($resource, $result);
+        $relationships = $this->resolveJsonApiRelationships($resource, $result, $scope);
         $links = $this->resolveJsonApiMethodShape($result, 'toLinks');
         $meta = $this->resolveJsonApiMethodShape($result, 'toMeta');
 
@@ -428,7 +429,7 @@ class ResourceAnalyzer
         return new ArrayType($typed);
     }
 
-    protected function resolveJsonApiRelationships(string $resource, ClassResult $result): ?TypeContract
+    protected function resolveJsonApiRelationships(string $resource, ClassResult $result, Scope $scope): ?TypeContract
     {
         // 1. Check for $relationships property
         try {
@@ -439,7 +440,7 @@ class ResourceAnalyzer
                 $relValue = $relProperty->getDefaultValue();
 
                 if (is_array($relValue) && ! empty($relValue)) {
-                    return $this->resolveRelationshipListToTypes($relValue);
+                    return $this->resolveRelationshipListToTypes($relValue, $scope);
                 }
             }
         } catch (Throwable $e) {
@@ -451,7 +452,10 @@ class ResourceAnalyzer
             $returnType = $result->getMethod('toRelationships')->returnType();
 
             if ($returnType instanceof ArrayType) {
-                return $returnType;
+                // The method's array shape gives us relationship NAMES as keys; the values
+                // (e.g. PostApiResource::class) are not the wire shape. Re-wrap into
+                // identifier shapes the same way the $relationships property path does.
+                return $this->resolveRelationshipListToTypes(array_keys($returnType->value), $scope);
             }
         }
 
@@ -459,31 +463,48 @@ class ResourceAnalyzer
     }
 
     /**
-     * Resolve a relationship list to types. In JSON:API, relationship output is always
-     * { data: { id: string, type: string } | null } for each relationship identifier.
+     * Resolve a relationship list to JSON:API identifier shapes.
+     * - to-one: { data: { id: string, type: string } | null }
+     * - to-many: { data: [{ id: string, type: string }] }
+     * Cardinality is detected by looking up the relationship name on the scope's
+     * model properties (an ArrayShapeType indicates a to-many relation).
      */
-    protected function resolveRelationshipListToTypes(array $relationships): ArrayType
+    protected function resolveRelationshipListToTypes(array $relationships, Scope $scope): ArrayType
     {
         $typed = [];
 
         foreach ($relationships as $key => $value) {
             // Could be ['author'] (indexed) or ['author' => UserResource::class] (keyed)
             $name = is_int($key) ? $value : $key;
-            $typed[$name] = $this->jsonApiRelationshipIdentifier();
+            $typed[$name] = $this->jsonApiRelationshipIdentifier($this->isToManyRelation($name, $scope));
         }
 
         return new ArrayType($typed);
     }
 
+    protected function isToManyRelation(string $name, Scope $scope): bool
+    {
+        return $scope->state()->properties()->get($name) instanceof ArrayShapeType;
+    }
+
     /**
-     * The fixed JSON:API relationship identifier shape: { data: { id: string, type: string } | null }.
+     * JSON:API relationship identifier shape.
+     * to-one  → { data: { id, type } | null }
+     * to-many → { data: [{ id, type }] }
      */
-    protected function jsonApiRelationshipIdentifier(): ArrayType
+    protected function jsonApiRelationshipIdentifier(bool $toMany = false): ArrayType
     {
         $identifier = new ArrayType([
             'id' => Type::string(),
             'type' => Type::string(),
         ]);
+
+        if ($toMany) {
+            return new ArrayType([
+                'data' => Type::arrayShape(Type::int(), $identifier),
+            ]);
+        }
+
         $identifier->nullable(true);
 
         return new ArrayType([
