@@ -115,6 +115,16 @@ describe('JSON:API ResourceAnalyzer', function () {
         expect($response->meta->keys())->toContain('created_at');
     });
 
+    it('captures with() method data as additional', function () {
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyzeClass(UserApiResource::class)->result();
+
+        $response = $result->resourceResponse();
+        expect($response)->toBeInstanceOf(JsonApiResourceResponse::class);
+        expect($response->additional)->toBeInstanceOf(ArrayType::class);
+        expect($response->additional->keys())->toContain('jsonapi');
+    });
+
     it('builds JsonApiResourceResponse for external use', function () {
         $resourceAnalyzer = app(ResourceAnalyzer::class);
 

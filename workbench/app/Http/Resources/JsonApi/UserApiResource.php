@@ -39,4 +39,13 @@ class UserApiResource extends JsonApiResource
             'created_at' => $this->created_at,
         ];
     }
+
+    public function with($request)
+    {
+        return [
+            'jsonapi' => [
+                'version' => '1.0',
+            ],
+        ];
+    }
 }

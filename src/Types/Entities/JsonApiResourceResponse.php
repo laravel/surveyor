@@ -14,6 +14,7 @@ class JsonApiResourceResponse extends ClassType
         public readonly ?TypeContract $links = null,
         public readonly ?TypeContract $meta = null,
         public readonly bool $isCollection = false,
+        public readonly ?TypeContract $additional = null,
     ) {
         parent::__construct($resourceClass);
     }
