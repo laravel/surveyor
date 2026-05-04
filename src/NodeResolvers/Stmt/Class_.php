@@ -94,10 +94,7 @@ class Class_ extends AbstractResolver
 
         foreach ($properties as $name => $type) {
             $this->scope->state()->addDocBlockProperty($name, $type);
-
-            if (! $result->hasProperty($name)) {
-                $result->addProperty(new PropertyResult($name, $type, fromDocBlock: true));
-            }
+            $result->addProperty(new PropertyResult($name, $type, fromDocBlock: true));
         }
 
         $methods = $this->docBlockParser->parseMethods($node->getDocComment());
