@@ -520,11 +520,7 @@ class ResourceAnalyzer
 
         $returnType = $result->getMethod($method)->returnType();
 
-        if ($returnType instanceof ArrayType && ! empty($returnType->value)) {
-            return $returnType;
-        }
-
-        return null;
+        return $returnType instanceof ArrayType ? $returnType : null;
     }
 
     public function buildJsonApiResourceResponse(string $resourceClass, bool $isCollection = false): ?JsonApiResourceResponse
