@@ -378,6 +378,7 @@ class ResourceAnalyzer
             links: $links,
             meta: $meta,
             isCollection: false,
+            additional: $this->resolveWithMethod($result),
         );
 
         $result->setResourceResponse($response);
@@ -551,6 +552,7 @@ class ResourceAnalyzer
                     links: $existing->links,
                     meta: $existing->meta,
                     isCollection: true,
+                    additional: $existing->additional,
                 );
             }
 
