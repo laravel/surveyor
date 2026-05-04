@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Resources\JsonApi\ChildJsonApiResource;
+use App\Http\Resources\JsonApi\EmptyShapeApiResource;
 use App\Http\Resources\JsonApi\PostApiResource;
 use App\Http\Resources\JsonApi\UserApiResource;
 use App\Http\Resources\PostResource;
@@ -137,6 +138,21 @@ describe('JSON:API ResourceAnalyzer', function () {
         $response = $result->resourceResponse();
         expect($response)->toBeInstanceOf(ResourceResponse::class);
         expect($response)->not->toBeInstanceOf(JsonApiResourceResponse::class);
+    });
+
+    it('preserves empty toLinks/toMeta shapes instead of dropping them', function () {
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyzeClass(EmptyShapeApiResource::class)->result();
+
+        $response = $result->resourceResponse();
+        expect($response)->toBeInstanceOf(JsonApiResourceResponse::class);
+
+        // Explicit `return []` is the user signaling "no links/meta yet"; the type
+        // should reflect that as an empty shape, not be silently nulled out.
+        expect($response->links)->toBeInstanceOf(ArrayType::class);
+        expect($response->links->value)->toBe([]);
+        expect($response->meta)->toBeInstanceOf(ArrayType::class);
+        expect($response->meta->value)->toBe([]);
     });
 
     it('honors $attributes and $relationships inherited from a base resource', function () {
