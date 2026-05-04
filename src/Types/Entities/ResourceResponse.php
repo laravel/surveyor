@@ -5,7 +5,7 @@ namespace Laravel\Surveyor\Types\Entities;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 
-class ResourceResponse extends ClassType implements TypeContract
+class ResourceResponse extends ClassType
 {
     public function __construct(
         public readonly string $resourceClass,

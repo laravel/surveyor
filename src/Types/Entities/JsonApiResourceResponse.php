@@ -5,7 +5,7 @@ namespace Laravel\Surveyor\Types\Entities;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 
-class JsonApiResourceResponse extends ClassType implements TypeContract
+class JsonApiResourceResponse extends ClassType
 {
     public function __construct(
         public readonly string $resourceClass,
