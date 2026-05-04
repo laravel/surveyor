@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.2.1 - 2026-05-04
+
+### What's Changed
+
+* Expose class-level [@property](https://github.com/property) docblock tags as properties by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/34
+
+**Full Changelog**: https://github.com/laravel/surveyor/compare/v0.2.0...v0.2.1
+
 ## v0.2.0 - 2026-05-04
 
 ### What's Changed
