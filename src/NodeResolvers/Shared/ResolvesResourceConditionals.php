@@ -71,13 +71,7 @@ trait ResolvesResourceConditionals
 
         $valueExpr = $args[1]->value;
 
-        // Check if it's a closure
-        $closureType = $this->resolveClosureReturnType($valueExpr);
-        if ($closureType) {
-            return $closureType;
-        }
-
-        return $this->from($valueExpr) ?? Type::mixed();
+        return $this->resolveClosureReturnType($valueExpr) ?? $this->from($valueExpr) ?? Type::mixed();
     }
 
     /**
@@ -127,8 +121,7 @@ trait ResolvesResourceConditionals
 
         // If there's a second argument, it's the value to use (closure or value)
         if (isset($args[1])) {
-            $closureType = $this->resolveClosureReturnType($args[1]->value);
-            if ($closureType) {
+            if ($closureType = $this->resolveClosureReturnType($args[1]->value)) {
                 return $closureType;
             }
 
@@ -161,12 +154,7 @@ trait ResolvesResourceConditionals
             return Type::mixed();
         }
 
-        $closureType = $this->resolveClosureReturnType($valueArg->value);
-        if ($closureType) {
-            return $closureType;
-        }
-
-        return $this->from($valueArg->value) ?? Type::mixed();
+        return $this->resolveClosureReturnType($valueArg->value) ?? $this->from($valueArg->value) ?? Type::mixed();
     }
 
     /**
@@ -181,29 +169,28 @@ trait ResolvesResourceConditionals
 
         $valueExpr = $args[1]->value;
 
-        // Check if it's a closure
-        $closureType = $this->resolveClosureReturnType($valueExpr);
-        if ($closureType) {
+        if ($closureType = $this->resolveClosureReturnType($valueExpr)) {
             return $closureType;
         }
 
         $resolved = $this->from($valueExpr);
 
-        if ($resolved instanceof ArrayType) {
-            // Mark each value in the array as optional. Clone first — these may be
-            // shared instances from the scope's property store.
-            $optionalValues = [];
-            foreach ($resolved->value as $key => $value) {
-                if ($value instanceof TypeContract) {
-                    $optionalValues[$key] = (clone $value)->optional();
-                } else {
-                    $optionalValues[$key] = $value;
-                }
-            }
-
-            return new ArrayType($optionalValues);
+        if (! $resolved instanceof ArrayType) {
+            return $resolved ?? Type::mixed();
         }
 
-        return $resolved ?? Type::mixed();
+        // Mark each value in the array as optional. Clone first — these may be
+        // shared instances from the scope's property store.
+        $optionalValues = [];
+
+        foreach ($resolved->value as $key => $value) {
+            if ($value instanceof TypeContract) {
+                $optionalValues[$key] = (clone $value)->optional();
+            } else {
+                $optionalValues[$key] = $value;
+            }
+        }
+
+        return new ArrayType($optionalValues);
     }
 }
