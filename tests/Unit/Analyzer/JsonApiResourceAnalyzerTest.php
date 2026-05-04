@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Resources\JsonApi\ChildJsonApiResource;
 use App\Http\Resources\JsonApi\PostApiResource;
 use App\Http\Resources\JsonApi\UserApiResource;
 use App\Http\Resources\PostResource;
@@ -136,5 +137,20 @@ describe('JSON:API ResourceAnalyzer', function () {
         $response = $result->resourceResponse();
         expect($response)->toBeInstanceOf(ResourceResponse::class);
         expect($response)->not->toBeInstanceOf(JsonApiResourceResponse::class);
+    });
+
+    it('honors $attributes and $relationships inherited from a base resource', function () {
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyzeClass(ChildJsonApiResource::class)->result();
+
+        $response = $result->resourceResponse();
+        expect($response)->toBeInstanceOf(JsonApiResourceResponse::class);
+
+        expect($response->attributes)->toBeInstanceOf(ArrayType::class);
+        expect($response->attributes->keys())->toContain('title');
+        expect($response->attributes->keys())->toContain('body');
+
+        expect($response->relationships)->toBeInstanceOf(ArrayType::class);
+        expect($response->relationships->keys())->toContain('user');
     });
 });
