@@ -19,6 +19,7 @@ use Laravel\Surveyor\Types\Entities\JsonApiResourceResponse;
 use Laravel\Surveyor\Types\Entities\ResourceResponse;
 use Laravel\Surveyor\Types\Type;
 use ReflectionClass;
+use ReflectionNamedType;
 use Throwable;
 
 class ResourceAnalyzer
@@ -59,7 +60,12 @@ class ResourceAnalyzer
 
         foreach ($modelResult->publicProperties() as $property) {
             $scope->state()->properties()->addManually(
-                $property->name, $property->type, 0, 0, 0, 0
+                $property->name,
+                $property->type,
+                0,
+                0,
+                0,
+                0
             );
         }
     }
@@ -181,20 +187,9 @@ class ResourceAnalyzer
 
     protected function resolveModelClass(string $resource, ClassResult $result, Scope $scope): ?string
     {
-        // 1. Check @mixin docblock
-        $modelFromMixin = $this->resolveFromMixin($resource);
-        if ($modelFromMixin) {
-            return $modelFromMixin;
-        }
-
-        // 2. Check constructor parameter type hints
-        $modelFromConstructor = $this->resolveFromConstructor($resource);
-        if ($modelFromConstructor) {
-            return $modelFromConstructor;
-        }
-
-        // 3. Naming convention fallback
-        return $this->resolveFromNamingConvention($resource);
+        return $this->resolveFromMixin($resource)
+            ?? $this->resolveFromConstructor($resource)
+            ?? $this->resolveFromNamingConvention($resource);
     }
 
     protected function resolveFromMixin(string $resource): ?string
@@ -238,7 +233,7 @@ class ResourceAnalyzer
             foreach ($reflection->getConstructor()->getParameters() as $param) {
                 $type = $param->getType();
 
-                if ($type instanceof \ReflectionNamedType && ! $type->isBuiltin()) {
+                if ($type instanceof ReflectionNamedType && ! $type->isBuiltin()) {
                     $typeName = $type->getName();
 
                     if (class_exists($typeName) && is_subclass_of($typeName, Model::class)) {
@@ -366,17 +361,12 @@ class ResourceAnalyzer
 
     protected function resolveJsonApiDataShape(string $resource, ClassResult $result, Scope $scope): void
     {
-        $attributes = $this->resolveJsonApiAttributes($resource, $result, $scope);
-        $relationships = $this->resolveJsonApiRelationships($resource, $result, $scope);
-        $links = $this->resolveJsonApiMethodShape($result, 'toLinks');
-        $meta = $this->resolveJsonApiMethodShape($result, 'toMeta');
-
         $this->responses[$resource] = new JsonApiResourceResponse(
             resourceClass: $resource,
-            attributes: $attributes,
-            relationships: $relationships,
-            links: $links,
-            meta: $meta,
+            attributes: $this->resolveJsonApiAttributes($resource, $result, $scope),
+            relationships: $this->resolveJsonApiRelationships($resource, $result, $scope),
+            links: $this->resolveJsonApiMethodShape($result, 'toLinks'),
+            meta: $this->resolveJsonApiMethodShape($result, 'toMeta'),
             isCollection: false,
             additional: $this->resolveWithMethod($result),
         );
