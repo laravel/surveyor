@@ -15,6 +15,7 @@ use Laravel\Surveyor\Analyzer\Analyzer;
 use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\Entities\ResourceResponse;
+use Laravel\Surveyor\Types\StringType;
 
 uses()->group('integration');
 
@@ -173,7 +174,7 @@ describe('ResourceAnalyzer', function () {
         foreach (['has_label', 'loaded_label'] as $key) {
             expect($data->value)->toHaveKey($key);
             expect($data->value[$key]->isOptional())->toBeTrue();
-            expect($data->value[$key])->toBeInstanceOf(\Laravel\Surveyor\Types\StringType::class);
+            expect($data->value[$key])->toBeInstanceOf(StringType::class);
         }
     });
 });
