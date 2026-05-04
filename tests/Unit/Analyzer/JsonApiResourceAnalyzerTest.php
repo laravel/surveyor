@@ -5,6 +5,7 @@ use App\Http\Resources\JsonApi\EmptyShapeApiResource;
 use App\Http\Resources\JsonApi\PostApiResource;
 use App\Http\Resources\JsonApi\UserApiResource;
 use App\Http\Resources\PostResource;
+use Illuminate\Http\Resources\JsonApi\JsonApiResource;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
 use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
@@ -17,6 +18,10 @@ use Laravel\Surveyor\Types\StringType;
 uses()->group('integration');
 
 beforeEach(function () {
+    if (! class_exists(JsonApiResource::class)) {
+        $this->markTestSkipped('JsonApiResource requires Laravel 13+');
+    }
+
     AnalyzedCache::clear();
 });
 
