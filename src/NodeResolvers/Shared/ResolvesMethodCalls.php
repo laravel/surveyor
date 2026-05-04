@@ -29,9 +29,12 @@ trait ResolvesMethodCalls
             // Method names that happen to match PHP function names resolve as ClassType
             // due to Util::isClassOrInterface(). Handle resource conditionals here before
             // returning mixed, since methods like when() collide with Laravel's when() helper.
-            if ($methodName instanceof ClassType && $methodName->value !== null
+            if (
+                $methodName instanceof ClassType
+                && $methodName->value !== null
                 && in_array($methodName->value, static::$conditionalMethods)
-                && $this->isJsonResource($var)) {
+                && $this->isJsonResource($var)
+            ) {
                 return $this->resolveResourceConditional($var, $methodName->value, $node);
             }
 
