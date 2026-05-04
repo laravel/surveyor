@@ -3,6 +3,7 @@
 namespace Laravel\Surveyor\Analyzer;
 
 use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
+use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\ModelInspector;
 use Laravel\Surveyor\Analysis\Scope;
