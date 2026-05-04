@@ -385,13 +385,13 @@ class ResourceAnalyzer
 
     protected function resolveJsonApiAttributes(string $resource, ClassResult $result, Scope $scope): ?TypeContract
     {
-        // 1. Check for $attributes property (list of field names)
+        // 1. Check for $attributes property (list of field names). Walks the inheritance
+        // chain so a base resource declaring shared attributes is honored.
         try {
             $reflection = new ReflectionClass($resource);
 
-            if ($reflection->hasProperty('attributes') && $reflection->getProperty('attributes')->getDeclaringClass()->getName() === $resource) {
-                $attrProperty = $reflection->getProperty('attributes');
-                $attrValue = $attrProperty->getDefaultValue();
+            if ($reflection->hasProperty('attributes')) {
+                $attrValue = $reflection->getProperty('attributes')->getDefaultValue();
 
                 if (is_array($attrValue) && ! empty($attrValue)) {
                     return $this->resolveAttributeListToTypes($attrValue, $scope);
@@ -431,13 +431,13 @@ class ResourceAnalyzer
 
     protected function resolveJsonApiRelationships(string $resource, ClassResult $result, Scope $scope): ?TypeContract
     {
-        // 1. Check for $relationships property
+        // 1. Check for $relationships property. Walks the inheritance chain so a base
+        // resource declaring shared relationships is honored.
         try {
             $reflection = new ReflectionClass($resource);
 
-            if ($reflection->hasProperty('relationships') && $reflection->getProperty('relationships')->getDeclaringClass()->getName() === $resource) {
-                $relProperty = $reflection->getProperty('relationships');
-                $relValue = $relProperty->getDefaultValue();
+            if ($reflection->hasProperty('relationships')) {
+                $relValue = $reflection->getProperty('relationships')->getDefaultValue();
 
                 if (is_array($relValue) && ! empty($relValue)) {
                     return $this->resolveRelationshipListToTypes($relValue, $scope);
