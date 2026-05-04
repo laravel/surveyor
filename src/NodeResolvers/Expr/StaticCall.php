@@ -3,8 +3,10 @@
 namespace Laravel\Surveyor\NodeResolvers\Expr;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Surveyor\Analysis\Condition;
+use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\NodeResolvers\Shared\AddsValidationRules;
 use Laravel\Surveyor\NodeResolvers\Shared\ResolvesClosureReturnTypes;
@@ -17,6 +19,7 @@ use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
 use Laravel\Surveyor\Types\UnionType;
 use PhpParser\Node;
+use Throwable;
 
 class StaticCall extends AbstractResolver
 {
@@ -101,8 +104,38 @@ class StaticCall extends AbstractResolver
         return match ($class->value) {
             'Inertia\Inertia' => $this->handleInertiaEntity($method, $node),
             'Illuminate\Support\Facades\View' => $this->handleViewEntity($method, $node),
-            default => [],
+            default => $this->handleEntitiesFallback($class, $method, $node),
         };
+    }
+
+    protected function handleEntitiesFallback(ClassType $class, string $method, Node\Expr\StaticCall $node): array
+    {
+        if (in_array($method, ['collection', 'make'])) {
+            return $this->handlePossibleResourceStaticCall($class, isCollection: $method === 'collection');
+        }
+
+        return [];
+    }
+
+    protected function handlePossibleResourceStaticCall(ClassType $class, bool $isCollection): array
+    {
+        $resolved = $class->resolved();
+
+        if (! class_exists($resolved) || ! is_subclass_of($resolved, JsonResource::class)) {
+            return [];
+        }
+
+        try {
+            $resourceResponse = app(ResourceAnalyzer::class)->buildResourceResponse($resolved, isCollection: $isCollection);
+
+            if ($resourceResponse) {
+                return [$resourceResponse];
+            }
+        } catch (Throwable $e) {
+            // Unable to resolve resource
+        }
+
+        return [];
     }
 
     protected function handleInertiaEntity(string $method, Node\Expr\StaticCall $node): array
