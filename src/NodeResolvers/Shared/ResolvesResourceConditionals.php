@@ -96,7 +96,7 @@ trait ResolvesResourceConditionals
             $property = $this->scope->state()->properties()->get($attrName->value);
 
             if ($property) {
-                return $property->type();
+                return $property;
             }
         }
 
@@ -142,7 +142,7 @@ trait ResolvesResourceConditionals
             $property = $this->scope->state()->properties()->get($relationName->value);
 
             if ($property) {
-                return $property->type();
+                return $property;
             }
         }
 

@@ -8,6 +8,7 @@ use App\Http\Resources\PostResource;
 use App\Http\Resources\UnwrappedResource;
 use App\Http\Resources\UserCollection;
 use App\Http\Resources\UserResource;
+use App\Http\Resources\WhenLookupResource;
 use App\Models\Tag;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
@@ -161,5 +162,18 @@ describe('ResourceAnalyzer', function () {
 
         expect($data->value)->toHaveKey('label');
         expect($data->value['label']->isOptional())->toBeFalse();
+    });
+
+    it('resolves whenHas() and whenLoaded() to the typed model property and marks them optional', function () {
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyzeClass(WhenLookupResource::class)->result();
+
+        $data = $result->resourceResponse()->data;
+
+        foreach (['has_label', 'loaded_label'] as $key) {
+            expect($data->value)->toHaveKey($key);
+            expect($data->value[$key]->isOptional())->toBeTrue();
+            expect($data->value[$key])->toBeInstanceOf(\Laravel\Surveyor\Types\StringType::class);
+        }
     });
 });
