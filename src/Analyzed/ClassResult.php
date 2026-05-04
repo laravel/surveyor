@@ -4,8 +4,6 @@ namespace Laravel\Surveyor\Analyzed;
 
 use Illuminate\Contracts\Support\Arrayable;
 use JsonSerializable;
-use Laravel\Surveyor\Types\Entities\JsonApiResourceResponse;
-use Laravel\Surveyor\Types\Entities\ResourceResponse;
 use Laravel\Surveyor\Types\Type;
 
 class ClassResult
@@ -23,8 +21,6 @@ class ClassResult
     protected array $methods = [];
 
     protected bool $arrayable = false;
-
-    protected ResourceResponse|JsonApiResourceResponse|null $resourceResponse = null;
 
     /**
      * @param  list<string>  $extends
@@ -186,15 +182,5 @@ class ClassResult
     public function getUse(string $name): ?string
     {
         return $this->uses[$name] ?? null;
-    }
-
-    public function setResourceResponse(ResourceResponse|JsonApiResourceResponse $resourceResponse): void
-    {
-        $this->resourceResponse = $resourceResponse;
-    }
-
-    public function resourceResponse(): ResourceResponse|JsonApiResourceResponse|null
-    {
-        return $this->resourceResponse;
     }
 }

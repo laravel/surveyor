@@ -34,7 +34,7 @@ describe('ResourceAnalyzer', function () {
 
         expect($result)->not->toBeNull();
 
-        $resourceResponse = $result->resourceResponse();
+        $resourceResponse = app(ResourceAnalyzer::class)->buildResourceResponse($result->name());
         expect($resourceResponse)->toBeInstanceOf(ResourceResponse::class);
         expect($resourceResponse->data)->toBeInstanceOf(ArrayType::class);
         expect($resourceResponse->data->keys())->toContain('id');
@@ -48,7 +48,7 @@ describe('ResourceAnalyzer', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(PostResource::class)->result();
 
-        $resourceResponse = $result->resourceResponse();
+        $resourceResponse = app(ResourceAnalyzer::class)->buildResourceResponse($result->name());
         expect($resourceResponse)->not->toBeNull();
 
         // The toArray keys should have resolved types from the Post model
@@ -60,7 +60,7 @@ describe('ResourceAnalyzer', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(UserResource::class)->result();
 
-        $resourceResponse = $result->resourceResponse();
+        $resourceResponse = app(ResourceAnalyzer::class)->buildResourceResponse($result->name());
         expect($resourceResponse)->not->toBeNull();
         expect($resourceResponse->data)->toBeInstanceOf(ArrayType::class);
 
@@ -83,7 +83,7 @@ describe('ResourceAnalyzer', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(UserResource::class)->result();
 
-        $resourceResponse = $result->resourceResponse();
+        $resourceResponse = app(ResourceAnalyzer::class)->buildResourceResponse($result->name());
         expect($resourceResponse)->not->toBeNull();
         expect($resourceResponse->additional)->toBeInstanceOf(ArrayType::class);
         expect($resourceResponse->additional->keys())->toContain('meta');
@@ -93,7 +93,7 @@ describe('ResourceAnalyzer', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(UnwrappedResource::class)->result();
 
-        $resourceResponse = $result->resourceResponse();
+        $resourceResponse = app(ResourceAnalyzer::class)->buildResourceResponse($result->name());
         expect($resourceResponse)->not->toBeNull();
         expect($resourceResponse->wrap)->toBeNull();
     });
@@ -102,7 +102,7 @@ describe('ResourceAnalyzer', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(CustomWrapResource::class)->result();
 
-        $resourceResponse = $result->resourceResponse();
+        $resourceResponse = app(ResourceAnalyzer::class)->buildResourceResponse($result->name());
         expect($resourceResponse)->not->toBeNull();
         expect($resourceResponse->wrap)->toBe('results');
     });
@@ -111,7 +111,7 @@ describe('ResourceAnalyzer', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(UserCollection::class)->result();
 
-        $resourceResponse = $result->resourceResponse();
+        $resourceResponse = app(ResourceAnalyzer::class)->buildResourceResponse($result->name());
         expect($resourceResponse)->not->toBeNull();
         expect($resourceResponse->isCollection)->toBeTrue();
     });
@@ -137,7 +137,7 @@ describe('ResourceAnalyzer', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(ChildApiResource::class)->result();
 
-        $resourceResponse = $result->resourceResponse();
+        $resourceResponse = app(ResourceAnalyzer::class)->buildResourceResponse($result->name());
         expect($resourceResponse)->not->toBeNull();
         expect($resourceResponse->data)->toBeInstanceOf(ArrayType::class);
         expect($resourceResponse->data->keys())->toContain('id');
@@ -159,7 +159,7 @@ describe('ResourceAnalyzer', function () {
         expect($labelProperty->type->isOptional())->toBeFalse();
 
         $plain = $analyzer->analyzeClass(PlainLabelResource::class)->result();
-        $data = $plain->resourceResponse()->data;
+        $data = app(ResourceAnalyzer::class)->buildResourceResponse($plain->name())->data;
 
         expect($data->value)->toHaveKey('label');
         expect($data->value['label']->isOptional())->toBeFalse();
@@ -169,7 +169,7 @@ describe('ResourceAnalyzer', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(WhenLookupResource::class)->result();
 
-        $data = $result->resourceResponse()->data;
+        $data = app(ResourceAnalyzer::class)->buildResourceResponse($result->name())->data;
 
         foreach (['has_label', 'loaded_label'] as $key) {
             expect($data->value)->toHaveKey($key);

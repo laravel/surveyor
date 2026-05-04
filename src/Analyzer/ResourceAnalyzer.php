@@ -23,6 +23,9 @@ use Throwable;
 
 class ResourceAnalyzer
 {
+    /** @var array<string, ResourceResponse|JsonApiResourceResponse> */
+    protected array $responses = [];
+
     public function __construct(
         protected Reflector $reflector,
         protected Analyzer $analyzer,
@@ -86,16 +89,13 @@ class ResourceAnalyzer
         $wrap = $this->resolveWrapKey($resource);
         $additional = $this->resolveWithMethod($result);
 
-        $resourceResponse = new ResourceResponse(
+        $this->responses[$resource] = new ResourceResponse(
             resourceClass: $resource,
             data: $data,
             isCollection: $this->isResourceCollection($resource),
             wrap: $wrap,
             additional: $additional,
         );
-
-        // Store as a synthetic method return type so downstream consumers can retrieve it
-        $result->setResourceResponse($resourceResponse);
     }
 
     /**
@@ -122,8 +122,8 @@ class ResourceAnalyzer
             return null;
         }
 
-        // If the ClassResult already has a ResourceResponse from Phase B, use it
-        if ($existing = $result->resourceResponse()) {
+        // Reuse the response cached during Phase B if analysis already produced one
+        if ($existing = $this->responses[$resourceClass] ?? null) {
             if ($isCollection && ! $existing->isCollection) {
                 return new ResourceResponse(
                     resourceClass: $existing->resourceClass,
@@ -371,7 +371,7 @@ class ResourceAnalyzer
         $links = $this->resolveJsonApiMethodShape($result, 'toLinks');
         $meta = $this->resolveJsonApiMethodShape($result, 'toMeta');
 
-        $response = new JsonApiResourceResponse(
+        $this->responses[$resource] = new JsonApiResourceResponse(
             resourceClass: $resource,
             attributes: $attributes,
             relationships: $relationships,
@@ -380,8 +380,6 @@ class ResourceAnalyzer
             isCollection: false,
             additional: $this->resolveWithMethod($result),
         );
-
-        $result->setResourceResponse($response);
     }
 
     protected function resolveJsonApiAttributes(string $resource, ClassResult $result, Scope $scope): ?TypeContract
@@ -541,7 +539,7 @@ class ResourceAnalyzer
             return null;
         }
 
-        $existing = $result->resourceResponse();
+        $existing = $this->responses[$resourceClass] ?? null;
 
         if ($existing instanceof JsonApiResourceResponse) {
             if ($isCollection && ! $existing->isCollection) {
