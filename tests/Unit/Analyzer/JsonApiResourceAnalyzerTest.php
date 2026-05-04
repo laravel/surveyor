@@ -78,6 +78,18 @@ describe('JSON:API ResourceAnalyzer', function () {
         expect($response)->toBeInstanceOf(JsonApiResourceResponse::class);
         expect($response->relationships)->toBeInstanceOf(ArrayType::class);
         expect($response->relationships->keys())->toContain('posts');
+
+        // toRelationships() values must be wrapped into identifier shapes,
+        // same as the $relationships property form. User::posts is hasMany, so
+        // the shape is { data: [{ id, type }] } (array of identifiers).
+        $posts = $response->relationships->value['posts'];
+        expect($posts)->toBeInstanceOf(ArrayType::class);
+        expect($posts->keys())->toEqual(['data']);
+
+        $data = $posts->value['data'];
+        expect($data)->toBeInstanceOf(\Laravel\Surveyor\Types\ArrayShapeType::class);
+        expect($data->valueType)->toBeInstanceOf(ArrayType::class);
+        expect($data->valueType->keys())->toEqual(['id', 'type']);
     });
 
     it('captures toLinks() data', function () {
