@@ -77,10 +77,10 @@ class Class_ extends AbstractResolver
 
     protected function extendsResource(): bool
     {
-        return (bool) array_intersect(
+        return array_intersect(
             [JsonResource::class, ResourceCollection::class],
             $this->scope->extends(),
-        );
+        ) !== [];
     }
 
     protected function parseDocBlock(Node\Stmt\Class_ $node, ClassResult $result)
