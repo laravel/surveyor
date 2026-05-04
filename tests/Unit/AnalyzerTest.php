@@ -207,6 +207,60 @@ class DefaultValueClass
         unlink($fixture);
     });
 
+    it('exposes class-level @property docblock tags as properties', function () {
+        $fixture = createPhpFixture('
+namespace App;
+
+/**
+ * @property int $id
+ * @property string $email
+ * @property string|null $remember_token
+ * @property-read \Illuminate\Support\Carbon $created_at
+ */
+class DocBlockClass
+{
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        expect($result->hasProperty('id'))->toBeTrue();
+        expect($result->getProperty('id')->fromDocBlock)->toBeTrue();
+        expect($result->getProperty('id')->type)->toBeInstanceOf(IntType::class);
+
+        expect($result->hasProperty('email'))->toBeTrue();
+        expect($result->getProperty('email')->type)->toBeInstanceOf(StringType::class);
+
+        expect($result->hasProperty('remember_token'))->toBeTrue();
+        expect($result->getProperty('remember_token')->type->isNullable())->toBeTrue();
+
+        expect($result->hasProperty('created_at'))->toBeTrue();
+
+        unlink($fixture);
+    });
+
+    it('does not let class-level @property docblock tags overwrite real property declarations', function () {
+        $fixture = createPhpFixture('
+namespace App;
+
+/**
+ * @property string $name
+ */
+class MixedClass
+{
+    public int $name = 0;
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        $nameProp = $result->getProperty('name');
+        expect($nameProp->type)->toBeInstanceOf(IntType::class);
+        expect($nameProp->fromDocBlock)->toBeFalse();
+
+        unlink($fixture);
+    });
+
     it('uses explicit type declaration over default value inference', function () {
         $fixture = createPhpFixture('
 namespace App;
