@@ -8,6 +8,7 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 use Laravel\Surveyor\Analysis\EntityType;
 use Laravel\Surveyor\Analyzed\ClassResult;
 use Laravel\Surveyor\Analyzed\MethodResult;
+use Laravel\Surveyor\Analyzed\PropertyResult;
 use Laravel\Surveyor\Analyzer\ModelAnalyzer;
 use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
@@ -91,8 +92,15 @@ class Class_ extends AbstractResolver
 
         $properties = $this->docBlockParser->parseProperties($node->getDocComment());
 
-        foreach ($properties as $name => $type) {
-            $this->scope->state()->addDocBlockProperty($name, $type);
+        foreach ($properties as $name => $details) {
+            $this->scope->state()->addDocBlockProperty($name, $details['type']);
+            $result->addProperty(new PropertyResult(
+                name: $name,
+                type: $details['type'],
+                fromDocBlock: true,
+                readOnly: $details['readOnly'],
+                writeOnly: $details['writeOnly'],
+            ));
         }
 
         $methods = $this->docBlockParser->parseMethods($node->getDocComment());

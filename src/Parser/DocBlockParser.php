@@ -119,16 +119,27 @@ class DocBlockParser
     {
         $this->parse($docBlock);
 
-        $propertyTagValues = array_merge(
-            $this->parsed->getPropertyTagValues(),
-            $this->parsed->getPropertyReadTagValues(),
-            $this->parsed->getPropertyWriteTagValues()
-        );
+        $readWriteTags = $this->parsed->getPropertyTagValues();
+        $readTags = $this->parsed->getPropertyReadTagValues();
+        $writeTags = $this->parsed->getPropertyWriteTagValues();
+
+        $extractName = fn ($node) => ltrim($node->propertyName, '$');
+
+        $readWriteNames = array_map($extractName, $readWriteTags);
+        $readNames = array_map($extractName, $readTags);
+        $writeNames = array_map($extractName, $writeTags);
 
         $result = [];
 
-        foreach ($propertyTagValues as $node) {
-            $result[ltrim($node->propertyName, '$')] = $this->resolve($node);
+        foreach (array_merge($readWriteTags, $readTags, $writeTags) as $node) {
+            $name = $extractName($node);
+            $hasReadWrite = in_array($name, $readWriteNames, true);
+
+            $result[$name] = [
+                'type' => $this->resolve($node),
+                'readOnly' => ! $hasReadWrite && in_array($name, $readNames, true) && ! in_array($name, $writeNames, true),
+                'writeOnly' => ! $hasReadWrite && in_array($name, $writeNames, true) && ! in_array($name, $readNames, true),
+            ];
         }
 
         return $result;
