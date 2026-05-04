@@ -6,6 +6,7 @@ use App\Http\Resources\PostResource;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
 use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
+use Laravel\Surveyor\Types\ArrayShapeType;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\Entities\JsonApiResourceResponse;
 use Laravel\Surveyor\Types\Entities\ResourceResponse;
@@ -87,7 +88,7 @@ describe('JSON:API ResourceAnalyzer', function () {
         expect($posts->keys())->toEqual(['data']);
 
         $data = $posts->value['data'];
-        expect($data)->toBeInstanceOf(\Laravel\Surveyor\Types\ArrayShapeType::class);
+        expect($data)->toBeInstanceOf(ArrayShapeType::class);
         expect($data->valueType)->toBeInstanceOf(ArrayType::class);
         expect($data->valueType->keys())->toEqual(['id', 'type']);
     });
