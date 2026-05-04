@@ -101,20 +101,23 @@ class StaticCall extends AbstractResolver
 
     protected function handleEntities(ClassType $class, string $method, Node\Expr\StaticCall $node): array
     {
-        $result = match ($class->value) {
+        return match ($class->value) {
             'Inertia\Inertia' => $this->handleInertiaEntity($method, $node),
             'Illuminate\Support\Facades\View' => $this->handleViewEntity($method, $node),
-            default => [],
+            default => $this->handleEntitiesFallback($class, $method, $node),
         };
-
-        if (empty($result) && in_array($method, ['collection', 'make'], true)) {
-            $result = $this->handleResourceStaticCall($class, isCollection: $method === 'collection');
-        }
-
-        return $result;
     }
 
-    protected function handleResourceStaticCall(ClassType $class, bool $isCollection): array
+    protected function handleEntitiesFallback(ClassType $class, string $method, Node\Expr\StaticCall $node): array
+    {
+        if (in_array($method, ['collection', 'make'])) {
+            return $this->handlePossibleResourceStaticCall($class, isCollection: $method === 'collection');
+        }
+
+        return [];
+    }
+
+    protected function handlePossibleResourceStaticCall(ClassType $class, bool $isCollection): array
     {
         $resolved = $class->resolved();
 
