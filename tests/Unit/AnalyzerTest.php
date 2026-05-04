@@ -261,6 +261,39 @@ class MixedClass
         unlink($fixture);
     });
 
+    it('flags @property-read as readOnly and @property-write as writeOnly', function () {
+        $fixture = createPhpFixture('
+namespace App;
+
+/**
+ * @property string $name
+ * @property-read int $id
+ * @property-write string $password
+ * @property string $email
+ * @property-read string $email
+ */
+class FlagsClass
+{
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        expect($result->getProperty('name')->readOnly)->toBeFalse();
+        expect($result->getProperty('name')->writeOnly)->toBeFalse();
+
+        expect($result->getProperty('id')->readOnly)->toBeTrue();
+        expect($result->getProperty('id')->writeOnly)->toBeFalse();
+
+        expect($result->getProperty('password')->readOnly)->toBeFalse();
+        expect($result->getProperty('password')->writeOnly)->toBeTrue();
+
+        expect($result->getProperty('email')->readOnly)->toBeFalse();
+        expect($result->getProperty('email')->writeOnly)->toBeFalse();
+
+        unlink($fixture);
+    });
+
     it('uses explicit type declaration over default value inference', function () {
         $fixture = createPhpFixture('
 namespace App;
