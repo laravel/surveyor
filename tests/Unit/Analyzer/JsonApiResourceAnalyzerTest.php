@@ -36,7 +36,7 @@ describe('JSON:API ResourceAnalyzer', function () {
 
         expect($result)->not->toBeNull();
 
-        $response = $result->resourceResponse();
+        $response = app(ResourceAnalyzer::class)->buildResourceResponse($result->name());
         expect($response)->toBeInstanceOf(JsonApiResourceResponse::class);
         expect($response->attributes)->toBeInstanceOf(ArrayType::class);
         expect($response->attributes->keys())->toContain('title');
@@ -48,7 +48,7 @@ describe('JSON:API ResourceAnalyzer', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(PostApiResource::class)->result();
 
-        $response = $result->resourceResponse();
+        $response = app(ResourceAnalyzer::class)->buildResourceResponse($result->name());
         expect($response)->toBeInstanceOf(JsonApiResourceResponse::class);
         expect($response->relationships)->toBeInstanceOf(ArrayType::class);
         expect($response->relationships->keys())->toContain('user');
@@ -71,7 +71,7 @@ describe('JSON:API ResourceAnalyzer', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(UserApiResource::class)->result();
 
-        $response = $result->resourceResponse();
+        $response = app(ResourceAnalyzer::class)->buildResourceResponse($result->name());
         expect($response)->toBeInstanceOf(JsonApiResourceResponse::class);
         expect($response->attributes)->toBeInstanceOf(ArrayType::class);
         expect($response->attributes->keys())->toContain('name');
@@ -82,7 +82,7 @@ describe('JSON:API ResourceAnalyzer', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(UserApiResource::class)->result();
 
-        $response = $result->resourceResponse();
+        $response = app(ResourceAnalyzer::class)->buildResourceResponse($result->name());
         expect($response)->toBeInstanceOf(JsonApiResourceResponse::class);
         expect($response->relationships)->toBeInstanceOf(ArrayType::class);
         expect($response->relationships->keys())->toContain('posts');
@@ -104,7 +104,7 @@ describe('JSON:API ResourceAnalyzer', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(UserApiResource::class)->result();
 
-        $response = $result->resourceResponse();
+        $response = app(ResourceAnalyzer::class)->buildResourceResponse($result->name());
         expect($response)->toBeInstanceOf(JsonApiResourceResponse::class);
         expect($response->links)->toBeInstanceOf(ArrayType::class);
         expect($response->links->keys())->toContain('self');
@@ -114,7 +114,7 @@ describe('JSON:API ResourceAnalyzer', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(UserApiResource::class)->result();
 
-        $response = $result->resourceResponse();
+        $response = app(ResourceAnalyzer::class)->buildResourceResponse($result->name());
         expect($response)->toBeInstanceOf(JsonApiResourceResponse::class);
         expect($response->meta)->toBeInstanceOf(ArrayType::class);
         expect($response->meta->keys())->toContain('created_at');
@@ -124,7 +124,7 @@ describe('JSON:API ResourceAnalyzer', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(UserApiResource::class)->result();
 
-        $response = $result->resourceResponse();
+        $response = app(ResourceAnalyzer::class)->buildResourceResponse($result->name());
         expect($response)->toBeInstanceOf(JsonApiResourceResponse::class);
         expect($response->additional)->toBeInstanceOf(ArrayType::class);
         expect($response->additional->keys())->toContain('jsonapi');
@@ -151,7 +151,7 @@ describe('JSON:API ResourceAnalyzer', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(PostResource::class)->result();
 
-        $response = $result->resourceResponse();
+        $response = app(ResourceAnalyzer::class)->buildResourceResponse($result->name());
         expect($response)->toBeInstanceOf(ResourceResponse::class);
         expect($response)->not->toBeInstanceOf(JsonApiResourceResponse::class);
     });
@@ -160,7 +160,7 @@ describe('JSON:API ResourceAnalyzer', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(EmptyShapeApiResource::class)->result();
 
-        $response = $result->resourceResponse();
+        $response = app(ResourceAnalyzer::class)->buildResourceResponse($result->name());
         expect($response)->toBeInstanceOf(JsonApiResourceResponse::class);
 
         // Explicit `return []` is the user signaling "no links/meta yet"; the type
@@ -175,7 +175,7 @@ describe('JSON:API ResourceAnalyzer', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(ChildJsonApiResource::class)->result();
 
-        $response = $result->resourceResponse();
+        $response = app(ResourceAnalyzer::class)->buildResourceResponse($result->name());
         expect($response)->toBeInstanceOf(JsonApiResourceResponse::class);
 
         expect($response->attributes)->toBeInstanceOf(ArrayType::class);
