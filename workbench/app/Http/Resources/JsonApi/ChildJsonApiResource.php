@@ -7,6 +7,4 @@ use App\Models\Post;
 /**
  * @mixin Post
  */
-class ChildJsonApiResource extends BaseInheritedJsonApiResource
-{
-}
+class ChildJsonApiResource extends BaseInheritedJsonApiResource {}
