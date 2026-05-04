@@ -13,6 +13,8 @@ class PropertyResult
         public readonly bool $fromDocBlock = false,
         public readonly bool $modelAttribute = false,
         public readonly bool $modelRelation = false,
+        public readonly bool $readOnly = false,
+        public readonly bool $writeOnly = false,
     ) {
         //
     }

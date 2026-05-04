@@ -247,7 +247,7 @@ class Reflector
                 $result = $this->getDocBlockParser()->parseProperties($ref->getDocComment());
 
                 if (array_key_exists($name, $result)) {
-                    return $result[$name];
+                    return $result[$name]['type'];
                 }
             }
         }
