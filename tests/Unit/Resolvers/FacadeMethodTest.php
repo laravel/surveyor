@@ -16,7 +16,7 @@ afterEach(function () {
     AnalyzedCache::clear();
 });
 
-function findStringType(\Laravel\Surveyor\Types\Contracts\Type $type): ?StringType
+function findStringType(Laravel\Surveyor\Types\Contracts\Type $type): ?StringType
 {
     if ($type instanceof StringType) {
         return $type;
