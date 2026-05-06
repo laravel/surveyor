@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.2.2 - 2026-05-06
+
+### What's Changed
+
+* Resolve facades to their root class for method reflection by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/35
+
+**Full Changelog**: https://github.com/laravel/surveyor/compare/v0.2.1...v0.2.2
+
 ## v0.2.1 - 2026-05-04
 
 ### What's Changed
