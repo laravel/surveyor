@@ -69,6 +69,66 @@ class MakeController
         unlink($fixture);
     });
 
+    it('preserves ResourceResponse when ->additional() is chained on new Resource()', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use App\\Http\\Resources\\UserResource;
+use App\\Models\\User;
+
+class AdditionalController
+{
+    public function show(User $user)
+    {
+        return (new UserResource($user))->additional([\'extra\' => \'value\']);
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        $returnType = $result->getMethod('show')->returnType();
+        $response = findResourceResponse($returnType);
+
+        expect($response)->not->toBeNull();
+        expect($response)->toBeInstanceOf(ResourceResponse::class);
+        expect($response->additional)->not->toBeNull();
+        // 'meta' comes from UserResource::with(); 'extra' comes from chained ->additional()
+        expect($response->additional->keys())->toContain('meta');
+        expect($response->additional->keys())->toContain('extra');
+
+        unlink($fixture);
+    });
+
+    it('preserves ResourceResponse when ->additional() is chained on Resource::make()', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use App\\Http\\Resources\\UserResource;
+use App\\Models\\User;
+
+class AdditionalController
+{
+    public function show(User $user)
+    {
+        return UserResource::make($user)->additional([\'extra\' => \'value\']);
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        $returnType = $result->getMethod('show')->returnType();
+        $response = findResourceResponse($returnType);
+
+        expect($response)->not->toBeNull();
+        expect($response)->toBeInstanceOf(ResourceResponse::class);
+        expect($response->additional->keys())->toContain('meta');
+        expect($response->additional->keys())->toContain('extra');
+
+        unlink($fixture);
+    });
+
     it('resolves Resource::collection($models) to a collection ResourceResponse', function () {
         $fixture = createPhpFixture('
 namespace App\\Test;
