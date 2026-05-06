@@ -446,6 +446,7 @@ class Reflector
     protected function resolveReflectedClass(string $className): ReflectionClass
     {
         $className = Util::resolveValidClass($className, $this->scope);
+        $className = Util::resolveClass($className);
 
         if (! Util::isClassOrInterface($className)) {
             throw new Exception('Class does not exist: '.$className);
