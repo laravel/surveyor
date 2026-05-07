@@ -4,6 +4,7 @@ namespace Laravel\Surveyor\NodeResolvers\Expr;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Http\Resources\JsonApi\JsonApiResource;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Surveyor\Analysis\Condition;
 use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
@@ -137,7 +138,14 @@ class StaticCall extends AbstractResolver
 
         $resolved = $class->resolved();
 
-        return class_exists($resolved) && is_subclass_of($resolved, JsonResource::class);
+        if (! class_exists($resolved) || ! is_subclass_of($resolved, JsonResource::class)) {
+            return false;
+        }
+
+        // JSON:API resources still need the documented return type unioned in
+        // for downstream consumers that haven't taught their converter about
+        // JsonApiResourceResponse yet.
+        return ! is_subclass_of($resolved, JsonApiResource::class);
     }
 
     protected function handlePossibleResourceStaticCall(ClassType $class, bool $isCollection): array
