@@ -135,7 +135,7 @@ class Reflector
             }
 
             return null;
-        })->filter()->values();
+        })->filter();
 
         return [Type::array($arr->all())];
     }
