@@ -96,4 +96,32 @@ class CollectionController
 
         unlink($fixture);
     });
+
+    it('does not pollute Resource::collection() return type with the documented AnonymousResourceCollection class', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use App\\Http\\Resources\\UserResource;
+use App\\Models\\User;
+
+class CollectionController
+{
+    public function index()
+    {
+        return UserResource::collection(User::all());
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        $returnType = $result->getMethod('index')->returnType();
+
+        // The ResourceResponse fully describes this call — the documented
+        // Illuminate\Http\Resources\Json\AnonymousResourceCollection return
+        // shouldn't get unioned in alongside it.
+        expect($returnType)->toBeInstanceOf(ResourceResponse::class);
+
+        unlink($fixture);
+    });
 });

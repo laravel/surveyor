@@ -81,8 +81,14 @@ class StaticCall extends AbstractResolver
             return $attributeType;
         }
 
+        $entityReturnTypes = $this->handleEntities($class, $method, $node);
+
+        if ($class instanceof ClassType && $this->entitiesFullyDescribeReturnType($class, $method, $entityReturnTypes)) {
+            return Type::union(...$entityReturnTypes);
+        }
+
         $returnTypes = array_merge(
-            $this->handleEntities($class, $method, $node),
+            $entityReturnTypes,
             $this->reflector->methodReturnType($class, $method, $node),
         );
 
@@ -115,6 +121,23 @@ class StaticCall extends AbstractResolver
         }
 
         return [];
+    }
+
+    protected function entitiesFullyDescribeReturnType(ClassType $class, string $method, array $entityReturnTypes): bool
+    {
+        if (count($entityReturnTypes) === 0) {
+            return false;
+        }
+
+        // Resource ::collection() / ::make() entity types fully describe the return shape;
+        // unioning the documented AnonymousResourceCollection only adds noise.
+        if (! in_array($method, ['collection', 'make'], true)) {
+            return false;
+        }
+
+        $resolved = $class->resolved();
+
+        return class_exists($resolved) && is_subclass_of($resolved, JsonResource::class);
     }
 
     protected function handlePossibleResourceStaticCall(ClassType $class, bool $isCollection): array
