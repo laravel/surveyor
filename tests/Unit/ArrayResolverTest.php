@@ -521,3 +521,38 @@ class ListInlineAssignTest
         unlink($fixture);
     });
 });
+
+describe('compact() function', function () {
+    it('preserves variable names as keys', function () {
+        $fixture = createPhpFixture('
+namespace App;
+
+class CompactTest
+{
+    public function test(): array
+    {
+        $name = "Joe";
+        $age = 25;
+
+        return compact("name", "age");
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        $method = $result->getMethod('test');
+        $returnType = $method->returnType();
+
+        expect($returnType)->toBeInstanceOf(ArrayType::class);
+        expect($returnType->isList())->toBeFalse();
+        expect($returnType->value)->toHaveKey('name');
+        expect($returnType->value)->toHaveKey('age');
+        expect($returnType->value['name'])->toBeInstanceOf(StringType::class);
+        expect($returnType->value['name']->value)->toBe('Joe');
+        expect($returnType->value['age'])->toBeInstanceOf(IntType::class);
+        expect($returnType->value['age']->value)->toBe(25);
+
+        unlink($fixture);
+    });
+});
