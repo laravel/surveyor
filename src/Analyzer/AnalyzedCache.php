@@ -4,6 +4,7 @@ namespace Laravel\Surveyor\Analyzer;
 
 use Laravel\Surveyor\Analysis\Scope;
 use RuntimeException;
+use Throwable;
 
 use function Illuminate\Filesystem\join_paths;
 
@@ -129,9 +130,17 @@ class AnalyzedCache
             return null;
         }
 
-        $data = unserialize($serialized);
+        try {
+            $data = unserialize($serialized);
+        } catch (Throwable) {
+            static::invalidate($path);
+
+            return null;
+        }
 
         if (! is_array($data) || ! isset($data['mtime'], $data['scope'])) {
+            static::invalidate($path);
+
             return null;
         }
 

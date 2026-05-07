@@ -276,6 +276,62 @@ describe('disk caching', function () {
         unlink($fixture);
         cleanupCacheDir($dir);
     });
+
+    it('treats a corrupted cache file as a miss and deletes it', function () {
+        $dir = createCacheDir();
+        AnalyzedCache::enableDiskCache($dir);
+
+        $fixture = createTestClassFixture('TestClass', 'public function test() {}');
+        $scope = new Scope;
+        $scope->setPath($fixture);
+        AnalyzedCache::add($fixture, $scope);
+
+        $cacheFiles = glob($dir.'/*.cache');
+        expect($cacheFiles)->toHaveCount(1);
+        $cacheFile = $cacheFiles[0];
+
+        $content = file_get_contents($cacheFile);
+        file_put_contents($cacheFile, substr($content, 0, intdiv(strlen($content), 2)).'garbage');
+
+        AnalyzedCache::clearMemory();
+
+        $cached = AnalyzedCache::get($fixture);
+        expect($cached)->toBeNull();
+        expect(file_exists($cacheFile))->toBeFalse();
+
+        unlink($fixture);
+        cleanupCacheDir($dir);
+    });
+
+    it('treats a signed cache file with corrupted payload as a miss and deletes it', function () {
+        $dir = createCacheDir();
+        AnalyzedCache::enableDiskCache($dir);
+        AnalyzedCache::setKey('base-secret-key');
+
+        $fixture = createTestClassFixture('TestClass', 'public function test() {}');
+        $scope = new Scope;
+        $scope->setPath($fixture);
+        AnalyzedCache::add($fixture, $scope);
+
+        $cacheFiles = glob($dir.'/*.cache');
+        expect($cacheFiles)->toHaveCount(1);
+        $cacheFile = $cacheFiles[0];
+
+        $content = file_get_contents($cacheFile);
+        [, $serialized] = explode(':', $content, 2);
+        $truncated = substr($serialized, 0, intdiv(strlen($serialized), 2));
+        $signature = hash_hmac('sha256', $truncated, 'base-secret-key');
+        file_put_contents($cacheFile, $signature.':'.$truncated);
+
+        AnalyzedCache::clearMemory();
+
+        $cached = AnalyzedCache::get($fixture);
+        expect($cached)->toBeNull();
+        expect(file_exists($cacheFile))->toBeFalse();
+
+        unlink($fixture);
+        cleanupCacheDir($dir);
+    });
 });
 
 describe('signed cache', function () {
