@@ -83,11 +83,11 @@ class AnalyzedCache
 
     public static function get(string $path): ?Scope
     {
-        if (! file_exists($path)) {
+        $currentModifiedTime = @filemtime($path);
+
+        if ($currentModifiedTime === false) {
             return null;
         }
-
-        $currentModifiedTime = filemtime($path);
 
         return self::tryFromMemory($path, $currentModifiedTime)
             ?? self::tryFromDisk($path, $currentModifiedTime)
