@@ -70,13 +70,13 @@ class AnalyzedCache
 
     public static function add(string $path, Scope $analyzed): void
     {
-        $mtime = file_exists($path) ? filemtime($path) : null;
+        $mtime = @filemtime($path);
 
         static::$cached[$path] = $analyzed;
-        static::$fileTimes[$path] = $mtime;
+        static::$fileTimes[$path] = $mtime !== false ? $mtime : null;
         unset(static::$inProgress[$path]);
 
-        if (static::$persistToDisk && $mtime !== null) {
+        if (static::$persistToDisk && $mtime !== false) {
             static::persistToDisk($path, $analyzed, $mtime);
         }
     }
@@ -142,7 +142,7 @@ class AnalyzedCache
         }
 
         foreach ($data['dependencies'] as $dependency) {
-            if ($dependency['mtime'] !== filemtime($dependency['path'])) {
+            if ($dependency['mtime'] !== @filemtime($dependency['path'])) {
                 static::invalidate($dependency['path']);
                 static::invalidate($path);
 
@@ -236,10 +236,11 @@ class AnalyzedCache
 
         $data = [
             'mtime' => $mtime,
-            'dependencies' => array_values(array_filter(array_map(fn ($dep) => [
-                'path' => $dep,
-                'mtime' => file_exists($dep) ? filemtime($dep) : null,
-            ], array_values(array_unique(self::$dependencies))), fn ($dep) => $dep['mtime'] !== null)),
+            'dependencies' => array_values(array_filter(array_map(function ($dep) {
+                $mtime = @filemtime($dep);
+
+                return ['path' => $dep, 'mtime' => $mtime !== false ? $mtime : null];
+            }, array_values(array_unique(self::$dependencies))), fn ($dep) => $dep['mtime'] !== null)),
             'scope' => $analyzed,
         ];
 
