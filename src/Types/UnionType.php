@@ -67,15 +67,6 @@ class UnionType extends AbstractType implements Contracts\CollapsibleType, Contr
 
     public function id(): string
     {
-        if ($this->cachedId !== null) {
-            return $this->cachedId;
-        }
-
-        $parts = [];
-        foreach ($this->types as $type) {
-            $parts[] = $type->id();
-        }
-
-        return $this->cachedId = implode('|', $parts);
+        return $this->cachedId ??= implode('|', array_map(fn ($type) => $type->id(), $this->types));
     }
 }
