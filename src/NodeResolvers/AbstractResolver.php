@@ -27,6 +27,16 @@ abstract class AbstractResolver
         $this->reflector->setScope($scope);
     }
 
+    public function getScopeOrNull(): ?Scope
+    {
+        return $this->scope ?? null;
+    }
+
+    public function setScopeWithoutPropagation(Scope $scope): void
+    {
+        $this->scope = $scope;
+    }
+
     public function onExit(NodeAbstract $node)
     {
         //

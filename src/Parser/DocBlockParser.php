@@ -48,6 +48,11 @@ class DocBlockParser
         $this->scope = $scope;
     }
 
+    public function getScopeOrNull(): ?Scope
+    {
+        return $this->scope ?? null;
+    }
+
     public function parseReturn(string $docBlock, ?CallLike $node = null): array
     {
         $this->node = $node;

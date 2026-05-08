@@ -48,6 +48,16 @@ class Reflector
         $this->getDocBlockParser()->setScope($scope);
     }
 
+    public function getScopeOrNull(): ?Scope
+    {
+        return $this->scope ?? null;
+    }
+
+    public function setScopeWithoutPropagation(Scope $scope): void
+    {
+        $this->scope = $scope;
+    }
+
     public function functionReturnType(string $name, ?Node $node = null): array
     {
         if (! function_exists($name)) {

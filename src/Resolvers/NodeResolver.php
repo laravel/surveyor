@@ -14,7 +14,14 @@ use Throwable;
 
 class NodeResolver
 {
+    /** @var array<class-string, class-string<AbstractResolver>> */
     protected array $resolved = [];
+
+    /** @var array<class-string<AbstractResolver>, AbstractResolver> */
+    protected array $instances = [];
+
+    /** @var array<class-string<AbstractResolver>, bool> */
+    protected array $hasResolveForCondition = [];
 
     public function __construct(
         protected Container $app,
@@ -30,21 +37,40 @@ class NodeResolver
     public function fromWithScope(NodeAbstract $node, Scope $scope)
     {
         $resolver = $this->resolveClassInstance($node);
+
+        $savedResolverScope = $resolver->getScopeOrNull();
+        $savedReflectorScope = $this->reflector->getScopeOrNull();
+        $savedDocBlockScope = $this->docBlockParser->getScopeOrNull();
+
         $resolver->setScope($scope);
+
+        $newScope = $scope;
+        $resolved = null;
 
         try {
             if ($scope->isAnalyzingCondition()) {
-                $newScope = $scope;
-                $resolved = method_exists($resolver, 'resolveForCondition') ? $resolver->resolveForCondition($node) : null;
+                $resolved = $this->hasResolveForCondition[$resolver::class] ? $resolver->resolveForCondition($node) : null;
             } else {
                 $newScope = $resolver->scope() ?? $scope;
-                $resolver->setScope($newScope);
+                if ($newScope !== $scope) {
+                    $resolver->setScope($newScope);
+                }
                 $resolved = $resolver->resolve($node);
             }
         } catch (Throwable $e) {
             Debug::error($e, 'Resolving node');
 
-            return Debug::throwOr($e, fn () => [Type::mixed(), $newScope ?? null]);
+            return Debug::throwOr($e, fn () => [Type::mixed(), $newScope]);
+        } finally {
+            if ($savedResolverScope !== null) {
+                $resolver->setScopeWithoutPropagation($savedResolverScope);
+            }
+            if ($savedReflectorScope !== null) {
+                $this->reflector->setScopeWithoutPropagation($savedReflectorScope);
+            }
+            if ($savedDocBlockScope !== null) {
+                $this->docBlockParser->setScope($savedDocBlockScope);
+            }
         }
 
         return [$resolved, $newScope];
@@ -57,10 +83,27 @@ class NodeResolver
     {
         $resolver = $this->resolveClassInstance($node);
 
-        $resolver->setScope($scope);
-        $resolver->onExit($node);
+        $savedResolverScope = $resolver->getScopeOrNull();
+        $savedReflectorScope = $this->reflector->getScopeOrNull();
+        $savedDocBlockScope = $this->docBlockParser->getScopeOrNull();
 
-        return $resolver->exitScope();
+        $resolver->setScope($scope);
+
+        try {
+            $resolver->onExit($node);
+
+            return $resolver->exitScope();
+        } finally {
+            if ($savedResolverScope !== null) {
+                $resolver->setScopeWithoutPropagation($savedResolverScope);
+            }
+            if ($savedReflectorScope !== null) {
+                $this->reflector->setScopeWithoutPropagation($savedReflectorScope);
+            }
+            if ($savedDocBlockScope !== null) {
+                $this->docBlockParser->setScope($savedDocBlockScope);
+            }
+        }
     }
 
     /**
@@ -70,7 +113,15 @@ class NodeResolver
     {
         $className = $this->getClassName($node);
 
-        Debug::log('🧐 Resolving Node: '.$className.' '.$node->getStartLine(), level: 3);
+        return $this->instances[$className] ??= $this->makeInstance($className);
+    }
+
+    /**
+     * @param  class-string<AbstractResolver>  $className
+     */
+    protected function makeInstance(string $className): AbstractResolver
+    {
+        $this->hasResolveForCondition[$className] = method_exists($className, 'resolveForCondition');
 
         return new $className($this, $this->docBlockParser, $this->reflector);
     }
@@ -96,9 +147,9 @@ class NodeResolver
      */
     protected function resolveClass(NodeAbstract $node)
     {
-        return str(get_class($node))
-            ->after('Node\\')
-            ->prepend('Laravel\\Surveyor\\NodeResolvers\\')
-            ->toString();
+        $class = get_class($node);
+        $pos = strpos($class, 'Node\\');
+
+        return 'Laravel\\Surveyor\\NodeResolvers\\'.($pos === false ? $class : substr($class, $pos + 5));
     }
 }
