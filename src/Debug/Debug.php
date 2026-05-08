@@ -94,9 +94,14 @@ class Debug
         return $callback();
     }
 
+    public static function shouldLog(int $level = 1): bool
+    {
+        return self::$logLevel >= $level;
+    }
+
     public static function log($message, $data = null, $level = 1)
     {
-        if (self::$logLevel < $level) {
+        if (! self::shouldLog($level)) {
             return;
         }
 
@@ -190,12 +195,23 @@ class Debug
 
     public static function increaseDepth()
     {
-        self::$depths[self::activePath()]++;
+        if (! self::shouldLog(1)) {
+            return;
+        }
+
+        $path = self::activePath();
+        self::$depths[$path] = (self::$depths[$path] ?? 0) + 1;
     }
 
     public static function decreaseDepth()
     {
-        self::$depths[self::activePath()] = max(0, self::$depths[self::activePath()] - 1);
+        if (! self::shouldLog(1)) {
+            return;
+        }
+
+        $path = self::activePath();
+        $current = self::$depths[$path] ?? 0;
+        self::$depths[$path] = $current > 0 ? $current - 1 : 0;
     }
 
     public static function throw(Throwable $e)
