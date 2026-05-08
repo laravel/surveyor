@@ -4,6 +4,8 @@ namespace Laravel\Surveyor\Types;
 
 class ArrayType extends AbstractType implements Contracts\Type
 {
+    private ?string $cachedId = null;
+
     public function __construct(public readonly array $value)
     {
         //
@@ -56,6 +58,21 @@ class ArrayType extends AbstractType implements Contracts\Type
 
     public function id(): string
     {
-        return json_encode($this->value);
+        return $this->cachedId ??= $this->determineId();
+    }
+
+    protected function determineId(): string
+    {
+        $parts = [];
+
+        foreach ($this->value as $key => $type) {
+            $parts[] = $key.'=>'.(
+                $type instanceof Contracts\Type ? $type->id()
+                : (is_scalar($type)
+                    ? (string) $type : 'mixed')
+            );
+        }
+
+        return '['.implode(',', $parts).']';
     }
 }

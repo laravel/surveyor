@@ -7,6 +7,8 @@ use Illuminate\Support\Collection;
 
 class UnionType extends AbstractType implements Contracts\CollapsibleType, Contracts\MultiType, Contracts\Type
 {
+    private ?string $cachedId = null;
+
     public function __construct(public readonly array $types = [])
     {
         //
@@ -65,6 +67,15 @@ class UnionType extends AbstractType implements Contracts\CollapsibleType, Contr
 
     public function id(): string
     {
-        return json_encode($this->types);
+        if ($this->cachedId !== null) {
+            return $this->cachedId;
+        }
+
+        $parts = [];
+        foreach ($this->types as $type) {
+            $parts[] = $type->id();
+        }
+
+        return $this->cachedId = implode('|', $parts);
     }
 }
