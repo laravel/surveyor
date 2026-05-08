@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.2.3 - 2026-05-07
+
+### What's Changed
+
+* Treat corrupted disk cache files as a miss by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/36
+* Preserve associative keys when resolving compact() by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/37
+* Don't union AnonymousResourceCollection into Resource::collection() return type by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/38
+
+**Full Changelog**: https://github.com/laravel/surveyor/compare/v0.2.2...v0.2.3
+
 ## v0.2.2 - 2026-05-06
 
 ### What's Changed
