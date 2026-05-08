@@ -2,7 +2,6 @@
 
 namespace Laravel\Surveyor\Types;
 
-use Illuminate\Support\Collection;
 use Laravel\Surveyor\Result\VariableState;
 use Laravel\Surveyor\Support\Util;
 use Laravel\Surveyor\Types\Contracts\CollapsibleType;
@@ -175,43 +174,83 @@ class Type
         return self::string($value);
     }
 
-    protected static function flattenUnion(array $args): Collection
+    protected static function flattenUnion(array $args, array &$out = []): array
     {
-        return collect($args)->flatMap(
-            fn ($type) => ($type instanceof UnionType)
-                ? self::flattenUnion($type->types)
-                : [$type]
-        );
+        foreach ($args as $type) {
+            if ($type instanceof UnionType) {
+                self::flattenUnion($type->types, $out);
+            } else {
+                $out[] = $type;
+            }
+        }
+
+        return $out;
     }
 
     public static function union(...$args): Contracts\Type
     {
-        $args = self::flattenUnion($args)
-            ->filter()
-            ->map(fn ($type) => match (true) {
-                $type instanceof VariableState => $type->type(),
-                default => $type,
-            })
-            ->unique(fn ($type) => $type->toString())
-            ->values();
+        $flat = [];
+        $unique = [];
+        $hasNull = false;
 
-        $nullType = $args->filter(fn ($type) => $type instanceof NullType);
+        self::flattenUnion($args, $flat);
 
-        if ($nullType->isNotEmpty()) {
-            $args = $args->map(fn ($type) => $type instanceof NullType ? null : $type->nullable())->filter()->values();
+        foreach ($flat as $type) {
+            if (! $type) {
+                continue;
+            }
+
+            if ($type instanceof VariableState) {
+                $type = $type->type();
+            }
+
+            if ($type instanceof NullType) {
+                $hasNull = true;
+
+                continue;
+            }
+
+            $key = $type->toString();
+
+            if (! isset($unique[$key])) {
+                $unique[$key] = $type;
+            }
         }
 
-        // Remove types that have a more specific counterpart
-        $args = $args->filter(fn ($type) => ! $args->contains(
-            fn ($otherType) => $type !== $otherType && $otherType->isMoreSpecificThan($type)
-        ))->values();
+        if ($hasNull) {
+            foreach ($unique as $key => $type) {
+                $unique[$key] = $type->nullable();
+            }
+        }
 
-        $args = $args->filter(fn ($type) => ! $type instanceof MixedType)->values();
+        if (count($unique) <= 1) {
+            $unique = array_filter($unique, fn ($t) => ! $t instanceof MixedType);
+        } else {
+            // Remove types that have a more specific counterpart
+            $values = array_values($unique);
+            $filtered = [];
 
-        return match ($args->count()) {
-            0 => Type::mixed(),
-            1 => $args->first(),
-            default => new UnionType($args->all()),
+            foreach ($values as $type) {
+                $hasMoreSpecific = false;
+                foreach ($values as $otherType) {
+                    if ($type !== $otherType && $otherType->isMoreSpecificThan($type)) {
+                        $hasMoreSpecific = true;
+                        break;
+                    }
+                }
+
+                if (! $hasMoreSpecific && ! $type instanceof MixedType) {
+                    $filtered[] = $type;
+                }
+            }
+
+            $unique = $filtered;
+        }
+
+        return match (count($unique)) {
+            0 => self::mixed(),
+            1 => $unique[reset($unique)],
+            default => new UnionType(array_values($unique)),
         };
     }
 
