@@ -232,6 +232,7 @@ class Type
 
             foreach ($values as $type) {
                 $hasMoreSpecific = false;
+
                 foreach ($values as $otherType) {
                     if ($type !== $otherType && $otherType->isMoreSpecificThan($type)) {
                         $hasMoreSpecific = true;
@@ -249,7 +250,7 @@ class Type
 
         return match (count($unique)) {
             0 => self::mixed(),
-            1 => $unique[reset($unique)],
+            1 => reset($unique),
             default => new UnionType(array_values($unique)),
         };
     }
