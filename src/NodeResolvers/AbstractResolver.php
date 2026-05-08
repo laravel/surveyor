@@ -25,7 +25,6 @@ abstract class AbstractResolver
     {
         $this->scope = $scope;
         $this->reflector->setScope($scope);
-        $this->docBlockParser->setScope($scope);
     }
 
     public function onExit(NodeAbstract $node)
