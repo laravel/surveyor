@@ -265,8 +265,20 @@ class StateTrackerItem
 
     protected function getAtLineFromSnapshot(string $name, NodeAbstract $node): ?VariableState
     {
-        foreach (array_reverse($this->snapshots) as $snapshot) {
-            if ($result = $this->findAtLine($snapshot[$name] ?? [], $node)) {
+        if (empty($this->snapshots)) {
+            return null;
+        }
+
+        $keys = array_keys($this->snapshots);
+
+        for ($i = count($keys) - 1; $i >= 0; $i--) {
+            $snapshot = $this->snapshots[$keys[$i]];
+
+            if (! isset($snapshot[$name])) {
+                continue;
+            }
+
+            if ($result = $this->findAtLine($snapshot[$name], $node)) {
                 return $result;
             }
         }
@@ -276,37 +288,51 @@ class StateTrackerItem
 
     protected function getAtLineFromVariables(string $name, NodeAbstract $node): ?VariableState
     {
-        return $this->findAtLine($this->variables[$name] ?? [], $node);
+        if (! isset($this->variables[$name])) {
+            return null;
+        }
+
+        return $this->findAtLine($this->variables[$name], $node);
     }
 
     protected function findAtLine(array $variables, NodeAbstract $node): ?VariableState
     {
-        $lines = array_filter(
-            $variables,
-            fn ($variable) => $variable->startLine() <= $node->getStartLine()
-                && $variable->startTokenPos() <= $node->getStartTokenPos()
-                && $variable->isTerminatedAfter($node->getStartLine()),
-        );
-
-        $result = end($lines);
-
-        if ($result === false) {
+        if (empty($variables)) {
             return null;
         }
 
-        if ($result->startLine() !== $node->getStartLine()) {
+        $nodeLine = $node->getStartLine();
+        $nodeTokenPos = $node->getStartTokenPos();
+
+        $result = null;
+        $prev = null;
+
+        foreach ($variables as $variable) {
+            if ($variable->startLine() > $nodeLine) {
+                continue;
+            }
+            if ($variable->startTokenPos() > $nodeTokenPos) {
+                continue;
+            }
+            if (! $variable->isTerminatedAfter($nodeLine)) {
+                continue;
+            }
+
+            $prev = $result;
+            $result = $variable;
+        }
+
+        if ($result === null) {
+            return null;
+        }
+
+        if ($result->startLine() !== $nodeLine) {
             return $result;
         }
 
-        // Trying to retrieve a value at the same line number as a possible assignment, so return the previous value if it exists
-        $newResult = prev($lines);
-
-        if ($newResult) {
-            return $newResult;
-        }
-
-        // If no previous value exists, return the current value
-        return $result;
+        // Trying to retrieve a value at the same line number as a possible
+        // assignment, so return the previous value if it exists.
+        return $prev ?? $result;
     }
 
     protected function getSnapshotKey(NodeAbstract $node): string
