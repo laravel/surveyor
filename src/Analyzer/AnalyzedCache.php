@@ -72,6 +72,11 @@ class AnalyzedCache
     {
         $mtime = @filemtime($path);
 
+        // Slim the scope before caching: drop local-variable history (dead
+        // post-traversal) and collapse property history to last-state-only
+        // (cross-file consumers only ever read the latest).
+        $analyzed->state()->compact();
+
         static::$cached[$path] = $analyzed;
         static::$fileTimes[$path] = $mtime !== false ? $mtime : null;
         unset(static::$inProgress[$path]);
