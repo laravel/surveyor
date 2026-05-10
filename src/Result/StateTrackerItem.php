@@ -52,6 +52,23 @@ class StateTrackerItem
         return $this->variables;
     }
 
+    /**
+     * Slim the tracker for caching: keep only the last VariableState per name
+     * (cross-file consumers only ever read the latest via `get()`), and drop
+     * all snapshot state (only meaningful during traversal of THIS file).
+     */
+    public function compact(): void
+    {
+        foreach ($this->variables as $name => $states) {
+            if (count($states) > 1) {
+                $this->variables[$name] = [end($states)];
+            }
+        }
+
+        $this->snapshots = [];
+        $this->activeSnapshots = [];
+    }
+
     public function addManually(
         string $name,
         TypeContract $type,

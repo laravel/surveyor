@@ -9,9 +9,12 @@ use Throwable;
 
 class Type
 {
+    /** @var array<class-string<Contracts\Type>, Contracts\Type> */
+    private static array $singletons = [];
+
     public static function mixed(): Contracts\Type
     {
-        return new MixedType;
+        return self::$singletons[MixedType::class] ??= new MixedType;
     }
 
     public static function array($value): Contracts\Type
@@ -48,8 +51,12 @@ class Type
 
     public static function string(?string $value = null): Contracts\Type
     {
+        if ($value === null) {
+            return self::$singletons[StringType::class] ??= new StringType;
+        }
+
         try {
-            if ($value !== null && Util::isClassOrInterface($value)) {
+            if (Util::isClassOrInterface($value)) {
                 return new ClassType($value);
             }
         } catch (Throwable $e) {
@@ -66,21 +73,29 @@ class Type
 
     public static function int(?int $value = null): Contracts\Type
     {
+        if ($value === null) {
+            return self::$singletons[IntType::class] ??= new IntType;
+        }
+
         return new IntType($value);
     }
 
     public static function object(): Contracts\Type
     {
-        return new ObjectType;
+        return self::$singletons[ObjectType::class] ??= new ObjectType;
     }
 
     public static function number(): Contracts\Type
     {
-        return new NumberType;
+        return self::$singletons[NumberType::class] ??= new NumberType;
     }
 
     public static function bool(?bool $bool = null): Contracts\Type
     {
+        if ($bool === null) {
+            return self::$singletons[BoolType::class] ??= new BoolType;
+        }
+
         return new BoolType($bool);
     }
 
@@ -96,22 +111,26 @@ class Type
 
     public static function null(): Contracts\Type
     {
-        return new NullType;
+        return self::$singletons[NullType::class] ??= new NullType;
     }
 
     public static function never(): Contracts\Type
     {
-        return new NeverType;
+        return self::$singletons[NeverType::class] ??= new NeverType;
     }
 
     public static function float(?float $value = null): Contracts\Type
     {
+        if ($value === null) {
+            return self::$singletons[FloatType::class] ??= new FloatType;
+        }
+
         return new FloatType($value);
     }
 
     public static function void(): Contracts\Type
     {
-        return new VoidType;
+        return self::$singletons[VoidType::class] ??= new VoidType;
     }
 
     public static function from(mixed $value): Contracts\Type

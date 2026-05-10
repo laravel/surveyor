@@ -10,8 +10,6 @@ class NullableType extends AbstractResolver
     {
         $type = $this->from($node->type);
 
-        $type->nullable();
-
-        return $type;
+        return $type->nullable();
     }
 }

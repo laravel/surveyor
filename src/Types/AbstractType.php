@@ -12,9 +12,14 @@ abstract class AbstractType implements Contracts\Type
 
     public function nullable(bool $nullable = true): static
     {
-        $this->nullable = $nullable;
+        if ($this->nullable === $nullable) {
+            return $this;
+        }
 
-        return $this;
+        $clone = clone $this;
+        $clone->nullable = $nullable;
+
+        return $clone;
     }
 
     public function isMoreSpecificThan(Contracts\Type $type): bool
@@ -24,16 +29,28 @@ abstract class AbstractType implements Contracts\Type
 
     public function required(bool $required = true): static
     {
-        $this->required = $required;
+        if ($this->required === $required) {
+            return $this;
+        }
 
-        return $this;
+        $clone = clone $this;
+        $clone->required = $required;
+
+        return $clone;
     }
 
     public function optional(bool $optional = true): static
     {
-        $this->required = ! $optional;
+        $required = ! $optional;
 
-        return $this;
+        if ($this->required === $required) {
+            return $this;
+        }
+
+        $clone = clone $this;
+        $clone->required = $required;
+
+        return $clone;
     }
 
     public function isOptional(): bool

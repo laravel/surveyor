@@ -249,10 +249,10 @@ describe('type properties', function () {
         $type = Type::string();
         expect($type->isNullable())->toBeFalse();
 
-        $type->nullable(true);
+        $type = $type->nullable(true);
         expect($type->isNullable())->toBeTrue();
 
-        $type->nullable(false);
+        $type = $type->nullable(false);
         expect($type->isNullable())->toBeFalse();
     });
 
@@ -260,10 +260,10 @@ describe('type properties', function () {
         $type = Type::string();
         expect($type->isOptional())->toBeFalse();
 
-        $type->optional(true);
+        $type = $type->optional(true);
         expect($type->isOptional())->toBeTrue();
 
-        $type->required(true);
+        $type = $type->required(true);
         expect($type->isOptional())->toBeFalse();
     });
 

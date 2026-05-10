@@ -30,6 +30,18 @@ class StateTracker
         return $this->propertyTracker;
     }
 
+    /**
+     * Slim the tracker for caching. Local variables are dead post-traversal —
+     * drop them entirely. Property tracker is needed for cross-file
+     * `properties()->get($name)` lookups, but only the latest entry per name
+     * is read, so collapse history.
+     */
+    public function compact(): void
+    {
+        $this->variableTracker = new StateTrackerItem;
+        $this->propertyTracker->compact();
+    }
+
     public function startSnapshot(NodeAbstract $node): void
     {
         $this->variableTracker->startSnapshot($node);

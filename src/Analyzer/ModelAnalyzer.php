@@ -36,7 +36,7 @@ class ModelAnalyzer
             $type = $this->resolveAttributeType($attribute, $model, $result);
 
             if (isset($attribute['nullable'])) {
-                $type->nullable($attribute['nullable']);
+                $type = $type->nullable($attribute['nullable']);
             }
 
             $result->addProperty(new PropertyResult($attribute['name'], $type, modelAttribute: true));
