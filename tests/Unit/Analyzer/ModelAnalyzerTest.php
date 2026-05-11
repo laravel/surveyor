@@ -49,7 +49,7 @@ describe('ModelAnalyzer relations', function () {
         expect($userMethod->isModelRelation())->toBeTrue();
     });
 
-    it('adds relation properties to the ClassResult', function () {
+    it('adds relation properties to the ClassLikeResult', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(User::class)->result();
 

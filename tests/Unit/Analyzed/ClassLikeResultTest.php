@@ -3,14 +3,14 @@
 use Illuminate\Contracts\Support\Arrayable;
 use JsonSerializable;
 use Laravel\Surveyor\Analysis\EntityType;
-use Laravel\Surveyor\Analyzed\ClassResult;
+use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Analyzed\MethodResult;
 use Laravel\Surveyor\Analyzed\PropertyResult;
 use Laravel\Surveyor\Types\Type;
 
 uses()->group('results');
 
-function createClassResult(array $overrides = []): ClassResult
+function createClassLikeResult(array $overrides = []): ClassLikeResult
 {
     $defaults = [
         'name' => 'TestClass',
@@ -24,7 +24,7 @@ function createClassResult(array $overrides = []): ClassResult
 
     $params = array_merge($defaults, $overrides);
 
-    return new ClassResult(
+    return new ClassLikeResult(
         name: $params['name'],
         namespace: $params['namespace'],
         extends: $params['extends'],
@@ -35,52 +35,52 @@ function createClassResult(array $overrides = []): ClassResult
     );
 }
 
-describe('ClassResult basic properties', function () {
+describe('ClassLikeResult basic properties', function () {
     it('stores and retrieves name', function () {
-        $result = createClassResult(['name' => 'UserController']);
+        $result = createClassLikeResult(['name' => 'UserController']);
         expect($result->name())->toBe('UserController');
     });
 
     it('stores and retrieves namespace', function () {
-        $result = createClassResult(['namespace' => 'App\\Http\\Controllers']);
+        $result = createClassLikeResult(['namespace' => 'App\\Http\\Controllers']);
         expect($result->namespace())->toBe('App\\Http\\Controllers');
     });
 
     it('stores and retrieves file path', function () {
-        $result = createClassResult(['filePath' => '/app/Controllers/Test.php']);
+        $result = createClassLikeResult(['filePath' => '/app/Controllers/Test.php']);
         expect($result->filePath())->toBe('/app/Controllers/Test.php');
     });
 });
 
 describe('extends and implements', function () {
     it('returns empty array when no extends', function () {
-        $result = createClassResult(['extends' => []]);
+        $result = createClassLikeResult(['extends' => []]);
         expect($result->extends())->toBe([]);
     });
 
     it('returns parent classes from extends', function () {
-        $result = createClassResult(['extends' => ['BaseController', 'Controller']]);
+        $result = createClassLikeResult(['extends' => ['BaseController', 'Controller']]);
         expect($result->extends())->toBe(['BaseController', 'Controller']);
     });
 
     it('checks if class extends a specific parent', function () {
-        $result = createClassResult(['extends' => [['BaseController']]]);
+        $result = createClassLikeResult(['extends' => [['BaseController']]]);
         expect($result->extends('BaseController'))->toBeTrue();
     });
 
     it('returns implements array', function () {
-        $result = createClassResult(['implements' => ['SomeInterface']]);
+        $result = createClassLikeResult(['implements' => ['SomeInterface']]);
         expect($result->implements())->toBe(['SomeInterface']);
     });
 
     it('checks if class implements a specific interface', function () {
-        $result = createClassResult(['implements' => [JsonSerializable::class]]);
+        $result = createClassLikeResult(['implements' => [JsonSerializable::class]]);
         expect($result->implements(JsonSerializable::class))->toBeTrue();
         expect($result->implements('NonExistent'))->toBeFalse();
     });
 
     it('checks multiple interfaces at once', function () {
-        $result = createClassResult(['implements' => [JsonSerializable::class, Arrayable::class]]);
+        $result = createClassLikeResult(['implements' => [JsonSerializable::class, Arrayable::class]]);
         expect($result->implements(JsonSerializable::class, Arrayable::class))->toBeTrue();
         expect($result->implements('NonExistent', JsonSerializable::class))->toBeTrue();
     });
@@ -88,7 +88,7 @@ describe('extends and implements', function () {
 
 describe('methods', function () {
     it('adds and retrieves methods', function () {
-        $result = createClassResult();
+        $result = createClassLikeResult();
         $method = new MethodResult('testMethod');
 
         $result->addMethod($method);
@@ -98,12 +98,12 @@ describe('methods', function () {
     });
 
     it('returns false for non-existent method', function () {
-        $result = createClassResult();
+        $result = createClassLikeResult();
         expect($result->hasMethod('nonExistent'))->toBeFalse();
     });
 
     it('returns all public methods', function () {
-        $result = createClassResult();
+        $result = createClassLikeResult();
         $method1 = new MethodResult('method1');
         $method2 = new MethodResult('method2');
 
@@ -118,7 +118,7 @@ describe('methods', function () {
 
 describe('properties', function () {
     it('adds and retrieves properties', function () {
-        $result = createClassResult();
+        $result = createClassLikeResult();
         $property = new PropertyResult('testProperty', Type::string());
 
         $result->addProperty($property);
@@ -128,12 +128,12 @@ describe('properties', function () {
     });
 
     it('returns false for non-existent property', function () {
-        $result = createClassResult();
+        $result = createClassLikeResult();
         expect($result->hasProperty('nonExistent'))->toBeFalse();
     });
 
     it('returns only public properties', function () {
-        $result = createClassResult();
+        $result = createClassLikeResult();
         $publicProp = new PropertyResult('publicProp', Type::string(), 'public');
         $protectedProp = new PropertyResult('protectedProp', Type::string(), 'protected');
         $privateProp = new PropertyResult('privateProp', Type::string(), 'private');
@@ -150,14 +150,14 @@ describe('properties', function () {
 
 describe('uses', function () {
     it('checks if use statement exists', function () {
-        $result = createClassResult(['uses' => ['Request' => 'Illuminate\\Http\\Request']]);
+        $result = createClassLikeResult(['uses' => ['Request' => 'Illuminate\\Http\\Request']]);
 
         expect($result->hasUse('Request'))->toBeTrue();
         expect($result->hasUse('NonExistent'))->toBeFalse();
     });
 
     it('returns use statement value', function () {
-        $result = createClassResult(['uses' => ['Request' => 'Illuminate\\Http\\Request']]);
+        $result = createClassLikeResult(['uses' => ['Request' => 'Illuminate\\Http\\Request']]);
 
         expect($result->getUse('Request'))->toBe('Illuminate\\Http\\Request');
         expect($result->getUse('NonExistent'))->toBeNull();
@@ -166,23 +166,23 @@ describe('uses', function () {
 
 describe('serialization helpers', function () {
     it('detects JsonSerializable implementation', function () {
-        $jsonSerializable = createClassResult(['implements' => [JsonSerializable::class]]);
-        $notJsonSerializable = createClassResult(['implements' => []]);
+        $jsonSerializable = createClassLikeResult(['implements' => [JsonSerializable::class]]);
+        $notJsonSerializable = createClassLikeResult(['implements' => []]);
 
         expect($jsonSerializable->isJsonSerializable())->toBeTrue();
         expect($notJsonSerializable->isJsonSerializable())->toBeFalse();
     });
 
     it('detects Arrayable implementation', function () {
-        $arrayable = createClassResult(['implements' => [Arrayable::class]]);
-        $notArrayable = createClassResult(['implements' => []]);
+        $arrayable = createClassLikeResult(['implements' => [Arrayable::class]]);
+        $notArrayable = createClassLikeResult(['implements' => []]);
 
         expect($arrayable->isArrayable())->toBeTrue();
         expect($notArrayable->isArrayable())->toBeFalse();
     });
 
     it('returns jsonSerialize method when JsonSerializable', function () {
-        $result = createClassResult(['implements' => [JsonSerializable::class]]);
+        $result = createClassLikeResult(['implements' => [JsonSerializable::class]]);
         $method = new MethodResult('jsonSerialize');
         $result->addMethod($method);
 
@@ -190,13 +190,13 @@ describe('serialization helpers', function () {
     });
 
     it('returns null for asJson when not JsonSerializable', function () {
-        $result = createClassResult(['implements' => []]);
+        $result = createClassLikeResult(['implements' => []]);
 
         expect($result->asJson())->toBeNull();
     });
 
     it('returns toArray method when Arrayable', function () {
-        $result = createClassResult(['implements' => [Arrayable::class]]);
+        $result = createClassLikeResult(['implements' => [Arrayable::class]]);
         $method = new MethodResult('toArray');
         $result->addMethod($method);
 
@@ -204,7 +204,7 @@ describe('serialization helpers', function () {
     });
 
     it('returns null for asArray when not Arrayable', function () {
-        $result = createClassResult(['implements' => []]);
+        $result = createClassLikeResult(['implements' => []]);
 
         expect($result->asArray())->toBeNull();
     });

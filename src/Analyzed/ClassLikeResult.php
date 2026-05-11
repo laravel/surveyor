@@ -7,7 +7,7 @@ use JsonSerializable;
 use Laravel\Surveyor\Analysis\EntityType;
 use Laravel\Surveyor\Types\Type;
 
-class ClassResult
+class ClassLikeResult
 {
     /** @var array<string, PropertyResult> */
     protected array $properties = [];

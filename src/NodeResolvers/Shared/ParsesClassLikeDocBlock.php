@@ -3,14 +3,14 @@
 namespace Laravel\Surveyor\NodeResolvers\Shared;
 
 use Laravel\Surveyor\Analysis\EntityType;
-use Laravel\Surveyor\Analyzed\ClassResult;
+use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Analyzed\MethodResult;
 use Laravel\Surveyor\Analyzed\PropertyResult;
 use PhpParser\Node;
 
 trait ParsesClassLikeDocBlock
 {
-    protected function parseClassLikeDocBlock(Node\Stmt\ClassLike $node, ClassResult $result): void
+    protected function parseClassLikeDocBlock(Node\Stmt\ClassLike $node, ClassLikeResult $result): void
     {
         if (! $node->getDocComment()) {
             return;

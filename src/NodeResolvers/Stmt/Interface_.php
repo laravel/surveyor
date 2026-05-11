@@ -3,7 +3,7 @@
 namespace Laravel\Surveyor\NodeResolvers\Stmt;
 
 use Laravel\Surveyor\Analysis\EntityType;
-use Laravel\Surveyor\Analyzed\ClassResult;
+use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\NodeResolvers\Shared\ParsesClassLikeDocBlock;
 use Laravel\Surveyor\Types\Type;
@@ -21,7 +21,7 @@ class Interface_ extends AbstractResolver
 
         $this->parseExtends($node);
 
-        $result = new ClassResult(
+        $result = new ClassLikeResult(
             name: $this->scope->entityName(),
             namespace: $this->scope->namespace(),
             extends: $this->scope->extends(),

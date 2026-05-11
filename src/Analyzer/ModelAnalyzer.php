@@ -7,7 +7,7 @@ use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\ModelInspector;
 use Laravel\Surveyor\Analysis\Scope;
-use Laravel\Surveyor\Analyzed\ClassResult;
+use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Analyzed\MethodResult;
 use Laravel\Surveyor\Analyzed\PropertyResult;
 use Laravel\Surveyor\Reflector\Reflector;
@@ -26,7 +26,7 @@ class ModelAnalyzer
         //
     }
 
-    public function mergeIntoResult(string $model, ClassResult $result, Scope $scope)
+    public function mergeIntoResult(string $model, ClassLikeResult $result, Scope $scope)
     {
         $this->reflector->setScope($scope);
 
@@ -78,7 +78,7 @@ class ModelAnalyzer
         }
     }
 
-    protected function resolveAttributeType(array $attribute, string $model, ClassResult $result): TypeContract
+    protected function resolveAttributeType(array $attribute, string $model, ClassLikeResult $result): TypeContract
     {
         if ($attribute['cast']) {
             if (in_array($attribute['cast'], ['accessor', 'attribute'])) {
@@ -199,7 +199,7 @@ class ModelAnalyzer
         return Type::string($cast);
     }
 
-    protected function resolveAccessorType(array $attribute, string $model, ClassResult $result): TypeContract
+    protected function resolveAccessorType(array $attribute, string $model, ClassLikeResult $result): TypeContract
     {
         $accessor = $attribute['name'];
 

@@ -2,6 +2,7 @@
 
 namespace Laravel\Surveyor\NodeResolvers\Stmt;
 
+use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Analyzed\PropertyResult;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\Type;
@@ -37,7 +38,13 @@ class Property extends AbstractResolver
                 $unionType,
             );
 
-            $this->scope->result()->addProperty(
+            $result = $this->scope->result();
+
+            if (! $result instanceof ClassLikeResult) {
+                continue;
+            }
+
+            $result->addProperty(
                 new PropertyResult(
                     name: $prop->name,
                     type: $unionType,

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use Laravel\Surveyor\Analysis\EntityType;
-use Laravel\Surveyor\Analyzed\ClassResult;
+use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Analyzer\ModelAnalyzer;
 use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
@@ -24,7 +24,7 @@ class Class_ extends AbstractResolver
     {
         // Anonymous classes (`new class { ... }`) have no name and no
         // namespacedName. Skip them: their inner methods will fall through
-        // to the ClassMethod resolver where the `instanceof ClassResult`
+        // to the ClassMethod resolver where the `instanceof ClassLikeResult`
         // parent guard will drop them rather than crashing.
         if ($node->name === null) {
             return null;
@@ -36,7 +36,7 @@ class Class_ extends AbstractResolver
         $this->parseImplements($node);
         $this->parseExtends($node);
 
-        $result = new ClassResult(
+        $result = new ClassLikeResult(
             name: $this->scope->entityName(),
             namespace: $this->scope->namespace(),
             extends: $this->scope->extends(),
@@ -65,7 +65,7 @@ class Class_ extends AbstractResolver
     {
         $result = $this->scope->result();
 
-        if (! $result instanceof ClassResult) {
+        if (! $result instanceof ClassLikeResult) {
             return;
         }
 
@@ -99,7 +99,11 @@ class Class_ extends AbstractResolver
         foreach ($node->implements as $interface) {
             $this->scope->addImplement($interface->toString());
 
-            $reflection = $this->reflector->reflectClass($interface->toString());
+            try {
+                $reflection = $this->reflector->reflectClass($interface->toString());
+            } catch (Throwable $e) {
+                continue;
+            }
 
             foreach ($reflection->getConstants() as $key => $value) {
                 $this->scope->addConstant($key, Type::from($value));
