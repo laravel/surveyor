@@ -6,6 +6,7 @@ use Laravel\Surveyor\Analysis\EntityType;
 use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Analyzed\MethodResult;
 use Laravel\Surveyor\Analyzed\PropertyResult;
+use Laravel\Surveyor\Types\TemplateTagType;
 use Laravel\Surveyor\Types\Type;
 
 uses()->group('results');
@@ -170,6 +171,52 @@ describe('uses', function () {
 
         expect($result->getUse('Request'))->toBe('Illuminate\\Http\\Request');
         expect($result->getUse('NonExistent'))->toBeNull();
+    });
+});
+
+describe('template tags', function () {
+    it('starts with no template tags', function () {
+        $result = createClassLikeResult();
+        expect($result->templateTags())->toBe([]);
+        expect($result->hasTemplateTag('T'))->toBeFalse();
+        expect($result->getTemplateTag('T'))->toBeNull();
+    });
+
+    it('stores and retrieves a template tag by name', function () {
+        $result = createClassLikeResult();
+        $tag = new TemplateTagType(name: 'TValue', bound: null, default: null, lowerBound: null, description: null);
+
+        $result->addTemplateTag($tag);
+
+        expect($result->hasTemplateTag('TValue'))->toBeTrue();
+        expect($result->getTemplateTag('TValue'))->toBe($tag);
+    });
+
+    it('returns all template tags keyed by name', function () {
+        $result = createClassLikeResult();
+        $tKey = new TemplateTagType(name: 'TKey', bound: Type::string(), default: null, lowerBound: null, description: null);
+        $tValue = new TemplateTagType(name: 'TValue', bound: null, default: null, lowerBound: null, description: null);
+
+        $result->addTemplateTag($tKey);
+        $result->addTemplateTag($tValue);
+
+        $tags = $result->templateTags();
+        expect($tags)->toHaveCount(2);
+        expect(array_keys($tags))->toBe(['TKey', 'TValue']);
+        expect($tags['TKey'])->toBe($tKey);
+        expect($tags['TValue'])->toBe($tValue);
+    });
+
+    it('overwrites an existing tag when added with the same name', function () {
+        $result = createClassLikeResult();
+        $first = new TemplateTagType(name: 'T', bound: null, default: null, lowerBound: null, description: null);
+        $second = new TemplateTagType(name: 'T', bound: Type::int(), default: null, lowerBound: null, description: null);
+
+        $result->addTemplateTag($first);
+        $result->addTemplateTag($second);
+
+        expect($result->templateTags())->toHaveCount(1);
+        expect($result->getTemplateTag('T'))->toBe($second);
     });
 });
 

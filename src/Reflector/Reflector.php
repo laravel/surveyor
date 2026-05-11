@@ -10,7 +10,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Application;
 use Laravel\Surveyor\Analysis\Scope;
+use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Concerns\LazilyLoadsDependencies;
+use Laravel\Surveyor\Concerns\SubstitutesTemplateBindings;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Support\Util;
 use Laravel\Surveyor\Types\ArrayType;
@@ -30,7 +32,7 @@ use Throwable;
 
 class Reflector
 {
-    use LazilyLoadsDependencies;
+    use LazilyLoadsDependencies, SubstitutesTemplateBindings;
 
     protected Scope $scope;
 
@@ -346,10 +348,20 @@ class Reflector
         }
 
         if (count($returnTypes) === 0 && $reflection->isSubclassOf(Model::class)) {
-            array_push(
-                $returnTypes,
-                ...$this->methodReturnType(Builder::class, $method, $node),
-            );
+            $builderTypes = $this->methodReturnType(Builder::class, $method, $node);
+
+            $builderResult = $this->getAnalyzer()
+                ->analyzeClass(Builder::class)
+                ->result();
+
+            if ($builderResult instanceof ClassLikeResult && ! empty($builderResult->templateTags())) {
+                $builderTypes = array_map(
+                    fn ($type) => $this->bindCallerTemplates($type, $className, $builderResult),
+                    $builderTypes,
+                );
+            }
+
+            array_push($returnTypes, ...$builderTypes);
         }
 
         if (count($returnTypes) > 0) {
@@ -469,5 +481,21 @@ class Reflector
         $this->appBindings ??= app()->getBindings();
 
         return $this->appBindings[$key] ?? null;
+    }
+
+    protected function bindCallerTemplates(TypeContract $type, string $callerClass, ClassLikeResult $calleeResult): TypeContract
+    {
+        $bindings = [];
+        foreach ($calleeResult->templateTags() as $tag) {
+            if ($tag->bound instanceof ClassType && is_a($callerClass, $tag->bound->value, true)) {
+                $bindings[$tag->name] = new ClassType($callerClass);
+            }
+        }
+
+        if (empty($bindings)) {
+            return $type;
+        }
+
+        return $this->substituteInType($type, $bindings);
     }
 }

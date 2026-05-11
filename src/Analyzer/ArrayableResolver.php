@@ -5,14 +5,18 @@ namespace Laravel\Surveyor\Analyzer;
 use Illuminate\Contracts\Support\Arrayable;
 use JsonSerializable;
 use Laravel\Surveyor\Analyzed\ClassLikeResult;
+use Laravel\Surveyor\Concerns\SubstitutesTemplateBindings;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
+use Laravel\Surveyor\Types\StringType;
 use ReflectionClass;
 use Throwable;
 
 class ArrayableResolver
 {
+    use SubstitutesTemplateBindings;
+
     public function __construct(
         protected Analyzer $analyzer,
     ) {
@@ -67,7 +71,7 @@ class ArrayableResolver
             $returnType = $analyzed->getMethod('toArray')->returnType();
 
             if ($returnType instanceof ArrayType) {
-                return $returnType;
+                return $this->substituteTemplateBindings($type, $analyzed, $returnType);
             }
         }
 
@@ -75,10 +79,33 @@ class ArrayableResolver
             $returnType = $analyzed->getMethod('jsonSerialize')->returnType();
 
             if ($returnType instanceof ArrayType) {
-                return $returnType;
+                return $this->substituteTemplateBindings($type, $analyzed, $returnType);
             }
         }
 
         return null;
+    }
+
+    protected function substituteTemplateBindings(ClassType $callerType, ClassLikeResult $analyzed, ArrayType $resolved): ArrayType
+    {
+        $templateTags = array_values($analyzed->templateTags());
+        $genericTypes = array_values($callerType->genericTypes());
+
+        if (empty($templateTags) || empty($genericTypes)) {
+            return $resolved;
+        }
+
+        $bindings = [];
+        foreach ($templateTags as $i => $tag) {
+            if (isset($genericTypes[$i]) && ! $genericTypes[$i] instanceof StringType) {
+                $bindings[$tag->name] = $genericTypes[$i];
+            }
+        }
+
+        if (empty($bindings)) {
+            return $resolved;
+        }
+
+        return $this->substituteInArrayType($resolved, $bindings);
     }
 }

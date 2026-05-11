@@ -3,6 +3,7 @@
 namespace Laravel\Surveyor\NodeResolvers\Shared;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Request as RequestFacade;
 use Laravel\Surveyor\Concerns\LazilyLoadsDependencies;
 use Laravel\Surveyor\Types\ClassType;
@@ -56,6 +57,16 @@ trait ResolvesMethodCalls
 
         if (in_array($methodName->value, static::$conditionalMethods) && $this->isJsonResource($var)) {
             return $this->resolveResourceConditional($var, $methodName->value, $node);
+        }
+
+        if (
+            $methodName->value === 'toArray'
+            && count($var->genericTypes()) >= 2
+            && is_a($this->scope->getUse($var->value), Collection::class, true)
+        ) {
+            $genericTypes = array_values($var->genericTypes());
+
+            return Type::arrayShape($genericTypes[0], $genericTypes[1]);
         }
 
         return Type::union(

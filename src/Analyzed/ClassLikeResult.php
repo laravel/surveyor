@@ -5,6 +5,7 @@ namespace Laravel\Surveyor\Analyzed;
 use Illuminate\Contracts\Support\Arrayable;
 use JsonSerializable;
 use Laravel\Surveyor\Analysis\EntityType;
+use Laravel\Surveyor\Types\TemplateTagType;
 use Laravel\Surveyor\Types\Type;
 
 class ClassLikeResult
@@ -20,6 +21,9 @@ class ClassLikeResult
 
     /** @var array<string, MethodResult> */
     protected array $methods = [];
+
+    /** @var array<string, TemplateTagType> */
+    protected array $templateTags = [];
 
     protected bool $arrayable = false;
 
@@ -204,5 +208,26 @@ class ClassLikeResult
     public function getUse(string $name): ?string
     {
         return $this->uses[$name] ?? null;
+    }
+
+    public function addTemplateTag(TemplateTagType $tag): void
+    {
+        $this->templateTags[$tag->name] = $tag;
+    }
+
+    /** @return array<string, TemplateTagType> */
+    public function templateTags(): array
+    {
+        return $this->templateTags;
+    }
+
+    public function hasTemplateTag(string $name): bool
+    {
+        return isset($this->templateTags[$name]);
+    }
+
+    public function getTemplateTag(string $name): ?TemplateTagType
+    {
+        return $this->templateTags[$name] ?? null;
     }
 }

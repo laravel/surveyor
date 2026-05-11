@@ -50,6 +50,10 @@ class Class_ extends AbstractResolver
 
         $this->parseClassLikeDocBlock($node, $result);
 
+        if (! empty($result->templateTags())) {
+            $this->scope->setTemplateTags(array_values($result->templateTags()));
+        }
+
         if ($this->extendsResource()) {
             try {
                 app(ResourceAnalyzer::class)->injectModelProperties($result->name(), $result, $this->scope);
