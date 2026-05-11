@@ -21,6 +21,10 @@ class Class_ extends AbstractResolver
 {
     public function resolve(Node\Stmt\Class_ $node)
     {
+        if ($node->name === null) {
+            return null;
+        }
+
         $this->scope->setEntityName($node->namespacedName->name);
         $this->scope->setEntityType(EntityType::CLASS_TYPE);
 
