@@ -64,8 +64,17 @@ describe('extends and implements', function () {
     });
 
     it('checks if class extends a specific parent', function () {
-        $result = createClassLikeResult(['extends' => [['BaseController']]]);
+        $result = createClassLikeResult(['extends' => ['BaseController', 'Controller']]);
         expect($result->extends('BaseController'))->toBeTrue();
+        expect($result->extends('Controller'))->toBeTrue();
+        expect($result->extends('NotAParent'))->toBeFalse();
+    });
+
+    it('checks multiple parents at once', function () {
+        $result = createClassLikeResult(['extends' => ['BaseController', 'Controller']]);
+        expect($result->extends('BaseController', 'Controller'))->toBeTrue();
+        expect($result->extends('NotAParent', 'BaseController'))->toBeTrue();
+        expect($result->extends('NotAParent', 'AlsoNotAParent'))->toBeFalse();
     });
 
     it('returns implements array', function () {

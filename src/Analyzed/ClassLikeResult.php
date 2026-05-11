@@ -123,7 +123,7 @@ class ClassLikeResult
             return $this->extends;
         }
 
-        return in_array($extends, $this->extends);
+        return count(array_intersect($extends, $this->extends)) > 0;
     }
 
     public function implements(...$implements): array|bool
