@@ -114,15 +114,20 @@ class Class_ extends AbstractResolver
         }
 
         $extends = [$node->extends->toString()];
-        $extendsClass = $this->reflector->reflectClass($node->extends->toString());
 
-        do {
-            $extendsClass = $extendsClass->getParentClass();
+        try {
+            $extendsClass = $this->reflector->reflectClass($node->extends->toString());
 
-            if ($extendsClass) {
-                $extends[] = $extendsClass->getName();
-            }
-        } while ($extendsClass);
+            do {
+                $extendsClass = $extendsClass->getParentClass();
+
+                if ($extendsClass) {
+                    $extends[] = $extendsClass->getName();
+                }
+            } while ($extendsClass);
+        } catch (Throwable $e) {
+            // Reflection failed; keep the directly-declared parent only.
+        }
 
         foreach ($extends as $extend) {
             $this->scope->addExtend($extend);

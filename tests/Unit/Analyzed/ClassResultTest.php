@@ -2,6 +2,7 @@
 
 use Illuminate\Contracts\Support\Arrayable;
 use JsonSerializable;
+use Laravel\Surveyor\Analysis\EntityType;
 use Laravel\Surveyor\Analyzed\ClassResult;
 use Laravel\Surveyor\Analyzed\MethodResult;
 use Laravel\Surveyor\Analyzed\PropertyResult;
@@ -18,6 +19,7 @@ function createClassResult(array $overrides = []): ClassResult
         'implements' => [],
         'uses' => [],
         'filePath' => '/path/to/TestClass.php',
+        'entityType' => EntityType::CLASS_TYPE,
     ];
 
     $params = array_merge($defaults, $overrides);
@@ -29,6 +31,7 @@ function createClassResult(array $overrides = []): ClassResult
         implements: $params['implements'],
         uses: $params['uses'],
         filePath: $params['filePath'],
+        entityType: $params['entityType'],
     );
 }
 

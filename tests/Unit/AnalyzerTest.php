@@ -434,6 +434,28 @@ interface PrintableSluggable extends \\Stringable
         unlink($fixture);
     });
 
+    it('captures constants declared in the interface body', function () {
+        $fixture = createPhpFixture('
+namespace App\\Contracts;
+
+interface Sluggable
+{
+    public const DEFAULT_SEPARATOR = \'-\';
+    public const MAX_LENGTH = 64;
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        expect($result->isInterface())->toBeTrue();
+        expect($result->hasConstant('DEFAULT_SEPARATOR'))->toBeTrue();
+        expect($result->getConstant('DEFAULT_SEPARATOR')->type->id())->toBe('-');
+        expect($result->hasConstant('MAX_LENGTH'))->toBeTrue();
+        expect($result->getConstant('MAX_LENGTH')->type->id())->toBe('64');
+
+        unlink($fixture);
+    });
+
     it('captures @method docblock tags on interfaces', function () {
         $fixture = createPhpFixture('
 namespace App\\Contracts;

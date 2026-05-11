@@ -35,7 +35,7 @@ class ClassResult
         protected array $implements,
         protected array $uses,
         protected string $filePath,
-        protected EntityType $entityType = EntityType::CLASS_TYPE,
+        protected EntityType $entityType,
     ) {
         //
     }
@@ -189,6 +189,11 @@ class ClassResult
     public function getConstant(string $name): ConstantResult
     {
         return $this->constants[$name];
+    }
+
+    public function addConstant(ConstantResult $constant): void
+    {
+        $this->constants[$constant->name] = $constant;
     }
 
     public function hasUse(string $name): bool
