@@ -4,6 +4,7 @@ namespace Laravel\Surveyor\Analyzed;
 
 use Illuminate\Contracts\Support\Arrayable;
 use JsonSerializable;
+use Laravel\Surveyor\Analysis\EntityType;
 use Laravel\Surveyor\Types\Type;
 
 class ClassResult
@@ -34,8 +35,24 @@ class ClassResult
         protected array $implements,
         protected array $uses,
         protected string $filePath,
+        protected EntityType $entityType = EntityType::CLASS_TYPE,
     ) {
         //
+    }
+
+    public function entityType(): EntityType
+    {
+        return $this->entityType;
+    }
+
+    public function isInterface(): bool
+    {
+        return $this->entityType === EntityType::INTERFACE_TYPE;
+    }
+
+    public function isClass(): bool
+    {
+        return $this->entityType === EntityType::CLASS_TYPE;
     }
 
     public function filePath(): string

@@ -391,6 +391,99 @@ class MultiInterface implements JsonSerializable, Stringable
     });
 });
 
+describe('analyzing interfaces', function () {
+    it('returns an interface-typed ClassResult with methods', function () {
+        $fixture = createPhpFixture('
+namespace App\\Contracts;
+
+interface Sluggable
+{
+    public function toSlug(): string;
+
+    public function isUnique(): bool;
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        expect($result)->toBeInstanceOf(ClassResult::class);
+        expect($result->isInterface())->toBeTrue();
+        expect($result->isClass())->toBeFalse();
+        expect($result->name())->toBe('App\\Contracts\\Sluggable');
+
+        expect($result->hasMethod('toSlug'))->toBeTrue();
+        expect($result->hasMethod('isUnique'))->toBeTrue();
+
+        unlink($fixture);
+    });
+
+    it('tracks transitive interface extends via reflection', function () {
+        $fixture = createPhpFixture('
+namespace App\\Contracts;
+
+interface PrintableSluggable extends \\Stringable
+{
+    public function toSlug(): string;
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        expect($result->extends())->toContain('Stringable');
+
+        unlink($fixture);
+    });
+
+    it('captures @method docblock tags on interfaces', function () {
+        $fixture = createPhpFixture('
+namespace App\\Contracts;
+
+/**
+ * @method string make(string $key)
+ */
+interface Builder
+{
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        expect($result->isInterface())->toBeTrue();
+        expect($result->hasMethod('make'))->toBeTrue();
+
+        unlink($fixture);
+    });
+
+    it('does not crash when analyzing anonymous classes', function () {
+        $fixture = createPhpFixture('
+namespace App;
+
+class Holder
+{
+    public function make()
+    {
+        return new class {
+            public function inner(): string
+            {
+                return "x";
+            }
+        };
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        expect($result)->toBeInstanceOf(ClassResult::class);
+        expect($result->isClass())->toBeTrue();
+        expect($result->name())->toBe('App\\Holder');
+        expect($result->hasMethod('make'))->toBeTrue();
+        expect($result->hasMethod('inner'))->toBeFalse();
+
+        unlink($fixture);
+    });
+});
+
 describe('analyzing return values', function () {
     it('tracks return statements in methods', function () {
         $fixture = createPhpFixture('

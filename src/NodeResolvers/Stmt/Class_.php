@@ -7,11 +7,10 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use Laravel\Surveyor\Analysis\EntityType;
 use Laravel\Surveyor\Analyzed\ClassResult;
-use Laravel\Surveyor\Analyzed\MethodResult;
-use Laravel\Surveyor\Analyzed\PropertyResult;
 use Laravel\Surveyor\Analyzer\ModelAnalyzer;
 use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
+use Laravel\Surveyor\NodeResolvers\Shared\ParsesClassLikeDocBlock;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
 use PhpParser\NodeAbstract;
@@ -19,8 +18,14 @@ use Throwable;
 
 class Class_ extends AbstractResolver
 {
+    use ParsesClassLikeDocBlock;
+
     public function resolve(Node\Stmt\Class_ $node)
     {
+        // Anonymous classes (`new class { ... }`) have no name and no
+        // namespacedName. Skip them: their inner methods will fall through
+        // to the ClassMethod resolver where the `instanceof ClassResult`
+        // parent guard will drop them rather than crashing.
         if ($node->name === null) {
             return null;
         }
@@ -38,11 +43,12 @@ class Class_ extends AbstractResolver
             implements: $this->scope->implements(),
             uses: $this->scope->uses(),
             filePath: $this->scope->fullPath(),
+            entityType: EntityType::CLASS_TYPE,
         );
 
         $this->scope->attachResult($result);
 
-        $this->parseDocBlock($node, $result);
+        $this->parseClassLikeDocBlock($node, $result);
 
         if ($this->extendsResource()) {
             try {
@@ -86,49 +92,6 @@ class Class_ extends AbstractResolver
             [JsonResource::class, ResourceCollection::class],
             $this->scope->extends(),
         ) !== [];
-    }
-
-    protected function parseDocBlock(Node\Stmt\Class_ $node, ClassResult $result)
-    {
-        if (! $node->getDocComment()) {
-            return;
-        }
-
-        $properties = $this->docBlockParser->parseProperties($node->getDocComment());
-
-        foreach ($properties as $name => $details) {
-            $this->scope->state()->addDocBlockProperty($name, $details['type']);
-            $result->addProperty(new PropertyResult(
-                name: $name,
-                type: $details['type'],
-                fromDocBlock: true,
-                readOnly: $details['readOnly'],
-                writeOnly: $details['writeOnly'],
-            ));
-        }
-
-        $methods = $this->docBlockParser->parseMethods($node->getDocComment());
-
-        foreach ($methods as $name => $type) {
-            $scope = $this->scope->newChildScope();
-            $scope->setMethodName($name);
-            $scope->setEntityType(EntityType::METHOD_TYPE);
-            $scope->addReturnType($type, 0);
-
-            $methodResult = new MethodResult(
-                name: $scope->methodName(),
-            );
-
-            foreach ($scope->parameters() as $parameter) {
-                $methodResult->addParameter($parameter->name, $parameter->type);
-            }
-
-            foreach ($scope->returnTypes() as $returnType) {
-                $methodResult->addReturnType($returnType['type'], $returnType['lineNumber']);
-            }
-
-            $result->addMethod($methodResult);
-        }
     }
 
     protected function parseImplements(Node\Stmt\Class_ $node)
