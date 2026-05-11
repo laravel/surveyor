@@ -1,6 +1,6 @@
 <?php
 
-use Laravel\Surveyor\Analyzed\ClassResult;
+use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Analyzed\MethodResult;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
@@ -41,7 +41,7 @@ class SimpleClass
         $result = $analyzer->analyze($fixture);
 
         expect($result->analyzed())->not->toBeNull();
-        expect($result->result())->toBeInstanceOf(ClassResult::class);
+        expect($result->result())->toBeInstanceOf(ClassLikeResult::class);
         expect($result->result()->name())->toBe('App\\Test\\SimpleClass');
         expect($result->result()->namespace())->toBe('App\\Test');
 
@@ -386,6 +386,147 @@ class MultiInterface implements JsonSerializable, Stringable
 
         expect($result->implements('JsonSerializable'))->toBeTrue();
         expect($result->implements('Stringable'))->toBeTrue();
+
+        unlink($fixture);
+    });
+});
+
+describe('analyzing interfaces', function () {
+    it('returns an interface-typed ClassLikeResult with methods', function () {
+        $fixture = createPhpFixture('
+namespace App\\Contracts;
+
+interface Sluggable
+{
+    public function toSlug(): string;
+
+    public function isUnique(): bool;
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        expect($result)->toBeInstanceOf(ClassLikeResult::class);
+        expect($result->isInterface())->toBeTrue();
+        expect($result->isClass())->toBeFalse();
+        expect($result->name())->toBe('App\\Contracts\\Sluggable');
+
+        expect($result->hasMethod('toSlug'))->toBeTrue();
+        expect($result->hasMethod('isUnique'))->toBeTrue();
+
+        unlink($fixture);
+    });
+
+    it('tracks transitive interface extends via reflection', function () {
+        $fixture = createPhpFixture('
+namespace App\\Contracts;
+
+interface PrintableSluggable extends \\Stringable
+{
+    public function toSlug(): string;
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        expect($result->extends())->toContain('Stringable');
+
+        unlink($fixture);
+    });
+
+    it('captures constants declared in the interface body', function () {
+        $fixture = createPhpFixture('
+namespace App\\Contracts;
+
+interface Sluggable
+{
+    public const DEFAULT_SEPARATOR = \'-\';
+    public const MAX_LENGTH = 64;
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        expect($result->isInterface())->toBeTrue();
+        expect($result->hasConstant('DEFAULT_SEPARATOR'))->toBeTrue();
+        expect($result->getConstant('DEFAULT_SEPARATOR')->type->id())->toBe('-');
+        expect($result->hasConstant('MAX_LENGTH'))->toBeTrue();
+        expect($result->getConstant('MAX_LENGTH')->type->id())->toBe('64');
+
+        unlink($fixture);
+    });
+
+    it('captures @method docblock tags on interfaces', function () {
+        $fixture = createPhpFixture('
+namespace App\\Contracts;
+
+/**
+ * @method string make(string $key)
+ */
+interface Builder
+{
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        expect($result->isInterface())->toBeTrue();
+        expect($result->hasMethod('make'))->toBeTrue();
+
+        unlink($fixture);
+    });
+
+    it('does not crash when analyzing anonymous classes', function () {
+        $fixture = createPhpFixture('
+namespace App;
+
+class Holder
+{
+    public function make()
+    {
+        return new class {
+            public function inner(): string
+            {
+                return "x";
+            }
+        };
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        expect($result)->toBeInstanceOf(ClassLikeResult::class);
+        expect($result->isClass())->toBeTrue();
+        expect($result->name())->toBe('App\\Holder');
+        expect($result->hasMethod('make'))->toBeTrue();
+        expect($result->hasMethod('inner'))->toBeFalse();
+
+        unlink($fixture);
+    });
+
+    it('does not crash when an anonymous class declares properties', function () {
+        $fixture = createPhpFixture('
+namespace App;
+
+class Holder
+{
+    public function make()
+    {
+        return new class {
+            public int $count = 0;
+            public string $label = "x";
+        };
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        expect($result)->toBeInstanceOf(ClassLikeResult::class);
+        expect($result->name())->toBe('App\\Holder');
+        expect($result->hasProperty('count'))->toBeFalse();
+        expect($result->hasProperty('label'))->toBeFalse();
 
         unlink($fixture);
     });

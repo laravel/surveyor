@@ -1,7 +1,7 @@
 <?php
 
 use App\Http\Resources\UserResource;
-use Laravel\Surveyor\Analyzed\ClassResult;
+use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
@@ -54,7 +54,7 @@ class MakeController
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyze($fixture)->result();
 
-        expect($result)->toBeInstanceOf(ClassResult::class);
+        expect($result)->toBeInstanceOf(ClassLikeResult::class);
 
         $returnType = $result->getMethod('show')->returnType();
         $response = findResourceResponse($returnType);

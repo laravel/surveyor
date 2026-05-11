@@ -70,9 +70,9 @@ $classResult = $result->result();
 
 ## Working with Results
 
-### ClassResult
+### ClassLikeResult
 
-After analyzing a file containing a class, you'll receive a `ClassResult` object that provides access to the class's metadata:
+After analyzing a file containing a class or interface, you'll receive a `ClassLikeResult` object that provides access to its metadata:
 
 ```php
 use Laravel\Surveyor\Analyzer\Analyzer;

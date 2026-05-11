@@ -6,6 +6,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\ValidationRuleParser;
 use Laravel\Surveyor\Analysis\EntityType;
 use Laravel\Surveyor\Analysis\Scope;
+use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Analyzed\MethodResult;
 use Laravel\Surveyor\Analyzed\PropertyResult;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
@@ -91,7 +92,7 @@ class ClassMethod extends AbstractResolver
             }
         }
 
-        if (($parentResult = $this->scope->parent()?->result())
+        if (($parentResult = $this->scope->parent()?->result()) instanceof ClassLikeResult
             && ($scopeResult = $this->scope->result()) instanceof MethodResult) {
             $parentResult->addMethod($scopeResult);
         }

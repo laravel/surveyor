@@ -7,7 +7,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use Illuminate\Http\Resources\JsonApi\JsonApiResource;
 use Laravel\Surveyor\Analysis\Scope;
-use Laravel\Surveyor\Analyzed\ClassResult;
+use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Parser\DocBlockParser;
 use Laravel\Surveyor\Reflector\Reflector;
@@ -41,7 +41,7 @@ class ResourceAnalyzer
      *
      * Called on class ENTER (before method bodies are walked).
      */
-    public function injectModelProperties(string $resource, ClassResult $result, Scope $scope): void
+    public function injectModelProperties(string $resource, ClassLikeResult $result, Scope $scope): void
     {
         $this->reflector->setScope($scope);
 
@@ -54,7 +54,7 @@ class ResourceAnalyzer
         $analyzed = $this->analyzer->analyzeClass($modelClass);
         $modelResult = $analyzed->result();
 
-        if (! $modelResult instanceof ClassResult) {
+        if (! $modelResult instanceof ClassLikeResult) {
             return;
         }
 
@@ -72,11 +72,11 @@ class ResourceAnalyzer
 
     /**
      * Phase B: After toArray() has been walked, extract the resolved data shape
-     * and store resource metadata on the ClassResult.
+     * and store resource metadata on the ClassLikeResult.
      *
      * Called on class EXIT (after method bodies have been walked).
      */
-    public function resolveDataShape(string $resource, ClassResult $result, Scope $scope): void
+    public function resolveDataShape(string $resource, ClassLikeResult $result, Scope $scope): void
     {
         $this->reflector->setScope($scope);
 
@@ -124,7 +124,7 @@ class ResourceAnalyzer
         $analyzed = $this->analyzer->analyzeClass($resourceClass);
         $result = $analyzed->result();
 
-        if (! $result instanceof ClassResult) {
+        if (! $result instanceof ClassLikeResult) {
             return null;
         }
 
@@ -159,7 +159,7 @@ class ResourceAnalyzer
         );
     }
 
-    protected function extractToArrayShape(string $resource, ClassResult $result): ?TypeContract
+    protected function extractToArrayShape(string $resource, ClassLikeResult $result): ?TypeContract
     {
         if ($result->hasMethod('toArray')) {
             $returnType = $result->getMethod('toArray')->returnType();
@@ -185,7 +185,7 @@ class ResourceAnalyzer
         return null;
     }
 
-    protected function resolveModelClass(string $resource, ClassResult $result, Scope $scope): ?string
+    protected function resolveModelClass(string $resource, ClassLikeResult $result, Scope $scope): ?string
     {
         return $this->resolveFromMixin($resource)
             ?? $this->resolveFromConstructor($resource)
@@ -296,7 +296,7 @@ class ResourceAnalyzer
         return 'data';
     }
 
-    protected function resolveWithMethod(ClassResult $result): ?TypeContract
+    protected function resolveWithMethod(ClassLikeResult $result): ?TypeContract
     {
         if (! $result->hasMethod('with')) {
             return null;
@@ -359,7 +359,7 @@ class ResourceAnalyzer
         return class_exists($resource) && is_subclass_of($resource, JsonApiResource::class);
     }
 
-    protected function resolveJsonApiDataShape(string $resource, ClassResult $result, Scope $scope): void
+    protected function resolveJsonApiDataShape(string $resource, ClassLikeResult $result, Scope $scope): void
     {
         $this->responses[$resource] = new JsonApiResourceResponse(
             resourceClass: $resource,
@@ -372,7 +372,7 @@ class ResourceAnalyzer
         );
     }
 
-    protected function resolveJsonApiAttributes(string $resource, ClassResult $result, Scope $scope): ?TypeContract
+    protected function resolveJsonApiAttributes(string $resource, ClassLikeResult $result, Scope $scope): ?TypeContract
     {
         // 1. Check for $attributes property (list of field names). Walks the inheritance
         // chain so a base resource declaring shared attributes is honored.
@@ -418,7 +418,7 @@ class ResourceAnalyzer
         return new ArrayType($typed);
     }
 
-    protected function resolveJsonApiRelationships(string $resource, ClassResult $result, Scope $scope): ?TypeContract
+    protected function resolveJsonApiRelationships(string $resource, ClassLikeResult $result, Scope $scope): ?TypeContract
     {
         // 1. Check for $relationships property. Walks the inheritance chain so a base
         // resource declaring shared relationships is honored.
@@ -501,7 +501,7 @@ class ResourceAnalyzer
         ]);
     }
 
-    protected function resolveJsonApiMethodShape(ClassResult $result, string $method): ?TypeContract
+    protected function resolveJsonApiMethodShape(ClassLikeResult $result, string $method): ?TypeContract
     {
         if (! $result->hasMethod($method)) {
             return null;
@@ -525,7 +525,7 @@ class ResourceAnalyzer
         $analyzed = $this->analyzer->analyzeClass($resourceClass);
         $result = $analyzed->result();
 
-        if (! $result instanceof ClassResult) {
+        if (! $result instanceof ClassLikeResult) {
             return null;
         }
 

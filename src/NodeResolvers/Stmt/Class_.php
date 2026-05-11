@@ -6,12 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use Laravel\Surveyor\Analysis\EntityType;
-use Laravel\Surveyor\Analyzed\ClassResult;
-use Laravel\Surveyor\Analyzed\MethodResult;
-use Laravel\Surveyor\Analyzed\PropertyResult;
+use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Analyzer\ModelAnalyzer;
 use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
+use Laravel\Surveyor\NodeResolvers\Shared\ParsesClassLikeDocBlock;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
 use PhpParser\NodeAbstract;
@@ -19,26 +18,37 @@ use Throwable;
 
 class Class_ extends AbstractResolver
 {
+    use ParsesClassLikeDocBlock;
+
     public function resolve(Node\Stmt\Class_ $node)
     {
+        // Anonymous classes (`new class { ... }`) have no name and no
+        // namespacedName. Skip them: their inner methods will fall through
+        // to the ClassMethod resolver where the `instanceof ClassLikeResult`
+        // parent guard will drop them rather than crashing.
+        if ($node->name === null) {
+            return null;
+        }
+
         $this->scope->setEntityName($node->namespacedName->name);
         $this->scope->setEntityType(EntityType::CLASS_TYPE);
 
         $this->parseImplements($node);
         $this->parseExtends($node);
 
-        $result = new ClassResult(
+        $result = new ClassLikeResult(
             name: $this->scope->entityName(),
             namespace: $this->scope->namespace(),
             extends: $this->scope->extends(),
             implements: $this->scope->implements(),
             uses: $this->scope->uses(),
             filePath: $this->scope->fullPath(),
+            entityType: EntityType::CLASS_TYPE,
         );
 
         $this->scope->attachResult($result);
 
-        $this->parseDocBlock($node, $result);
+        $this->parseClassLikeDocBlock($node, $result);
 
         if ($this->extendsResource()) {
             try {
@@ -55,7 +65,7 @@ class Class_ extends AbstractResolver
     {
         $result = $this->scope->result();
 
-        if (! $result instanceof ClassResult) {
+        if (! $result instanceof ClassLikeResult) {
             return;
         }
 
@@ -84,55 +94,16 @@ class Class_ extends AbstractResolver
         ) !== [];
     }
 
-    protected function parseDocBlock(Node\Stmt\Class_ $node, ClassResult $result)
-    {
-        if (! $node->getDocComment()) {
-            return;
-        }
-
-        $properties = $this->docBlockParser->parseProperties($node->getDocComment());
-
-        foreach ($properties as $name => $details) {
-            $this->scope->state()->addDocBlockProperty($name, $details['type']);
-            $result->addProperty(new PropertyResult(
-                name: $name,
-                type: $details['type'],
-                fromDocBlock: true,
-                readOnly: $details['readOnly'],
-                writeOnly: $details['writeOnly'],
-            ));
-        }
-
-        $methods = $this->docBlockParser->parseMethods($node->getDocComment());
-
-        foreach ($methods as $name => $type) {
-            $scope = $this->scope->newChildScope();
-            $scope->setMethodName($name);
-            $scope->setEntityType(EntityType::METHOD_TYPE);
-            $scope->addReturnType($type, 0);
-
-            $methodResult = new MethodResult(
-                name: $scope->methodName(),
-            );
-
-            foreach ($scope->parameters() as $parameter) {
-                $methodResult->addParameter($parameter->name, $parameter->type);
-            }
-
-            foreach ($scope->returnTypes() as $returnType) {
-                $methodResult->addReturnType($returnType['type'], $returnType['lineNumber']);
-            }
-
-            $result->addMethod($methodResult);
-        }
-    }
-
     protected function parseImplements(Node\Stmt\Class_ $node)
     {
         foreach ($node->implements as $interface) {
             $this->scope->addImplement($interface->toString());
 
-            $reflection = $this->reflector->reflectClass($interface->toString());
+            try {
+                $reflection = $this->reflector->reflectClass($interface->toString());
+            } catch (Throwable $e) {
+                continue;
+            }
 
             foreach ($reflection->getConstants() as $key => $value) {
                 $this->scope->addConstant($key, Type::from($value));
@@ -147,15 +118,20 @@ class Class_ extends AbstractResolver
         }
 
         $extends = [$node->extends->toString()];
-        $extendsClass = $this->reflector->reflectClass($node->extends->toString());
 
-        do {
-            $extendsClass = $extendsClass->getParentClass();
+        try {
+            $extendsClass = $this->reflector->reflectClass($node->extends->toString());
 
-            if ($extendsClass) {
-                $extends[] = $extendsClass->getName();
-            }
-        } while ($extendsClass);
+            do {
+                $extendsClass = $extendsClass->getParentClass();
+
+                if ($extendsClass) {
+                    $extends[] = $extendsClass->getName();
+                }
+            } while ($extendsClass);
+        } catch (Throwable $e) {
+            // Reflection failed; keep the directly-declared parent only.
+        }
 
         foreach ($extends as $extend) {
             $this->scope->addExtend($extend);

@@ -4,7 +4,7 @@ namespace Laravel\Surveyor\Analyzer;
 
 use Illuminate\Contracts\Support\Arrayable;
 use JsonSerializable;
-use Laravel\Surveyor\Analyzed\ClassResult;
+use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
@@ -59,7 +59,7 @@ class ArrayableResolver
 
         $analyzed = $this->analyzer->analyzeClass($className)->result();
 
-        if (! $analyzed instanceof ClassResult) {
+        if (! $analyzed instanceof ClassLikeResult) {
             return null;
         }
 

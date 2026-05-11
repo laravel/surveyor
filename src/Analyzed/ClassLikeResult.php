@@ -4,9 +4,10 @@ namespace Laravel\Surveyor\Analyzed;
 
 use Illuminate\Contracts\Support\Arrayable;
 use JsonSerializable;
+use Laravel\Surveyor\Analysis\EntityType;
 use Laravel\Surveyor\Types\Type;
 
-class ClassResult
+class ClassLikeResult
 {
     /** @var array<string, PropertyResult> */
     protected array $properties = [];
@@ -34,8 +35,24 @@ class ClassResult
         protected array $implements,
         protected array $uses,
         protected string $filePath,
+        protected EntityType $entityType,
     ) {
         //
+    }
+
+    public function entityType(): EntityType
+    {
+        return $this->entityType;
+    }
+
+    public function isInterface(): bool
+    {
+        return $this->entityType === EntityType::INTERFACE_TYPE;
+    }
+
+    public function isClass(): bool
+    {
+        return $this->entityType === EntityType::CLASS_TYPE;
     }
 
     public function filePath(): string
@@ -106,7 +123,7 @@ class ClassResult
             return $this->extends;
         }
 
-        return in_array($extends, $this->extends);
+        return count(array_intersect($extends, $this->extends)) > 0;
     }
 
     public function implements(...$implements): array|bool
@@ -172,6 +189,11 @@ class ClassResult
     public function getConstant(string $name): ConstantResult
     {
         return $this->constants[$name];
+    }
+
+    public function addConstant(ConstantResult $constant): void
+    {
+        $this->constants[$constant->name] = $constant;
     }
 
     public function hasUse(string $name): bool
