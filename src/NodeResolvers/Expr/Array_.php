@@ -3,7 +3,9 @@
 namespace Laravel\Surveyor\NodeResolvers\Expr;
 
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
+use Laravel\Surveyor\Result\VariableState;
 use Laravel\Surveyor\Types\ArrayType;
+use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
 
@@ -64,7 +66,7 @@ class Array_ extends AbstractResolver
                 continue;
             }
 
-            $result[] = $this->from($item->value);
+            $result[] = $this->resolveItemValue($item);
         }
 
         return Type::array($result);
@@ -91,9 +93,26 @@ class Array_ extends AbstractResolver
                 continue;
             }
 
-            $result[$item->key->value ?? null] = $this->from($item->value);
+            $result[$item->key->value ?? null] = $this->resolveItemValue($item);
         }
 
         return Type::array($result);
+    }
+
+    protected function resolveItemValue(Node\ArrayItem $item): TypeContract
+    {
+        if ($comment = $item->getDocComment()) {
+            if ($type = $this->docBlockParser->parseVar($comment->getText())) {
+                return $type;
+            }
+        }
+
+        $type = $this->from($item->value);
+
+        return match (true) {
+            $type instanceof VariableState => $type->type(),
+            $type instanceof TypeContract => $type,
+            default => Type::mixed(),
+        };
     }
 }
