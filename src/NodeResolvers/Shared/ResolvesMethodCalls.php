@@ -27,19 +27,18 @@ trait ResolvesMethodCalls
         $methodName = $this->from($node->name);
 
         if (! Type::is($methodName, StringType::class) || $methodName->value === null) {
-            // Method names that happen to match PHP function names resolve as ClassType
-            // due to Util::isClassOrInterface(). Handle resource conditionals here before
-            // returning mixed, since methods like when() collide with Laravel's when() helper.
-            if (
-                $methodName instanceof ClassType
-                && $methodName->value !== null
-                && in_array($methodName->value, static::$conditionalMethods)
-                && $this->isJsonResource($var)
-            ) {
-                return $this->resolveResourceConditional($var, $methodName->value, $node);
-            }
+            // Method names that happen to match PHP function/class names resolve as ClassType
+            // due to Util::isClassOrInterface(). If the value has no namespace separator it's
+            // a simple identifier mis-identified as a class; treat it as the method name.
+            if ($methodName instanceof ClassType && $methodName->value !== null && ! str_contains($methodName->value, '\\')) {
+                if (in_array($methodName->value, static::$conditionalMethods) && $this->isJsonResource($var)) {
+                    return $this->resolveResourceConditional($var, $methodName->value, $node);
+                }
 
-            return Type::mixed();
+                $methodName = Type::string($methodName->value);
+            } else {
+                return Type::mixed();
+            }
         }
 
         switch ($var->value) {
