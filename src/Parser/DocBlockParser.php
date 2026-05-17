@@ -5,6 +5,7 @@ namespace Laravel\Surveyor\Parser;
 use Illuminate\Support\Arr;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Resolvers\DocBlockResolver;
+use Laravel\Surveyor\Types\TemplateTagType;
 use Laravel\Surveyor\Types\Type;
 // use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 // use Laravel\Surveyor\Types\Type as RangerType;
@@ -108,11 +109,41 @@ class DocBlockParser
     {
         $this->parse($docBlock);
 
-        $templateTags = array_map(fn ($tag) => $this->resolve($tag), $this->parsed->getTemplateTagValues());
+        $allTags = array_merge(
+            $this->parsed->getTemplateTagValues('@template'),
+            $this->parsed->getTemplateTagValues('@template-covariant'),
+            $this->parsed->getTemplateTagValues('@template-contravariant'),
+        );
+
+        $templateTags = array_map(fn ($tag) => $this->resolve($tag), $allTags);
 
         $this->scope->setTemplateTags($templateTags);
 
-        return $this->parsed->getTemplateTagValues();
+        return $allTags;
+    }
+
+    /**
+     * @return array<string, TemplateTagType>
+     */
+    public function resolveTemplateTags(string $docBlock): array
+    {
+        $this->parse($docBlock);
+
+        $allTags = array_merge(
+            $this->parsed->getTemplateTagValues('@template'),
+            $this->parsed->getTemplateTagValues('@template-covariant'),
+            $this->parsed->getTemplateTagValues('@template-contravariant'),
+        );
+
+        $result = [];
+        foreach ($allTags as $tag) {
+            $resolved = $this->resolve($tag);
+            if ($resolved instanceof TemplateTagType) {
+                $result[$resolved->name] = $resolved;
+            }
+        }
+
+        return $result;
     }
 
     public function parseProperties(string $docBlock): array

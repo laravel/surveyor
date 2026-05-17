@@ -10,6 +10,7 @@ use Laravel\Surveyor\Types\BoolType;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\IntType;
 use Laravel\Surveyor\Types\StringType;
+use Laravel\Surveyor\Types\TemplateTagType;
 use Laravel\Surveyor\Types\Type;
 use Laravel\Surveyor\Types\UnionType;
 use Laravel\Surveyor\Types\VoidType;
@@ -620,6 +621,96 @@ class TestController
         $scope = $analyzer->analyze($fixture)->analyzed();
 
         expect($scope->namespace())->toBe('App\\Http\\Controllers');
+
+        unlink($fixture);
+    });
+});
+
+describe('template tag storage in ClassLikeResult', function () {
+    it('stores @template declarations from a class docblock', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+/**
+ * @template TKey of array-key
+ * @template TValue
+ */
+class TemplatedCollection {}
+');
+
+        $result = app(Analyzer::class)->analyze($fixture)->result();
+
+        expect($result)->toBeInstanceOf(ClassLikeResult::class);
+        expect($result->hasTemplateTag('TKey'))->toBeTrue();
+        expect($result->hasTemplateTag('TValue'))->toBeTrue();
+
+        $tKey = $result->getTemplateTag('TKey');
+        expect($tKey)->toBeInstanceOf(TemplateTagType::class);
+        expect($tKey->name)->toBe('TKey');
+        expect($tKey->bound)->not->toBeNull();
+
+        $tValue = $result->getTemplateTag('TValue');
+        expect($tValue)->toBeInstanceOf(TemplateTagType::class);
+        expect($tValue->name)->toBe('TValue');
+        expect($tValue->bound)->toBeNull();
+
+        unlink($fixture);
+    });
+
+    it('returns empty templateTags() for a class with no @template annotations', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+class PlainClass {}
+');
+
+        $result = app(Analyzer::class)->analyze($fixture)->result();
+
+        expect($result->templateTags())->toBe([]);
+
+        unlink($fixture);
+    });
+
+    it('stores @template declarations from an interface docblock', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+/**
+ * @template TItem
+ */
+interface CollectionInterface {}
+');
+
+        $result = app(Analyzer::class)->analyze($fixture)->result();
+
+        expect($result)->toBeInstanceOf(ClassLikeResult::class);
+        expect($result->hasTemplateTag('TItem'))->toBeTrue();
+        expect($result->getTemplateTag('TItem')->name)->toBe('TItem');
+
+        unlink($fixture);
+    });
+
+    it('substitutes class template names with their bounds in property @var annotations', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+/**
+ * @template TKey of array-key
+ * @template TValue
+ */
+class TemplatedCollection
+{
+    /** @var array<TKey, TValue> */
+    public $data;
+}
+');
+
+        $result = app(Analyzer::class)->analyze($fixture)->result();
+        $propType = $result->getProperty('data')->type;
+
+        expect($propType)->toBeInstanceOf(ArrayShapeType::class);
+        expect($propType->keyType)->toBeInstanceOf(StringType::class);
+        expect($propType->keyType->value)->toBe('array-key');
 
         unlink($fixture);
     });

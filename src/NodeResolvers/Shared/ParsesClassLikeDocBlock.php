@@ -51,5 +51,9 @@ trait ParsesClassLikeDocBlock
 
             $result->addMethod($methodResult);
         }
+
+        foreach ($this->docBlockParser->resolveTemplateTags($node->getDocComment()) as $tag) {
+            $result->addTemplateTag($tag);
+        }
     }
 }
