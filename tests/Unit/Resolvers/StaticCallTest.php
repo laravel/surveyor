@@ -6,6 +6,7 @@ use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Entities\ResourceResponse;
+use Laravel\Surveyor\Types\IntType;
 use Laravel\Surveyor\Types\UnionType;
 
 uses()->group('integration');
@@ -121,6 +122,34 @@ class CollectionController
         // Illuminate\Http\Resources\Json\AnonymousResourceCollection return
         // shouldn't get unioned in alongside it.
         expect($returnType)->toBeInstanceOf(ResourceResponse::class);
+
+        unlink($fixture);
+    });
+});
+
+describe('Eloquent builder chains', function () {
+    it('resolves Model::query()->count() to int', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use App\\Models\\User;
+
+class UserController
+{
+    public function index()
+    {
+        $count = User::query()->count();
+
+        return $count;
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        $returnType = $result->getMethod('index')->returnType();
+
+        expect($returnType)->toBeInstanceOf(IntType::class);
 
         unlink($fixture);
     });
