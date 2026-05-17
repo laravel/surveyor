@@ -2,6 +2,7 @@
 
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
+use Laravel\Surveyor\Types\ArrayShapeType;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\BoolType;
 use Laravel\Surveyor\Types\FloatType;
@@ -76,6 +77,43 @@ class KeyedArrayTest
         expect($returnType->value['name']->value)->toBe('Joe');
         expect($returnType->value['age'])->toBeInstanceOf(IntType::class);
         expect($returnType->value['age']->value)->toBe(25);
+
+        unlink($fixture);
+    });
+
+    it('uses array item var docblocks to override inferred values', function () {
+        $fixture = createPhpFixture('
+namespace App;
+
+class KeyedArrayDocBlockTest
+{
+    public function test(): array
+    {
+        return [
+            /** @var list<array{value:int,label:string}> */
+            "categories" => $this->options(),
+        ];
+    }
+
+    public function options(): mixed
+    {
+        return [];
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        $method = $result->getMethod('test');
+        $returnType = $method->returnType();
+        $categories = $returnType->value['categories'];
+
+        expect($returnType)->toBeInstanceOf(ArrayType::class);
+        expect($categories)->toBeInstanceOf(ArrayShapeType::class);
+        expect($categories->keyType)->toBeInstanceOf(IntType::class);
+        expect($categories->valueType)->toBeInstanceOf(ArrayType::class);
+        expect($categories->valueType->value['value'])->toBeInstanceOf(IntType::class);
+        expect($categories->valueType->value['label'])->toBeInstanceOf(StringType::class);
 
         unlink($fixture);
     });
