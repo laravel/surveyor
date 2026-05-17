@@ -23,7 +23,9 @@ trait ResolvesMethodCalls
             return Type::mixed();
         }
 
-        $methodName = $this->from($node->name);
+        $methodName = $node->name instanceof Node\Identifier
+            ? new StringType($node->name->name)
+            : $this->from($node->name);
 
         if (! Type::is($methodName, StringType::class) || $methodName->value === null) {
             // Method names that happen to match PHP function names resolve as ClassType
