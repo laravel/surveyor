@@ -352,6 +352,27 @@ class Reflector
             );
         }
 
+        if (count($returnTypes) === 0 && $reflection->getDocComment()) {
+            $mixins = $this->getDocBlockParser()->parseMixins($reflection->getDocComment());
+
+            foreach ($mixins as $mixin) {
+                if (! $mixin instanceof ClassType) {
+                    continue;
+                }
+
+                try {
+                    $mixinReflection = $this->reflectClass($mixin->value);
+                } catch (Throwable $e) {
+                    continue;
+                }
+
+                if ($mixinReflection->hasMethod($method)) {
+                    array_push($returnTypes, ...$this->methodReturnType($mixin->value, $method, $node));
+                    break;
+                }
+            }
+        }
+
         if (count($returnTypes) > 0) {
             return $returnTypes;
         }

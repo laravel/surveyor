@@ -42,6 +42,12 @@ class GenericTypeNode extends AbstractResolver
                 return Type::union(...$genericTypes);
             case 'iterable':
                 return $this->handleIterableType($node, $genericTypes);
+            case 'int':
+            case 'positive-int':
+            case 'negative-int':
+            case 'non-negative-int':
+            case 'non-positive-int':
+                return Type::int();
             default:
                 return $this->handleUnknownType($node);
         }
