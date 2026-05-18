@@ -12,6 +12,12 @@ class IdentifierTypeNode extends AbstractResolver
     {
         $name = (string) $node->name;
 
+        foreach ($this->scope->getTemplateTags() as $templateTag) {
+            if ($templateTag->name === $name) {
+                return $templateTag->bound;
+            }
+        }
+
         return Type::from($this->scope->getUse($name));
     }
 }

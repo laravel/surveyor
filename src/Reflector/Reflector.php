@@ -17,6 +17,7 @@ use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Type;
+use Laravel\Surveyor\Types\TemplateTagType;
 use Laravel\Surveyor\Types\UnionType;
 use PhpParser\Node;
 use PhpParser\Node\Expr\CallLike;
@@ -312,6 +313,34 @@ class Reflector
             }
         }
 
+        $scopeToRestore = null;
+
+        if ($class instanceof ClassType && count($class->genericTypes()) > 0) {
+            $templateTags = $this->scope->getTemplateTags();
+
+            if (count($templateTags) === 0 && $reflection->getDocComment()) {
+                $this->getDocBlockParser()->parseTemplateTags($reflection->getDocComment());
+                $templateTags = $this->scope->getTemplateTags();
+            }
+
+            if (count($templateTags) > 0) {
+                $genericTypes = $class->genericTypes();
+                $overriddenTags = array_map(
+                    fn ($index, $tag) => isset($genericTypes[$index])
+                        ? new TemplateTagType($tag->name, $genericTypes[$index], $tag->default, $tag->lowerBound, $tag->description)
+                        : $tag,
+                    array_keys($templateTags),
+                    $templateTags,
+                );
+
+                $scopeToRestore = $this->scope;
+                $tempScope = clone $this->scope;
+                $tempScope->setTemplateTags(array_values($overriddenTags));
+                $this->setScope($tempScope);
+            }
+        }
+
+        try {
         if ($reflection->isSubclassOf(Model::class) && $this->scope->result()->hasProperty($method)) {
             return [$this->scope->result()->getProperty($method)->type];
         }
@@ -382,6 +411,11 @@ class Reflector
         }
 
         return $this->cachedMacros[$className][$node->name->name] ??= $this->resolveMacro($reflection, $node->name->name);
+        } finally {
+            if ($scopeToRestore !== null) {
+                $this->setScope($scopeToRestore);
+            }
+        }
     }
 
     protected function resolveMacro(ReflectionClass $reflection, string $macroName): array

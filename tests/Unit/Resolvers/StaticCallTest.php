@@ -4,9 +4,11 @@ use App\Http\Resources\UserResource;
 use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
+use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Entities\ResourceResponse;
 use Laravel\Surveyor\Types\IntType;
+use Laravel\Surveyor\Types\NullType;
 use Laravel\Surveyor\Types\UnionType;
 
 uses()->group('integration');
@@ -150,6 +152,63 @@ class UserController
         $returnType = $result->getMethod('index')->returnType();
 
         expect($returnType)->toBeInstanceOf(IntType::class);
+
+        unlink($fixture);
+    });
+
+    it('resolves Model::query()->firstWhere() to Model|null', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use App\\Models\\Post;
+
+class PostController
+{
+    public function show()
+    {
+        return Post::query()->firstWhere(\'id\', 1);
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        $returnType = $result->getMethod('show')->returnType();
+
+        expect($returnType)->toBeInstanceOf(ClassType::class);
+        expect($returnType->value)->toBe('App\\Models\\Post');
+        expect($returnType->nullable)->toBeTrue();
+
+        unlink($fixture);
+    });
+
+    it('resolves Model::query()->get() to Collection of Model', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use App\\Models\\Post;
+
+class PostController
+{
+    public function index()
+    {
+        return Post::query()->get();
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        $returnType = $result->getMethod('index')->returnType();
+
+        expect($returnType)->toBeInstanceOf(ClassType::class);
+        expect($returnType->value)->toBe('Illuminate\\Database\\Eloquent\\Collection');
+        expect($returnType->genericTypes())->toHaveCount(2);
+
+        $modelType = $returnType->genericTypes()[1];
+
+        expect($modelType)->toBeInstanceOf(ClassType::class);
+        expect($modelType->value)->toBe('App\\Models\\Post');
 
         unlink($fixture);
     });

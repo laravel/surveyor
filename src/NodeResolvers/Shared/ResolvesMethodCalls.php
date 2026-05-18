@@ -62,7 +62,7 @@ trait ResolvesMethodCalls
 
         return Type::union(
             ...$this->reflector->methodReturnType(
-                $this->scope->getUse($var->value),
+                $var,
                 $methodName->value,
                 $node,
             ),
