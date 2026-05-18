@@ -16,8 +16,8 @@ use Laravel\Surveyor\Support\Util;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
-use Laravel\Surveyor\Types\Type;
 use Laravel\Surveyor\Types\TemplateTagType;
+use Laravel\Surveyor\Types\Type;
 use Laravel\Surveyor\Types\UnionType;
 use PhpParser\Node;
 use PhpParser\Node\Expr\CallLike;
@@ -342,76 +342,76 @@ class Reflector
         }
 
         try {
-        if ($reflection->isSubclassOf(Model::class) && $this->scope->result()->hasProperty($method)) {
-            return [$this->scope->result()->getProperty($method)->type];
-        }
-
-        $returnTypes = [];
-
-        if ($reflection->hasMethod($method)) {
-            $methodReflection = $reflection->getMethod($method);
-
-            if ($methodReflection->hasReturnType()) {
-                $returnTypes[] = $this->returnType($methodReflection->getReturnType());
+            if ($reflection->isSubclassOf(Model::class) && $this->scope->result()->hasProperty($method)) {
+                return [$this->scope->result()->getProperty($method)->type];
             }
 
-            if ($methodReflection->getDocComment()) {
+            $returnTypes = [];
+
+            if ($reflection->hasMethod($method)) {
+                $methodReflection = $reflection->getMethod($method);
+
+                if ($methodReflection->hasReturnType()) {
+                    $returnTypes[] = $this->returnType($methodReflection->getReturnType());
+                }
+
+                if ($methodReflection->getDocComment()) {
+                    array_push(
+                        $returnTypes,
+                        ...$this->parseDocBlock($methodReflection->getDocComment()),
+                    );
+                }
+
                 array_push(
                     $returnTypes,
-                    ...$this->parseDocBlock($methodReflection->getDocComment()),
+                    ...$this->parseDocBlock($methodReflection->getDocComment(), $node)
                 );
             }
 
-            array_push(
-                $returnTypes,
-                ...$this->parseDocBlock($methodReflection->getDocComment(), $node)
-            );
-        }
+            if ($reflection->getDocComment()) {
+                array_push(
+                    $returnTypes,
+                    ...$this->parseDocBlock($reflection->getDocComment(), $node)
+                );
+            }
 
-        if ($reflection->getDocComment()) {
-            array_push(
-                $returnTypes,
-                ...$this->parseDocBlock($reflection->getDocComment(), $node)
-            );
-        }
+            if (count($returnTypes) === 0 && $reflection->isSubclassOf(Model::class)) {
+                array_push(
+                    $returnTypes,
+                    ...$this->methodReturnType(Builder::class, $method, $node),
+                );
+            }
 
-        if (count($returnTypes) === 0 && $reflection->isSubclassOf(Model::class)) {
-            array_push(
-                $returnTypes,
-                ...$this->methodReturnType(Builder::class, $method, $node),
-            );
-        }
+            if (count($returnTypes) === 0 && $reflection->getDocComment()) {
+                $mixins = $this->getDocBlockParser()->parseMixins($reflection->getDocComment());
 
-        if (count($returnTypes) === 0 && $reflection->getDocComment()) {
-            $mixins = $this->getDocBlockParser()->parseMixins($reflection->getDocComment());
+                foreach ($mixins as $mixin) {
+                    if (! $mixin instanceof ClassType) {
+                        continue;
+                    }
 
-            foreach ($mixins as $mixin) {
-                if (! $mixin instanceof ClassType) {
-                    continue;
-                }
+                    try {
+                        $mixinReflection = $this->reflectClass($mixin->value);
+                    } catch (Throwable $e) {
+                        continue;
+                    }
 
-                try {
-                    $mixinReflection = $this->reflectClass($mixin->value);
-                } catch (Throwable $e) {
-                    continue;
-                }
-
-                if ($mixinReflection->hasMethod($method)) {
-                    array_push($returnTypes, ...$this->methodReturnType($mixin->value, $method, $node));
-                    break;
+                    if ($mixinReflection->hasMethod($method)) {
+                        array_push($returnTypes, ...$this->methodReturnType($mixin->value, $method, $node));
+                        break;
+                    }
                 }
             }
-        }
 
-        if (count($returnTypes) > 0) {
-            return $returnTypes;
-        }
+            if (count($returnTypes) > 0) {
+                return $returnTypes;
+            }
 
-        if (! $node || ! $reflection->isInstantiable() || ! $this->hasMacro($className, $node)) {
-            return [Type::mixed()];
-        }
+            if (! $node || ! $reflection->isInstantiable() || ! $this->hasMacro($className, $node)) {
+                return [Type::mixed()];
+            }
 
-        return $this->cachedMacros[$className][$node->name->name] ??= $this->resolveMacro($reflection, $node->name->name);
+            return $this->cachedMacros[$className][$node->name->name] ??= $this->resolveMacro($reflection, $node->name->name);
         } finally {
             if ($scopeToRestore !== null) {
                 $this->setScope($scopeToRestore);

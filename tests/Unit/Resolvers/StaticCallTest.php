@@ -8,7 +8,6 @@ use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Entities\ResourceResponse;
 use Laravel\Surveyor\Types\IntType;
-use Laravel\Surveyor\Types\NullType;
 use Laravel\Surveyor\Types\UnionType;
 
 uses()->group('integration');
