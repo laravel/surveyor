@@ -336,6 +336,7 @@ class Reflector
                 $scopeToRestore = $this->scope;
                 $tempScope = clone $this->scope;
                 $tempScope->setTemplateTags(array_values($overriddenTags));
+                $tempScope->setReceiverType($class);
                 $this->setScope($tempScope);
             }
         }

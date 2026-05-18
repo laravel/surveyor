@@ -212,4 +212,30 @@ class PostController
 
         unlink($fixture);
     });
+
+    it('preserves generic type through fluent method chain', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use App\\Models\\Post;
+
+class PostController
+{
+    public function show()
+    {
+        return Post::query()->with(\'comments\')->where(\'active\', 1)->firstWhere(\'id\', 1);
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        $returnType = $result->getMethod('show')->returnType();
+
+        expect($returnType)->toBeInstanceOf(ClassType::class);
+        expect($returnType->value)->toBe('App\\Models\\Post');
+        expect($returnType->nullable)->toBeTrue();
+
+        unlink($fixture);
+    });
 });

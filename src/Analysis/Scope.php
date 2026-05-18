@@ -9,6 +9,7 @@ use Laravel\Surveyor\Analyzed\MethodResult;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Result\StateTracker;
 use Laravel\Surveyor\Support\Util;
+use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type;
 use Laravel\Surveyor\Types\TemplateTagType;
 use Laravel\Surveyor\Types\Type as SurveyorType;
@@ -60,6 +61,8 @@ class Scope
      * @var PHPStan\PhpDocParser\Ast\PhpDoc\TemplateTagValueNode[]
      */
     protected array $templateTags = [];
+
+    protected ?ClassType $receiverType = null;
 
     public function __construct(protected ?Scope $parent = null)
     {
@@ -500,5 +503,15 @@ class Scope
             $this->templateTags,
             fn ($tag) => $tag->name === $name,
         );
+    }
+
+    public function setReceiverType(ClassType $type): void
+    {
+        $this->receiverType = $type;
+    }
+
+    public function getReceiverType(): ?ClassType
+    {
+        return $this->receiverType;
     }
 }

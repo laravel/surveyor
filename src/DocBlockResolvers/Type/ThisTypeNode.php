@@ -10,6 +10,10 @@ class ThisTypeNode extends AbstractResolver
 {
     public function resolve(Ast\Type\ThisTypeNode $node)
     {
+        if ($receiverType = $this->scope->getReceiverType()) {
+            return $receiverType;
+        }
+
         return Type::from($this->scope->entityName());
     }
 }
