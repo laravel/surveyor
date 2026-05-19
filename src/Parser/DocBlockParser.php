@@ -9,8 +9,10 @@ use Laravel\Surveyor\Types\Type;
 // use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 // use Laravel\Surveyor\Types\Type as RangerType;
 use PhpParser\Node\Expr\CallLike;
+use PHPStan\PhpDocParser\Ast\PhpDoc\ExtendsTagValueNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\MixinTagValueNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\PhpDocNode;
+use PHPStan\PhpDocParser\Ast\PhpDoc\UsesTagValueNode;
 use PHPStan\PhpDocParser\Lexer\Lexer;
 use PHPStan\PhpDocParser\Parser\ConstExprParser;
 use PHPStan\PhpDocParser\Parser\PhpDocParser;
@@ -108,11 +110,18 @@ class DocBlockParser
     {
         $this->parse($docBlock);
 
-        $templateTags = array_map(fn ($tag) => $this->resolve($tag), $this->parsed->getTemplateTagValues());
+        $regularTagValues = $this->parsed->getTemplateTagValues();
+        $covariantTagValues = array_map(
+            fn ($tag) => $tag->value,
+            $this->parsed->getTagsByName('@template-covariant'),
+        );
+        $allTagValues = array_merge($regularTagValues, $covariantTagValues);
+
+        $templateTags = array_map(fn ($tag) => $this->resolve($tag), $allTagValues);
 
         $this->scope->setTemplateTags($templateTags);
 
-        return $this->parsed->getTemplateTagValues();
+        return $allTagValues;
     }
 
     public function parseProperties(string $docBlock): array
@@ -165,6 +174,69 @@ class DocBlockParser
         return array_map(
             fn (MixinTagValueNode $node) => $this->resolve($node->type),
             $this->parsed->getMixinTagValues(),
+        );
+    }
+
+    public function parseUsesTags(string $docBlock): array
+    {
+        $this->parse($docBlock);
+
+        return array_map(
+            fn (UsesTagValueNode $node) => $this->resolve($node->type),
+            $this->parsed->getUsesTagValues(),
+        );
+    }
+
+    /**
+     * Return the template parameter names declared in @template tags of a
+     * docblock, without updating scope (unlike parseTemplateTags).
+     *
+     * @return list<string>
+     */
+    public function getTemplateTagNames(string $docBlock): array
+    {
+        if (! $docBlock) {
+            return [];
+        }
+
+        $this->parse($docBlock);
+
+        return array_map(fn ($tag) => $tag->name, $this->parsed->getTemplateTagValues());
+    }
+
+    /**
+     * Return all template parameter names (both @template and @template-covariant),
+     * preserving document order.
+     *
+     * @return list<string>
+     */
+    public function getAllTemplateTagNames(string $docBlock): array
+    {
+        if (! $docBlock) {
+            return [];
+        }
+
+        $this->parse($docBlock);
+
+        $regularNames = array_map(fn ($tag) => $tag->name, $this->parsed->getTemplateTagValues());
+        $covariantNames = array_map(
+            fn ($tag) => $tag->value->name,
+            $this->parsed->getTagsByName('@template-covariant'),
+        );
+
+        return array_merge($regularNames, $covariantNames);
+    }
+
+    /**
+     * Parse @extends Foo<T> tags and return their resolved generic ClassType objects.
+     */
+    public function parseExtendsTags(string $docBlock): array
+    {
+        $this->parse($docBlock);
+
+        return array_map(
+            fn (ExtendsTagValueNode $node) => $this->resolve($node->type),
+            $this->parsed->getExtendsTagValues(),
         );
     }
 

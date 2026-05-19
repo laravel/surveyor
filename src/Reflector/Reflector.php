@@ -13,14 +13,19 @@ use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Concerns\LazilyLoadsDependencies;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Support\Util;
+use Laravel\Surveyor\Types\ArrayShapeType;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
+use Laravel\Surveyor\Types\FloatType;
+use Laravel\Surveyor\Types\IntType;
+use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\TemplateTagType;
 use Laravel\Surveyor\Types\Type;
 use Laravel\Surveyor\Types\UnionType;
 use PhpParser\Node;
 use PhpParser\Node\Expr\CallLike;
+use PhpParser\NodeFinder;
 use ReflectionClass;
 use ReflectionFunction;
 use ReflectionIntersectionType;
@@ -90,6 +95,7 @@ class Reflector
             'compact' => $this->handleFunctionCompact($node),
             'app' => $this->handleFunctionApp($node),
             'get_class_vars' => $this->handleFunctionGetClassVars($node),
+            'collect' => $this->handleFunctionCollect($node),
             default => null,
         };
     }
@@ -185,6 +191,139 @@ class Reflector
         }
 
         return [Type::array($properties)];
+    }
+
+    protected function handleFunctionCollect(?CallLike $node): ?array
+    {
+        $collectionClass = \Illuminate\Support\Collection::class;
+
+        if (! $node || count($node->getArgs()) === 0) {
+            return [new ClassType($collectionClass)];
+        }
+
+        $argType = $this->getNodeResolver()->from($node->getArgs()[0]->value, $this->scope);
+
+        if ($argType instanceof ClassType) {
+            return [$argType];
+        }
+
+        if ($argType instanceof ArrayType) {
+            $keyType = $argType->isList() ? Type::int() : $argType->keyType();
+            $valueType = $this->generalizeLiteralType($argType->valueType());
+
+            return [(new ClassType($collectionClass))->setGenericTypes([$keyType, $valueType])];
+        }
+
+        if ($argType instanceof ArrayShapeType) {
+            return [(new ClassType($collectionClass))->setGenericTypes([$argType->keyType, $argType->valueType])];
+        }
+
+        return [new ClassType($collectionClass)];
+    }
+
+    /**
+     * Generalize a literal type to its base type (e.g., StringType('a') → StringType()).
+     * This is needed when building Collection generic types from literal array values.
+     */
+    protected function generalizeLiteralType(TypeContract $type): TypeContract
+    {
+        if ($type instanceof StringType && $type->value !== null) {
+            return new StringType();
+        }
+
+        if ($type instanceof IntType && $type->value !== null) {
+            return new IntType();
+        }
+
+        if ($type instanceof FloatType && $type->value !== null) {
+            return new FloatType();
+        }
+
+        if ($type instanceof UnionType) {
+            return Type::union(...array_map(fn ($t) => $this->generalizeLiteralType($t), $type->types));
+        }
+
+        return $type;
+    }
+
+    /**
+     * When a method is declared in a parent class, resolve the @extends chain to map
+     * the parent class's template names to the child class's resolved generic types.
+     * E.g., EloquentCollection extends Collection<TKey, TModel>, so Collection's TValue
+     * maps to EloquentCollection's TModel binding.
+     */
+    protected function resolveExtendsChain(ReflectionClass $childReflection, string $parentClassName): void
+    {
+        $extendsTypes = $this->getDocBlockParser()->parseExtendsTags($childReflection->getDocComment());
+
+        foreach ($extendsTypes as $extendsType) {
+            if (! $extendsType instanceof ClassType) {
+                continue;
+            }
+
+            // Match the @extends class name (handle leading backslash)
+            $extendsClassName = ltrim($extendsType->value, '\\');
+            if ($extendsClassName !== $parentClassName) {
+                continue;
+            }
+
+            try {
+                $parentReflection = $this->reflectClass($parentClassName);
+            } catch (Throwable $e) {
+                continue;
+            }
+
+            if (! $parentReflection->getDocComment()) {
+                continue;
+            }
+
+            $parentTemplateNames = $this->getDocBlockParser()->getAllTemplateTagNames($parentReflection->getDocComment());
+            $extendsGenericTypes = $extendsType->genericTypes();
+
+            $additionalTags = [];
+            foreach ($parentTemplateNames as $i => $parentName) {
+                if (isset($extendsGenericTypes[$i])) {
+                    $additionalTags[] = new TemplateTagType($parentName, $extendsGenericTypes[$i], null, null, null);
+                }
+            }
+
+            if (count($additionalTags) > 0) {
+                $currentTags = $this->scope->getTemplateTags();
+                $existingNames = array_map(fn ($t) => $t->name, $currentTags);
+                $newTags = array_values(array_filter($additionalTags, fn ($t) => ! in_array($t->name, $existingNames)));
+                $this->scope->setTemplateTags(array_merge($currentTags, $newTags));
+            }
+
+            break;
+        }
+    }
+
+    /**
+     * Bind method-level @template tags (like TFirstDefault) that are not already
+     * in the scope. Unbound method templates default to NullType, which correctly
+     * models optional parameters that default to null.
+     */
+    protected function bindMethodLevelTemplateTags(string $methodDocBlock): void
+    {
+        $methodTemplateNames = $this->getDocBlockParser()->getTemplateTagNames($methodDocBlock);
+
+        if (count($methodTemplateNames) === 0) {
+            return;
+        }
+
+        $currentTags = $this->scope->getTemplateTags();
+        $existingNames = array_map(fn ($t) => $t->name, $currentTags);
+
+        $newTags = [];
+        foreach ($methodTemplateNames as $name) {
+            if (! in_array($name, $existingNames)) {
+                $newTags[] = new TemplateTagType($name, Type::null(), null, null, null);
+            }
+        }
+
+        if (count($newTags) > 0) {
+            $this->scope->setTemplateTags(array_merge($currentTags, $newTags));
+        }
     }
 
     public function propertyType(string $name, ClassType|string $class, ?Node $node = null): ?TypeContract
@@ -338,6 +477,8 @@ class Reflector
                 $tempScope->setTemplateTags(array_values($overriddenTags));
                 $tempScope->setReceiverType($class);
                 $this->setScope($tempScope);
+
+                $this->resolveUseTraitBindings($reflection);
             }
         }
 
@@ -350,6 +491,19 @@ class Reflector
 
             if ($reflection->hasMethod($method)) {
                 $methodReflection = $reflection->getMethod($method);
+
+                // When we have a temp scope with class-level template bindings, also resolve
+                // @extends chain for inherited methods and bind method-level template tags.
+                if ($scopeToRestore !== null) {
+                    $declaringClassName = $methodReflection->getDeclaringClass()->getName();
+                    if ($declaringClassName !== $reflection->getName() && $reflection->getDocComment()) {
+                        $this->resolveExtendsChain($reflection, $declaringClassName);
+                    }
+
+                    if ($methodReflection->getDocComment()) {
+                        $this->bindMethodLevelTemplateTags($methodReflection->getDocComment());
+                    }
+                }
 
                 if ($methodReflection->hasReturnType()) {
                     $returnTypes[] = $this->returnType($methodReflection->getReturnType());
@@ -376,9 +530,10 @@ class Reflector
             }
 
             if (count($returnTypes) === 0 && $reflection->isSubclassOf(Model::class)) {
+                $builderType = (new ClassType(Builder::class))->setGenericTypes([new ClassType($className)]);
                 array_push(
                     $returnTypes,
-                    ...$this->methodReturnType(Builder::class, $method, $node),
+                    ...$this->methodReturnType($builderType, $method, $node),
                 );
             }
 
@@ -419,6 +574,92 @@ class Reflector
         }
     }
 
+    protected function resolveUseTraitBindings(ReflectionClass $reflection): void
+    {
+        $fileName = $reflection->getFileName();
+
+        if (! $fileName || ! file_exists($fileName)) {
+            return;
+        }
+
+        $useBindings = $this->parseTraitUseBindings($reflection, $fileName);
+
+        if (empty($useBindings)) {
+            return;
+        }
+
+        $additionalTags = [];
+
+        foreach ($useBindings as $traitName => $boundTypes) {
+            try {
+                $traitReflection = $this->reflectClass($traitName);
+            } catch (Throwable $e) {
+                continue;
+            }
+
+            $traitParamNames = $this->getDocBlockParser()->getTemplateTagNames(
+                $traitReflection->getDocComment() ?: ''
+            );
+
+            foreach ($traitParamNames as $index => $paramName) {
+                $boundType = $boundTypes[$index] ?? null;
+
+                if ($boundType !== null && ! $this->scope->getTemplateTag($paramName)) {
+                    $additionalTags[] = new TemplateTagType($paramName, $boundType, null, null, null);
+                }
+            }
+        }
+
+        if (! empty($additionalTags)) {
+            $this->scope->setTemplateTags([...$this->scope->getTemplateTags(), ...$additionalTags]);
+        }
+    }
+
+    /**
+     * Parse the PHP source file of a class to extract @use Trait<Type> bindings
+     * declared on trait use statements.
+     *
+     * Returns an array keyed by fully-qualified trait name, with values being
+     * arrays of resolved Surveyor Type objects corresponding to the bound generic
+     * type arguments.
+     *
+     * @return array<string, list<\Laravel\Surveyor\Types\Contracts\Type>>
+     */
+    protected function parseTraitUseBindings(ReflectionClass $reflection, string $fileName): array
+    {
+        try {
+            $nodes = $this->getParser()->parseFile($fileName);
+        } catch (Throwable $e) {
+            return [];
+        }
+
+        $bindings = [];
+        $nodeFinder = new NodeFinder;
+
+        /** @var \PhpParser\Node\Stmt\TraitUse[] $traitUseNodes */
+        $traitUseNodes = $nodeFinder->findInstanceOf($nodes, Node\Stmt\TraitUse::class);
+
+        foreach ($traitUseNodes as $traitUseNode) {
+            $docComment = $traitUseNode->getDocComment();
+
+            if (! $docComment || ! str_contains($docComment->getText(), '@use')) {
+                continue;
+            }
+
+            $useTypes = $this->getDocBlockParser()->parseUsesTags($docComment->getText());
+
+            foreach ($useTypes as $useType) {
+                if (! $useType instanceof ClassType || count($useType->genericTypes()) === 0) {
+                    continue;
+                }
+
+                $bindings[$useType->value] = $useType->genericTypes();
+            }
+        }
+
+        return $bindings;
+    }
+
     protected function resolveMacro(ReflectionClass $reflection, string $macroName): array
     {
         $analyzed = $this->getAnalyzer()->analyze($reflection->getFileName());
@@ -440,6 +681,10 @@ class Reflector
     {
         if ($returnType instanceof ReflectionNamedType) {
             if (in_array($returnType->getName(), ['static', 'self'])) {
+                if ($receiverType = $this->scope->getReceiverType()) {
+                    return clone $receiverType;
+                }
+
                 return Type::from($this->scope->entityName());
             }
 

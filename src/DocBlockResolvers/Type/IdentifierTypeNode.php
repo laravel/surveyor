@@ -18,6 +18,10 @@ class IdentifierTypeNode extends AbstractResolver
             }
         }
 
+        if (in_array($name, ['static', 'self'], true) && ($receiverType = $this->scope->getReceiverType())) {
+            return clone $receiverType;
+        }
+
         return Type::from($this->scope->getUse($name));
     }
 }
