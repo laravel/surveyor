@@ -281,7 +281,7 @@ class DocBlockParser
         $result = [];
 
         foreach ($this->parsed->getParamTagValues() as $tag) {
-            if (! $tag->type instanceof \PHPStan\PhpDocParser\Ast\Type\CallableTypeNode) {
+            if (! $tag->type instanceof CallableTypeNode) {
                 continue;
             }
 
@@ -289,7 +289,7 @@ class DocBlockParser
             $inputTypeNames = [];
 
             foreach ($tag->type->parameters as $callableParam) {
-                if ($callableParam->type instanceof \PHPStan\PhpDocParser\Ast\Type\IdentifierTypeNode) {
+                if ($callableParam->type instanceof IdentifierTypeNode) {
                     $inputTypeNames[] = $callableParam->type->name;
                 } else {
                     $inputTypeNames[] = null;

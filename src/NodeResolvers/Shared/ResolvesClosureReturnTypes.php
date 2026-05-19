@@ -37,7 +37,7 @@ trait ResolvesClosureReturnTypes
      * Used when the collection's template types (e.g. TValue=string) are available
      * and should flow into the closure body.
      *
-     * @param array<int, TypeContract|null> $paramTypes Resolved types indexed by param position
+     * @param  array<int, TypeContract|null>  $paramTypes  Resolved types indexed by param position
      */
     protected function resolveClosureReturnTypeWithParamHints(Node\Expr $expr, array $paramTypes): ?TypeContract
     {

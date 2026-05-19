@@ -25,6 +25,7 @@ use Laravel\Surveyor\Types\TemplateTagType;
 use Laravel\Surveyor\Types\Type;
 use Laravel\Surveyor\Types\UnionType;
 use PhpParser\Node;
+use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\CallLike;
 use PhpParser\Node\Stmt\TraitUse;
 use PhpParser\NodeFinder;
@@ -380,7 +381,7 @@ class Reflector
      * this resolves each callable param type name to its concrete type and
      * injects it as the closure param hint.
      *
-     * @param array<int, \PhpParser\Node\Expr> $callableArgNodes
+     * @param  array<int, Expr>  $callableArgNodes
      * @return array<int, TypeContract>
      */
     protected function resolveClosuresWithParamHints(

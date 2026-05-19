@@ -2,6 +2,7 @@
 
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
+use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\IntType;
 use Laravel\Surveyor\Types\StringType;
@@ -176,7 +177,7 @@ class TestClass
         expect($returnType->genericTypes())->toHaveCount(2);
 
         $valueType = $returnType->genericTypes()[1];
-        expect($valueType)->toBeInstanceOf(\Laravel\Surveyor\Types\ArrayType::class);
+        expect($valueType)->toBeInstanceOf(ArrayType::class);
 
         $nameType = $valueType->value['name'] ?? null;
         expect($nameType)->toBeInstanceOf(StringType::class);

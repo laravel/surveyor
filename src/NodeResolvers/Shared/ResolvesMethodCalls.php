@@ -11,12 +11,13 @@ use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
 use PhpParser\Node\Arg;
+use PhpParser\Node\Expr;
 
 trait ResolvesMethodCalls
 {
     use AddsValidationRules, LazilyLoadsDependencies, ResolvesClosureReturnTypes, ResolvesResourceConditionals;
 
-    protected function resolveMethodCall(Node\Expr\MethodCall|Node\Expr\NullsafeMethodCall $node)
+    protected function resolveMethodCall(Expr\MethodCall|Expr\NullsafeMethodCall $node)
     {
         $var = $this->from($node->var);
 
@@ -68,14 +69,14 @@ trait ResolvesMethodCalls
                 $node,
                 $this->resolveCallableArgReturnTypes($node->args),
                 $this->getCallableArgNodes($node->args),
-                fn (Node\Expr $expr, array $paramTypes) => $this->resolveClosureReturnTypeWithParamHints($expr, $paramTypes),
+                fn (Expr $expr, array $paramTypes) => $this->resolveClosureReturnTypeWithParamHints($expr, $paramTypes),
             ),
         );
     }
 
     /**
      * @param  Arg[]  $args
-     * @return array<int, \PhpParser\Node\Expr>
+     * @return array<int, Expr>
      */
     protected function getCallableArgNodes(array $args): array
     {
@@ -83,8 +84,8 @@ trait ResolvesMethodCalls
 
         foreach ($args as $i => $arg) {
             if (
-                $arg->value instanceof Node\Expr\ArrowFunction
-                || $arg->value instanceof Node\Expr\Closure
+                $arg->value instanceof Expr\ArrowFunction
+                || $arg->value instanceof Expr\Closure
             ) {
                 $nodes[$i] = $arg->value;
             }
@@ -103,8 +104,8 @@ trait ResolvesMethodCalls
 
         foreach ($args as $i => $arg) {
             if (
-                $arg->value instanceof Node\Expr\ArrowFunction
-                || $arg->value instanceof Node\Expr\Closure
+                $arg->value instanceof Expr\ArrowFunction
+                || $arg->value instanceof Expr\Closure
             ) {
                 $returnType = $this->resolveClosureReturnType($arg->value);
 
