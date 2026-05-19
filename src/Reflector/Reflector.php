@@ -644,16 +644,22 @@ class Reflector
                 }
 
                 if ($methodReflection->getDocComment()) {
-                    array_push(
-                        $returnTypes,
-                        ...$this->parseDocBlock($methodReflection->getDocComment()),
-                    );
-                }
+                    $methodDocBlock = $methodReflection->getDocComment();
 
-                array_push(
-                    $returnTypes,
-                    ...$this->parseDocBlock($methodReflection->getDocComment(), $node)
-                );
+                    if ($class instanceof ClassType && $this->hasSimpleStaticReturn($methodDocBlock)) {
+                        $returnTypes[] = clone $class;
+                    } else {
+                        array_push(
+                            $returnTypes,
+                            ...$this->parseDocBlock($methodDocBlock),
+                        );
+
+                        array_push(
+                            $returnTypes,
+                            ...$this->parseDocBlock($methodDocBlock, $node)
+                        );
+                    }
+                }
             }
 
             if ($reflection->getDocComment()) {
@@ -874,7 +880,16 @@ class Reflector
             return [];
         }
 
+        // Keep parser scope aligned with Reflector scope so @return static/self
+        // resolves against the current receiver type and template bindings.
+        $this->getDocBlockParser()->setScope($this->scope);
+
         return $this->getDocBlockParser()->parseReturn($docBlock, $node);
+    }
+
+    protected function hasSimpleStaticReturn(string $docBlock): bool
+    {
+        return (bool) preg_match('/@return\s+\\\\?(static|self)\s*$/m', $docBlock);
     }
 
     public function reflectClass(ClassType|string $class): ReflectionClass
