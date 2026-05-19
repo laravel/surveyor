@@ -9,6 +9,7 @@ use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Application;
+use Illuminate\Support\Collection;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Concerns\LazilyLoadsDependencies;
 use Laravel\Surveyor\Debug\Debug;
@@ -25,6 +26,7 @@ use Laravel\Surveyor\Types\Type;
 use Laravel\Surveyor\Types\UnionType;
 use PhpParser\Node;
 use PhpParser\Node\Expr\CallLike;
+use PhpParser\Node\Stmt\TraitUse;
 use PhpParser\NodeFinder;
 use ReflectionClass;
 use ReflectionFunction;
@@ -195,7 +197,7 @@ class Reflector
 
     protected function handleFunctionCollect(?CallLike $node): ?array
     {
-        $collectionClass = \Illuminate\Support\Collection::class;
+        $collectionClass = Collection::class;
 
         if (! $node || count($node->getArgs()) === 0) {
             return [new ClassType($collectionClass)];
@@ -228,15 +230,15 @@ class Reflector
     protected function generalizeLiteralType(TypeContract $type): TypeContract
     {
         if ($type instanceof StringType && $type->value !== null) {
-            return new StringType();
+            return new StringType;
         }
 
         if ($type instanceof IntType && $type->value !== null) {
-            return new IntType();
+            return new IntType;
         }
 
         if ($type instanceof FloatType && $type->value !== null) {
-            return new FloatType();
+            return new FloatType;
         }
 
         if ($type instanceof UnionType) {
@@ -623,7 +625,7 @@ class Reflector
      * arrays of resolved Surveyor Type objects corresponding to the bound generic
      * type arguments.
      *
-     * @return array<string, list<\Laravel\Surveyor\Types\Contracts\Type>>
+     * @return array<string, list<TypeContract>>
      */
     protected function parseTraitUseBindings(ReflectionClass $reflection, string $fileName): array
     {
@@ -636,8 +638,8 @@ class Reflector
         $bindings = [];
         $nodeFinder = new NodeFinder;
 
-        /** @var \PhpParser\Node\Stmt\TraitUse[] $traitUseNodes */
-        $traitUseNodes = $nodeFinder->findInstanceOf($nodes, Node\Stmt\TraitUse::class);
+        /** @var TraitUse[] $traitUseNodes */
+        $traitUseNodes = $nodeFinder->findInstanceOf($nodes, TraitUse::class);
 
         foreach ($traitUseNodes as $traitUseNode) {
             $docComment = $traitUseNode->getDocComment();
