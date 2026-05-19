@@ -10,6 +10,7 @@ use Laravel\Surveyor\Types\MixedType;
 use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
+use PhpParser\Node\Arg;
 
 trait ResolvesMethodCalls
 {
@@ -71,7 +72,7 @@ trait ResolvesMethodCalls
     }
 
     /**
-     * @param \PhpParser\Node\Arg[] $args
+     * @param  Arg[]  $args
      * @return array<int, \Laravel\Surveyor\Types\Contracts\Type>
      */
     protected function resolveCallableArgReturnTypes(array $args): array

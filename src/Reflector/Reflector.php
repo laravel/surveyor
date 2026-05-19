@@ -333,7 +333,7 @@ class Reflector
      * e.g. @param callable(TValue, TKey): TMapValue $callback — binds TMapValue to the
      * actual return type of the closure passed at the corresponding argument position.
      *
-     * @param array<int, \Laravel\Surveyor\Types\Contracts\Type> $closureReturnTypes
+     * @param  array<int, TypeContract>  $closureReturnTypes
      */
     protected function bindCallableArgTemplates(string $methodDocBlock, \ReflectionMethod $methodReflection, array $closureReturnTypes): void
     {

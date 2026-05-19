@@ -13,6 +13,8 @@ use PHPStan\PhpDocParser\Ast\PhpDoc\ExtendsTagValueNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\MixinTagValueNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\PhpDocNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\UsesTagValueNode;
+use PHPStan\PhpDocParser\Ast\Type\CallableTypeNode;
+use PHPStan\PhpDocParser\Ast\Type\IdentifierTypeNode;
 use PHPStan\PhpDocParser\Lexer\Lexer;
 use PHPStan\PhpDocParser\Parser\ConstExprParser;
 use PHPStan\PhpDocParser\Parser\PhpDocParser;
@@ -254,8 +256,8 @@ class DocBlockParser
 
         foreach ($this->parsed->getParamTagValues() as $tag) {
             if (
-                $tag->type instanceof \PHPStan\PhpDocParser\Ast\Type\CallableTypeNode
-                && $tag->type->returnType instanceof \PHPStan\PhpDocParser\Ast\Type\IdentifierTypeNode
+                $tag->type instanceof CallableTypeNode
+                && $tag->type->returnType instanceof IdentifierTypeNode
             ) {
                 $paramName = ltrim($tag->parameterName, '$');
                 $result[$paramName] = $tag->type->returnType->name;
