@@ -67,8 +67,30 @@ trait ResolvesMethodCalls
                 $methodName->value,
                 $node,
                 $this->resolveCallableArgReturnTypes($node->args),
+                $this->getCallableArgNodes($node->args),
+                fn (Node\Expr $expr, array $paramTypes) => $this->resolveClosureReturnTypeWithParamHints($expr, $paramTypes),
             ),
         );
+    }
+
+    /**
+     * @param  Arg[]  $args
+     * @return array<int, \PhpParser\Node\Expr>
+     */
+    protected function getCallableArgNodes(array $args): array
+    {
+        $nodes = [];
+
+        foreach ($args as $i => $arg) {
+            if (
+                $arg->value instanceof Node\Expr\ArrowFunction
+                || $arg->value instanceof Node\Expr\Closure
+            ) {
+                $nodes[$i] = $arg->value;
+            }
+        }
+
+        return $nodes;
     }
 
     /**

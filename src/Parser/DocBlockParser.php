@@ -267,6 +267,43 @@ class DocBlockParser
         return $result;
     }
 
+    /**
+     * For callable @param tags, returns the INPUT param type names keyed by param name.
+     * e.g. "@param callable(TValue, TKey): TMapValue $callback" → ['callback' => ['TValue', 'TKey']]
+     * Only IdentifierTypeNode params are included; complex types are represented as null.
+     *
+     * @return array<string, array<int, string|null>>
+     */
+    public function getCallableParamInputTypeNames(string $docBlock): array
+    {
+        $this->parse($docBlock);
+
+        $result = [];
+
+        foreach ($this->parsed->getParamTagValues() as $tag) {
+            if (! $tag->type instanceof \PHPStan\PhpDocParser\Ast\Type\CallableTypeNode) {
+                continue;
+            }
+
+            $paramName = ltrim($tag->parameterName, '$');
+            $inputTypeNames = [];
+
+            foreach ($tag->type->parameters as $callableParam) {
+                if ($callableParam->type instanceof \PHPStan\PhpDocParser\Ast\Type\IdentifierTypeNode) {
+                    $inputTypeNames[] = $callableParam->type->name;
+                } else {
+                    $inputTypeNames[] = null;
+                }
+            }
+
+            if (! empty($inputTypeNames)) {
+                $result[$paramName] = $inputTypeNames;
+            }
+        }
+
+        return $result;
+    }
+
     protected function parse(string $docBlock): PhpDocNode
     {
         if (isset($this->cached[$docBlock])) {

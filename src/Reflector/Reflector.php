@@ -374,6 +374,72 @@ class Reflector
         }
     }
 
+    /**
+     * Re-resolve closure nodes with template-aware param type hints.
+     * After the template scope is fully set up (TValue=string, TKey=int, etc.),
+     * this resolves each callable param type name to its concrete type and
+     * injects it as the closure param hint.
+     *
+     * @param array<int, \PhpParser\Node\Expr> $callableArgNodes
+     * @return array<int, TypeContract>
+     */
+    protected function resolveClosuresWithParamHints(
+        string $methodDocBlock,
+        \ReflectionMethod $methodReflection,
+        array $callableArgNodes,
+        callable $closureResolver,
+    ): array {
+        $callableInputTypeNames = $this->getDocBlockParser()->getCallableParamInputTypeNames($methodDocBlock);
+
+        if (empty($callableInputTypeNames)) {
+            return [];
+        }
+
+        $paramNames = array_map(fn ($p) => $p->getName(), $methodReflection->getParameters());
+        $result = [];
+
+        foreach ($callableArgNodes as $argIndex => $argNode) {
+            $paramName = $paramNames[$argIndex] ?? null;
+
+            if ($paramName === null || ! isset($callableInputTypeNames[$paramName])) {
+                continue;
+            }
+
+            $resolvedParamTypes = [];
+
+            foreach ($callableInputTypeNames[$paramName] as $i => $typeName) {
+                if ($typeName !== null) {
+                    $resolvedParamTypes[$i] = $this->resolveTemplateTagByName($typeName);
+                }
+            }
+
+            // Save and restore Reflector scope around the callback. When the node
+            // resolver calls AbstractResolver::setScope it also re-points the
+            // Reflector's $this->scope to the node-resolver scope, wiping the
+            // tempScope (with template-tag bindings) that we set up above.
+            $savedScope = $this->scope;
+            $returnType = $closureResolver($argNode, $resolvedParamTypes);
+            $this->setScope($savedScope);
+
+            if ($returnType !== null) {
+                $result[$argIndex] = $returnType;
+            }
+        }
+
+        return $result;
+    }
+
+    protected function resolveTemplateTagByName(string $name): TypeContract
+    {
+        foreach ($this->scope->getTemplateTags() as $tag) {
+            if ($tag->name === $name) {
+                return $tag->bound;
+            }
+        }
+
+        return Type::mixed();
+    }
+
     public function propertyType(string $name, ClassType|string $class, ?Node $node = null): ?TypeContract
     {
         $reflection = $this->reflectClass($class);
@@ -487,7 +553,7 @@ class Reflector
         return Type::from($constantValue);
     }
 
-    public function methodReturnType(ClassType|string $class, string $method, ?Node $node = null, array $closureReturnTypes = []): array
+    public function methodReturnType(ClassType|string $class, string $method, ?Node $node = null, array $closureReturnTypes = [], array $callableArgNodes = [], ?callable $closureResolver = null): array
     {
         $className = $class instanceof ClassType ? $class->value : $class;
         $reflection = $this->reflectClass($class);
@@ -550,7 +616,23 @@ class Reflector
 
                     if ($methodReflection->getDocComment()) {
                         $this->bindMethodLevelTemplateTags($methodReflection->getDocComment());
-                        if (! empty($closureReturnTypes)) {
+
+                        // Re-resolve closures with template-aware param type hints when possible.
+                        // This allows TValue/TKey to flow into untyped closure params.
+                        if (! empty($callableArgNodes) && $closureResolver !== null) {
+                            $hintedReturnTypes = $this->resolveClosuresWithParamHints(
+                                $methodReflection->getDocComment(),
+                                $methodReflection,
+                                $callableArgNodes,
+                                $closureResolver,
+                            );
+
+                            if (! empty($hintedReturnTypes)) {
+                                $this->bindCallableArgTemplates($methodReflection->getDocComment(), $methodReflection, $hintedReturnTypes);
+                            } elseif (! empty($closureReturnTypes)) {
+                                $this->bindCallableArgTemplates($methodReflection->getDocComment(), $methodReflection, $closureReturnTypes);
+                            }
+                        } elseif (! empty($closureReturnTypes)) {
                             $this->bindCallableArgTemplates($methodReflection->getDocComment(), $methodReflection, $closureReturnTypes);
                         }
                     }

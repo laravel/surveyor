@@ -5,6 +5,7 @@ use Laravel\Surveyor\Analyzer\Analyzer;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\IntType;
 use Laravel\Surveyor\Types\StringType;
+use Laravel\Surveyor\Types\UnionType;
 
 uses()->group('integration');
 
@@ -154,6 +155,37 @@ class TestClass
 
         unlink($fixture);
     });
+
+    it('flows TValue into untyped closure params in map()', function () {
+        $fixture = createPhpFixture('
+namespace App;
+
+class TestClass
+{
+    public function test()
+    {
+        return collect([\'a\', \'b\', \'c\'])->map(fn($item) => [\'name\' => $item, \'len\' => strlen($item)]);
+    }
+}');
+
+        $result = app(Analyzer::class)->analyze($fixture)->result();
+        $returnType = $result->getMethod('test')->returnType();
+
+        expect($returnType)->toBeInstanceOf(ClassType::class);
+        expect($returnType->value)->toBe('Illuminate\Support\Collection');
+        expect($returnType->genericTypes())->toHaveCount(2);
+
+        $valueType = $returnType->genericTypes()[1];
+        expect($valueType)->toBeInstanceOf(\Laravel\Surveyor\Types\ArrayType::class);
+
+        $nameType = $valueType->value['name'] ?? null;
+        expect($nameType)->toBeInstanceOf(StringType::class);
+
+        $lenType = $valueType->value['len'] ?? null;
+        expect($lenType)->toBeInstanceOf(IntType::class);
+
+        unlink($fixture);
+    });
 });
 
 describe('Eloquent\\Collection chaining', function () {
@@ -277,6 +309,30 @@ class TestClass
         expect($returnType)->toBeInstanceOf(ClassType::class);
         expect($returnType->value)->toBe('App\Models\User');
         expect($returnType->nullable)->toBeTrue();
+
+        unlink($fixture);
+    });
+
+    it('resolves map() on Eloquent collection to EloquentCollection not UnionType', function () {
+        $fixture = createPhpFixture('
+namespace App;
+
+use App\Models\User;
+
+class TestClass
+{
+    public function test()
+    {
+        return User::all()->map(fn(User $u) => $u->name);
+    }
+}');
+
+        $result = app(Analyzer::class)->analyze($fixture)->result();
+        $returnType = $result->getMethod('test')->returnType();
+
+        expect($returnType)->not->toBeInstanceOf(UnionType::class);
+        expect($returnType)->toBeInstanceOf(ClassType::class);
+        expect($returnType->value)->toBe('Illuminate\Database\Eloquent\Collection');
 
         unlink($fixture);
     });
