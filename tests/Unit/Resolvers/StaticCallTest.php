@@ -237,4 +237,30 @@ class PostController
 
         unlink($fixture);
     });
+
+    it('resolves Model::query()->first() to Model|null via @use trait binding', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use App\\Models\\Post;
+
+class PostController
+{
+    public function show()
+    {
+        return Post::query()->first();
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        $returnType = $result->getMethod('show')->returnType();
+
+        expect($returnType)->toBeInstanceOf(ClassType::class);
+        expect($returnType->value)->toBe('App\\Models\\Post');
+        expect($returnType->nullable)->toBeTrue();
+
+        unlink($fixture);
+    });
 });

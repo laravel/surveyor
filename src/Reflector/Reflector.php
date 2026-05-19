@@ -708,6 +708,12 @@ class Reflector
         }
     }
 
+    /**
+     * Resolve @use Trait<Type> bindings and inject the trait's template param
+     * mappings into the current scope, so that methods defined in a trait that
+     * reference the trait's own template params (e.g. TValue) resolve to the
+     * concrete types passed via @use.
+     */
     protected function resolveUseTraitBindings(ReflectionClass $reflection): void
     {
         $fileName = $reflection->getFileName();

@@ -179,6 +179,10 @@ class DocBlockParser
         );
     }
 
+    /**
+     * Parse @use Trait<Type> tags and return their resolved generic types
+     * as ClassType objects (with generic types resolved through the current scope).
+     */
     public function parseUsesTags(string $docBlock): array
     {
         $this->parse($docBlock);
