@@ -240,6 +240,31 @@ class DocBlockParser
         );
     }
 
+    /**
+     * For each @param whose type is callable(...): TXxx, return [paramName => templateName].
+     * Operates at the PHPStan AST level so it never triggers template resolution.
+     *
+     * @return array<string, string>
+     */
+    public function getCallableParamReturnTemplates(string $docBlock): array
+    {
+        $this->parse($docBlock);
+
+        $result = [];
+
+        foreach ($this->parsed->getParamTagValues() as $tag) {
+            if (
+                $tag->type instanceof \PHPStan\PhpDocParser\Ast\Type\CallableTypeNode
+                && $tag->type->returnType instanceof \PHPStan\PhpDocParser\Ast\Type\IdentifierTypeNode
+            ) {
+                $paramName = ltrim($tag->parameterName, '$');
+                $result[$paramName] = $tag->type->returnType->name;
+            }
+        }
+
+        return $result;
+    }
+
     protected function parse(string $docBlock): PhpDocNode
     {
         if (isset($this->cached[$docBlock])) {

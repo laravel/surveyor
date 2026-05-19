@@ -13,7 +13,7 @@ use PhpParser\Node;
 
 trait ResolvesMethodCalls
 {
-    use AddsValidationRules, LazilyLoadsDependencies, ResolvesResourceConditionals;
+    use AddsValidationRules, LazilyLoadsDependencies, ResolvesClosureReturnTypes, ResolvesResourceConditionals;
 
     protected function resolveMethodCall(Node\Expr\MethodCall|Node\Expr\NullsafeMethodCall $node)
     {
@@ -65,7 +65,32 @@ trait ResolvesMethodCalls
                 $var,
                 $methodName->value,
                 $node,
+                $this->resolveCallableArgReturnTypes($node->args),
             ),
         );
+    }
+
+    /**
+     * @param \PhpParser\Node\Arg[] $args
+     * @return array<int, \Laravel\Surveyor\Types\Contracts\Type>
+     */
+    protected function resolveCallableArgReturnTypes(array $args): array
+    {
+        $closureReturnTypes = [];
+
+        foreach ($args as $i => $arg) {
+            if (
+                $arg->value instanceof Node\Expr\ArrowFunction
+                || $arg->value instanceof Node\Expr\Closure
+            ) {
+                $returnType = $this->resolveClosureReturnType($arg->value);
+
+                if ($returnType !== null) {
+                    $closureReturnTypes[$i] = $returnType;
+                }
+            }
+        }
+
+        return $closureReturnTypes;
     }
 }

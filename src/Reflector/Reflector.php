@@ -328,6 +328,52 @@ class Reflector
         }
     }
 
+    /**
+     * Bind method-level templates that appear as the return type of a callable @param.
+     * e.g. @param callable(TValue, TKey): TMapValue $callback — binds TMapValue to the
+     * actual return type of the closure passed at the corresponding argument position.
+     *
+     * @param array<int, \Laravel\Surveyor\Types\Contracts\Type> $closureReturnTypes
+     */
+    protected function bindCallableArgTemplates(string $methodDocBlock, \ReflectionMethod $methodReflection, array $closureReturnTypes): void
+    {
+        $callableReturnTemplates = $this->getDocBlockParser()->getCallableParamReturnTemplates($methodDocBlock);
+
+        if (empty($callableReturnTemplates)) {
+            return;
+        }
+
+        $paramNames = array_map(
+            fn ($p) => $p->getName(),
+            $methodReflection->getParameters(),
+        );
+
+        $currentTags = $this->scope->getTemplateTags();
+        $updated = false;
+
+        foreach ($callableReturnTemplates as $paramName => $templateName) {
+            $position = array_search($paramName, $paramNames, true);
+
+            if ($position === false || ! isset($closureReturnTypes[$position])) {
+                continue;
+            }
+
+            $closureReturnType = $closureReturnTypes[$position];
+
+            foreach ($currentTags as $i => $tag) {
+                if ($tag->name === $templateName) {
+                    $currentTags[$i] = new TemplateTagType($tag->name, $closureReturnType, $tag->default, $tag->lowerBound, $tag->description);
+                    $updated = true;
+                    break;
+                }
+            }
+        }
+
+        if ($updated) {
+            $this->scope->setTemplateTags($currentTags);
+        }
+    }
+
     public function propertyType(string $name, ClassType|string $class, ?Node $node = null): ?TypeContract
     {
         $reflection = $this->reflectClass($class);
@@ -441,7 +487,7 @@ class Reflector
         return Type::from($constantValue);
     }
 
-    public function methodReturnType(ClassType|string $class, string $method, ?Node $node = null): array
+    public function methodReturnType(ClassType|string $class, string $method, ?Node $node = null, array $closureReturnTypes = []): array
     {
         $className = $class instanceof ClassType ? $class->value : $class;
         $reflection = $this->reflectClass($class);
@@ -504,6 +550,9 @@ class Reflector
 
                     if ($methodReflection->getDocComment()) {
                         $this->bindMethodLevelTemplateTags($methodReflection->getDocComment());
+                        if (! empty($closureReturnTypes)) {
+                            $this->bindCallableArgTemplates($methodReflection->getDocComment(), $methodReflection, $closureReturnTypes);
+                        }
                     }
                 }
 

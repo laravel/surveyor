@@ -106,6 +106,54 @@ class TestClass
 
         unlink($fixture);
     });
+
+    it('resolves map() with arrow function returning int to Collection<int, int>', function () {
+        $fixture = createPhpFixture('
+namespace App;
+
+class TestClass
+{
+    public function test()
+    {
+        return collect([\'a\', \'b\', \'c\'])->map(fn($item) => strlen($item));
+    }
+}');
+
+        $result = app(Analyzer::class)->analyze($fixture)->result();
+        $returnType = $result->getMethod('test')->returnType();
+
+        expect($returnType)->toBeInstanceOf(ClassType::class);
+        expect($returnType->value)->toBe('Illuminate\Support\Collection');
+        expect($returnType->genericTypes())->toHaveCount(2);
+        expect($returnType->genericTypes()[0])->toBeInstanceOf(IntType::class);
+        expect($returnType->genericTypes()[1])->toBeInstanceOf(IntType::class);
+
+        unlink($fixture);
+    });
+
+    it('resolves map() with arrow function returning string to Collection<int, string>', function () {
+        $fixture = createPhpFixture('
+namespace App;
+
+class TestClass
+{
+    public function test()
+    {
+        return collect([\'a\', \'b\', \'c\'])->map(fn($item) => strtoupper($item));
+    }
+}');
+
+        $result = app(Analyzer::class)->analyze($fixture)->result();
+        $returnType = $result->getMethod('test')->returnType();
+
+        expect($returnType)->toBeInstanceOf(ClassType::class);
+        expect($returnType->value)->toBe('Illuminate\Support\Collection');
+        expect($returnType->genericTypes())->toHaveCount(2);
+        expect($returnType->genericTypes()[0])->toBeInstanceOf(IntType::class);
+        expect($returnType->genericTypes()[1])->toBeInstanceOf(StringType::class);
+
+        unlink($fixture);
+    });
 });
 
 describe('Eloquent\\Collection chaining', function () {
