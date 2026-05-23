@@ -27,11 +27,12 @@
         "spatie/php-structure-discoverer": "^2.3"
     },
     "require-dev": {
+        "inertiajs/inertia-laravel": "^3.1",
+        "laravel/pint": "^1.22",
         "mockery/mockery": "^1.6",
         "orchestra/testbench": "^9.0|^10.0|^11.0",
         "pestphp/pest": "^3.0",
-        "phpstan/phpstan": "^2.1",
-        "laravel/pint": "^1.22"
+        "phpstan/phpstan": "^2.1"
     },
     "autoload": {
         "psr-4": {

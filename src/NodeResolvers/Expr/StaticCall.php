@@ -129,6 +129,13 @@ class StaticCall extends AbstractResolver
             return false;
         }
 
+        if (
+            $class->value === 'Inertia\Inertia'
+            && in_array($method, ['defer', 'optional', 'lazy', 'always', 'merge'], true)
+        ) {
+            return true;
+        }
+
         // Resource ::collection() / ::make() entity types fully describe the return shape;
         // unioning the documented AnonymousResourceCollection only adds noise.
         if (! in_array($method, ['collection', 'make'], true)) {
@@ -163,18 +170,34 @@ class StaticCall extends AbstractResolver
 
     protected function handleInertiaEntity(string $method, Node\Expr\StaticCall $node): array
     {
-        if ($method !== 'render') {
-            return [];
+        if ($method === 'render') {
+            $args = array_map(fn ($arg) => $this->from($arg->value), $node->getArgs());
+
+            return [
+                new InertiaRender(
+                    $args[0]->value,
+                    $args[1] ?? Type::arrayShape(Type::string(), Type::mixed()),
+                ),
+            ];
         }
 
-        $args = array_map(fn ($arg) => $this->from($arg->value), $node->getArgs());
+        if (in_array($method, ['defer', 'optional', 'lazy', 'always', 'merge'], true)) {
+            $args = $node->getArgs();
 
-        return [
-            new InertiaRender(
-                $args[0]->value,
-                $args[1] ?? Type::arrayShape(Type::string(), Type::mixed()),
-            ),
-        ];
+            if (empty($args)) {
+                return [Type::mixed()];
+            }
+
+            $type = $this->resolveClosureReturnType($args[0]->value) ?? Type::mixed();
+
+            if (in_array($method, ['defer', 'optional', 'lazy'], true)) {
+                $type->optional();
+            }
+
+            return [$type];
+        }
+
+        return [];
     }
 
     protected function handleViewEntity(string $method, Node\Expr\StaticCall $node): array
