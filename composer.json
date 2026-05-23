@@ -81,9 +81,9 @@
             "@php vendor/bin/pint --ansi",
             "@php vendor/bin/phpstan analyse --verbose --ansi"
         ],
-        "test": "@php vendor/bin/pest",
-        "test-unit": "@php vendor/bin/pest tests/Unit",
-        "test-feature": "@php vendor/bin/pest tests/Feature",
+        "test": "@php vendor/bin/pest --parallel",
+        "test-unit": "@php vendor/bin/pest tests/Unit --parallel",
+        "test-feature": "@php vendor/bin/pest tests/Feature --parallel",
         "test-coverage": "@php vendor/bin/pest --coverage",
         "test-coverage-html": "@php vendor/bin/pest --coverage-html coverage"
     }
