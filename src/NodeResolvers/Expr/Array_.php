@@ -110,6 +110,7 @@ class Array_ extends AbstractResolver
         $type = $this->from($item->value);
 
         return match (true) {
+            $type instanceof VariableState => $type->type(),
             $type instanceof TypeContract => $type,
             default => Type::mixed(),
         };
