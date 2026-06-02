@@ -151,7 +151,9 @@ class AnalyzedCache
         }
 
         foreach ($data['dependencies'] as $dependency) {
-            if ($dependency['mtime'] !== filemtime($dependency['path'])) {
+            $currentMtime = file_exists($dependency['path']) ? filemtime($dependency['path']) : null;
+
+            if ($dependency['mtime'] !== $currentMtime) {
                 static::invalidate($dependency['path']);
                 static::invalidate($path);
 
