@@ -485,6 +485,33 @@ describe('dependency tracking', function () {
         cleanupCacheDir($dir);
     });
 
+    it('invalidates cache when dependency file is deleted', function () {
+        $dir = createCacheDir();
+        AnalyzedCache::enableDiskCache($dir);
+
+        $mainFixture = createTestClassFixture('MainClass', 'public function main() {}');
+        $depFixture = createTestClassFixture('DepClass', 'public function dep() {}');
+
+        AnalyzedCache::addDependency($depFixture);
+
+        $scope = new Scope;
+        $scope->setPath($mainFixture);
+        AnalyzedCache::add($mainFixture, $scope);
+
+        AnalyzedCache::clearMemory();
+
+        expect(AnalyzedCache::get($mainFixture))->not->toBeNull();
+
+        unlink($depFixture);
+
+        AnalyzedCache::clearMemory();
+
+        expect(AnalyzedCache::get($mainFixture))->toBeNull();
+
+        unlink($mainFixture);
+        cleanupCacheDir($dir);
+    });
+
     it('invalidates cache when dependency file changes', function () {
         $dir = createCacheDir();
         AnalyzedCache::enableDiskCache($dir);
