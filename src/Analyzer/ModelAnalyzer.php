@@ -161,7 +161,8 @@ class ModelAnalyzer
     protected function resolveCast(string $cast): TypeContract
     {
         $result = match ($cast) {
-            'json', 'encrypted:json', 'encrypted:array', 'encrypted:collection', 'array', 'encrypted:object' => Type::arrayShape(Type::mixed(), Type::mixed()),
+            'json', 'encrypted:json', 'encrypted:object' => Type::arrayShape(Type::mixed(), Type::mixed()),
+            'array', 'encrypted:array', 'encrypted:collection' => Type::array([]),
             'timestamp', 'int', 'integer', 'float' => Type::int(),
             'attribute', 'encrypted' => Type::mixed(),
             'hashed', 'date', 'datetime', 'immutable_date', 'immutable_datetime',  'string' => Type::string(),

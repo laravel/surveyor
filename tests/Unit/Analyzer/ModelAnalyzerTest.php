@@ -370,3 +370,71 @@ describe('ModelInspector integration', function () {
         expect($relations->get('posts')['related'])->toBe(Post::class);
     });
 });
+
+describe('ModelAnalyzer resolveCast', function () {
+    it('resolves array cast to ArrayType', function () {
+        $analyzer = app(\Laravel\Surveyor\Analyzer\ModelAnalyzer::class);
+        $reflection = new \ReflectionClass($analyzer);
+        $method = $reflection->getMethod('resolveCast');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($analyzer, 'array');
+
+        expect($result)->toBeInstanceOf(ArrayType::class);
+    });
+
+    it('resolves encrypted:array cast to ArrayType', function () {
+        $analyzer = app(\Laravel\Surveyor\Analyzer\ModelAnalyzer::class);
+        $reflection = new \ReflectionClass($analyzer);
+        $method = $reflection->getMethod('resolveCast');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($analyzer, 'encrypted:array');
+
+        expect($result)->toBeInstanceOf(ArrayType::class);
+    });
+
+    it('resolves encrypted:collection cast to ArrayType', function () {
+        $analyzer = app(\Laravel\Surveyor\Analyzer\ModelAnalyzer::class);
+        $reflection = new \ReflectionClass($analyzer);
+        $method = $reflection->getMethod('resolveCast');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($analyzer, 'encrypted:collection');
+
+        expect($result)->toBeInstanceOf(ArrayType::class);
+    });
+
+    it('resolves json cast to ArrayShapeType', function () {
+        $analyzer = app(\Laravel\Surveyor\Analyzer\ModelAnalyzer::class);
+        $reflection = new \ReflectionClass($analyzer);
+        $method = $reflection->getMethod('resolveCast');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($analyzer, 'json');
+
+        expect($result)->toBeInstanceOf(\Laravel\Surveyor\Types\ArrayShapeType::class);
+    });
+
+    it('resolves encrypted:json cast to ArrayShapeType', function () {
+        $analyzer = app(\Laravel\Surveyor\Analyzer\ModelAnalyzer::class);
+        $reflection = new \ReflectionClass($analyzer);
+        $method = $reflection->getMethod('resolveCast');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($analyzer, 'encrypted:json');
+
+        expect($result)->toBeInstanceOf(\Laravel\Surveyor\Types\ArrayShapeType::class);
+    });
+
+    it('resolves encrypted:object cast to ArrayShapeType', function () {
+        $analyzer = app(\Laravel\Surveyor\Analyzer\ModelAnalyzer::class);
+        $reflection = new \ReflectionClass($analyzer);
+        $method = $reflection->getMethod('resolveCast');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($analyzer, 'encrypted:object');
+
+        expect($result)->toBeInstanceOf(\Laravel\Surveyor\Types\ArrayShapeType::class);
+    });
+});
