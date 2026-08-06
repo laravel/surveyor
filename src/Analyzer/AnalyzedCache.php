@@ -212,6 +212,7 @@ class AnalyzedCache
         static::$cached = [];
         static::$fileTimes = [];
         static::$inProgress = [];
+        static::$dependencies = [];
     }
 
     public static function clear(): void

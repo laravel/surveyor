@@ -37,6 +37,9 @@ class Analyzer
         if ($path === '') {
             Debug::log('⚠️ No path provided to analyze.');
 
+            $this->analyzing--;
+            $this->analyzed = new Scope;
+
             return $this;
         }
 

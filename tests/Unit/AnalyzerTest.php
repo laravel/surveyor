@@ -18,6 +18,8 @@ uses()->group('integration');
 
 beforeEach(function () {
     AnalyzedCache::clear();
+
+    app()->forgetInstance(Analyzer::class);
 });
 
 afterEach(function () {
@@ -622,5 +624,75 @@ class TestController
         expect($scope->namespace())->toBe('App\\Http\\Controllers');
 
         unlink($fixture);
+    });
+});
+
+describe('empty path handling', function () {
+    it('does not leak the analyzing counter when given an empty path', function () {
+        $analyzer = app(Analyzer::class);
+
+        $analyzer->analyze('');
+
+        $analyzing = new ReflectionProperty(Analyzer::class, 'analyzing');
+
+        expect($analyzing->getValue($analyzer))->toBe(0);
+    });
+
+    it('does not treat an unrelated later call as nested after an empty path leak', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+class AfterEmptyPath
+{
+}');
+
+        $analyzer = app(Analyzer::class);
+
+        $analyzer->analyze('');
+        $analyzer->analyze($fixture);
+
+        $dependencies = new ReflectionProperty(AnalyzedCache::class, 'dependencies');
+
+        expect($dependencies->getValue())->toBe([]);
+
+        unlink($fixture);
+    });
+
+    it('does not return stale data from a previous file when given an empty path', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+class BeforeEmptyPath
+{
+}');
+
+        $analyzer = app(Analyzer::class);
+        $analyzer->analyze($fixture);
+
+        $analyzer->analyze('');
+
+        expect($analyzer->result())->toBeNull();
+
+        unlink($fixture);
+    });
+
+    it('does not throw when result() is called after an empty path on a fresh analyzer', function () {
+        $analyzer = app(Analyzer::class);
+
+        $analyzer->analyze('');
+
+        expect($analyzer->result())->toBeNull();
+    });
+
+    it('handles internal classes whose file cannot be resolved', function () {
+        $analyzer = app(Analyzer::class);
+
+        $analyzer->analyzeClass(DateTime::class);
+
+        expect($analyzer->result())->toBeNull();
+
+        $analyzing = new ReflectionProperty(Analyzer::class, 'analyzing');
+
+        expect($analyzing->getValue($analyzer))->toBe(0);
     });
 });
