@@ -9,9 +9,12 @@ use Laravel\Surveyor\Types\Type;
 // use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 // use Laravel\Surveyor\Types\Type as RangerType;
 use PhpParser\Node\Expr\CallLike;
+use PHPStan\PhpDocParser\Ast\PhpDoc\ExtendsTagValueNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\MixinTagValueNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\PhpDocNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\UsesTagValueNode;
+use PHPStan\PhpDocParser\Ast\Type\CallableTypeNode;
+use PHPStan\PhpDocParser\Ast\Type\IdentifierTypeNode;
 use PHPStan\PhpDocParser\Lexer\Lexer;
 use PHPStan\PhpDocParser\Parser\ConstExprParser;
 use PHPStan\PhpDocParser\Parser\PhpDocParser;
@@ -109,11 +112,18 @@ class DocBlockParser
     {
         $this->parse($docBlock);
 
-        $templateTags = array_map(fn ($tag) => $this->resolve($tag), $this->parsed->getTemplateTagValues());
+        $regularTagValues = $this->parsed->getTemplateTagValues();
+        $covariantTagValues = array_map(
+            fn ($tag) => $tag->value,
+            $this->parsed->getTagsByName('@template-covariant'),
+        );
+        $allTagValues = array_merge($regularTagValues, $covariantTagValues);
+
+        $templateTags = array_map(fn ($tag) => $this->resolve($tag), $allTagValues);
 
         $this->scope->setTemplateTags($templateTags);
 
-        return $this->parsed->getTemplateTagValues();
+        return $allTagValues;
     }
 
     public function parseProperties(string $docBlock): array
@@ -198,6 +208,104 @@ class DocBlockParser
         $this->parse($docBlock);
 
         return array_map(fn ($tag) => $tag->name, $this->parsed->getTemplateTagValues());
+    }
+
+    /**
+     * Return all template parameter names (both @template and @template-covariant),
+     * preserving document order.
+     *
+     * @return list<string>
+     */
+    public function getAllTemplateTagNames(string $docBlock): array
+    {
+        if (! $docBlock) {
+            return [];
+        }
+
+        $this->parse($docBlock);
+
+        $regularNames = array_map(fn ($tag) => $tag->name, $this->parsed->getTemplateTagValues());
+        $covariantNames = array_map(
+            fn ($tag) => $tag->value->name,
+            $this->parsed->getTagsByName('@template-covariant'),
+        );
+
+        return array_merge($regularNames, $covariantNames);
+    }
+
+    /**
+     * Parse @extends Foo<T> tags and return their resolved generic ClassType objects.
+     */
+    public function parseExtendsTags(string $docBlock): array
+    {
+        $this->parse($docBlock);
+
+        return array_map(
+            fn (ExtendsTagValueNode $node) => $this->resolve($node->type),
+            $this->parsed->getExtendsTagValues(),
+        );
+    }
+
+    /**
+     * For each @param whose type is callable(...): TXxx, return [paramName => templateName].
+     * Operates at the PHPStan AST level so it never triggers template resolution.
+     *
+     * @return array<string, string>
+     */
+    public function getCallableParamReturnTemplates(string $docBlock): array
+    {
+        $this->parse($docBlock);
+
+        $result = [];
+
+        foreach ($this->parsed->getParamTagValues() as $tag) {
+            if (
+                $tag->type instanceof CallableTypeNode
+                && $tag->type->returnType instanceof IdentifierTypeNode
+            ) {
+                $paramName = ltrim($tag->parameterName, '$');
+                $result[$paramName] = $tag->type->returnType->name;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * For callable @param tags, returns the INPUT param type names keyed by param name.
+     * e.g. "@param callable(TValue, TKey): TMapValue $callback" → ['callback' => ['TValue', 'TKey']]
+     * Only IdentifierTypeNode params are included; complex types are represented as null.
+     *
+     * @return array<string, array<int, string|null>>
+     */
+    public function getCallableParamInputTypeNames(string $docBlock): array
+    {
+        $this->parse($docBlock);
+
+        $result = [];
+
+        foreach ($this->parsed->getParamTagValues() as $tag) {
+            if (! $tag->type instanceof CallableTypeNode) {
+                continue;
+            }
+
+            $paramName = ltrim($tag->parameterName, '$');
+            $inputTypeNames = [];
+
+            foreach ($tag->type->parameters as $callableParam) {
+                if ($callableParam->type instanceof IdentifierTypeNode) {
+                    $inputTypeNames[] = $callableParam->type->name;
+                } else {
+                    $inputTypeNames[] = null;
+                }
+            }
+
+            if (! empty($inputTypeNames)) {
+                $result[$paramName] = $inputTypeNames;
+            }
+        }
+
+        return $result;
     }
 
     protected function parse(string $docBlock): PhpDocNode

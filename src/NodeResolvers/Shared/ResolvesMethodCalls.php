@@ -10,12 +10,14 @@ use Laravel\Surveyor\Types\MixedType;
 use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
+use PhpParser\Node\Arg;
+use PhpParser\Node\Expr;
 
 trait ResolvesMethodCalls
 {
-    use AddsValidationRules, LazilyLoadsDependencies, ResolvesResourceConditionals;
+    use AddsValidationRules, LazilyLoadsDependencies, ResolvesClosureReturnTypes, ResolvesResourceConditionals;
 
-    protected function resolveMethodCall(Node\Expr\MethodCall|Node\Expr\NullsafeMethodCall $node)
+    protected function resolveMethodCall(Expr\MethodCall|Expr\NullsafeMethodCall $node)
     {
         $var = $this->from($node->var);
 
@@ -65,7 +67,54 @@ trait ResolvesMethodCalls
                 $var,
                 $methodName->value,
                 $node,
+                $this->resolveCallableArgReturnTypes($node->args),
+                $this->getCallableArgNodes($node->args),
+                fn (Expr $expr, array $paramTypes) => $this->resolveClosureReturnTypeWithParamHints($expr, $paramTypes),
             ),
         );
+    }
+
+    /**
+     * @param  Arg[]  $args
+     * @return array<int, Expr>
+     */
+    protected function getCallableArgNodes(array $args): array
+    {
+        $nodes = [];
+
+        foreach ($args as $i => $arg) {
+            if (
+                $arg->value instanceof Expr\ArrowFunction
+                || $arg->value instanceof Expr\Closure
+            ) {
+                $nodes[$i] = $arg->value;
+            }
+        }
+
+        return $nodes;
+    }
+
+    /**
+     * @param  Arg[]  $args
+     * @return array<int, \Laravel\Surveyor\Types\Contracts\Type>
+     */
+    protected function resolveCallableArgReturnTypes(array $args): array
+    {
+        $closureReturnTypes = [];
+
+        foreach ($args as $i => $arg) {
+            if (
+                $arg->value instanceof Expr\ArrowFunction
+                || $arg->value instanceof Expr\Closure
+            ) {
+                $returnType = $this->resolveClosureReturnType($arg->value);
+
+                if ($returnType !== null) {
+                    $closureReturnTypes[$i] = $returnType;
+                }
+            }
+        }
+
+        return $closureReturnTypes;
     }
 }

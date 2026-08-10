@@ -9,17 +9,23 @@ use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Application;
+use Illuminate\Support\Collection;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Concerns\LazilyLoadsDependencies;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Support\Util;
+use Laravel\Surveyor\Types\ArrayShapeType;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
+use Laravel\Surveyor\Types\FloatType;
+use Laravel\Surveyor\Types\IntType;
+use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\TemplateTagType;
 use Laravel\Surveyor\Types\Type;
 use Laravel\Surveyor\Types\UnionType;
 use PhpParser\Node;
+use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\CallLike;
 use PhpParser\Node\Stmt\TraitUse;
 use PhpParser\NodeFinder;
@@ -92,6 +98,7 @@ class Reflector
             'compact' => $this->handleFunctionCompact($node),
             'app' => $this->handleFunctionApp($node),
             'get_class_vars' => $this->handleFunctionGetClassVars($node),
+            'collect' => $this->handleFunctionCollect($node),
             default => null,
         };
     }
@@ -187,6 +194,251 @@ class Reflector
         }
 
         return [Type::array($properties)];
+    }
+
+    protected function handleFunctionCollect(?CallLike $node): ?array
+    {
+        $collectionClass = Collection::class;
+
+        if (! $node || count($node->getArgs()) === 0) {
+            return [new ClassType($collectionClass)];
+        }
+
+        $argType = $this->getNodeResolver()->from($node->getArgs()[0]->value, $this->scope);
+
+        if ($argType instanceof ClassType) {
+            return [$argType];
+        }
+
+        if ($argType instanceof ArrayType) {
+            $keyType = $argType->isList() ? Type::int() : $argType->keyType();
+            $valueType = $this->generalizeLiteralType($argType->valueType());
+
+            return [(new ClassType($collectionClass))->setGenericTypes([$keyType, $valueType])];
+        }
+
+        if ($argType instanceof ArrayShapeType) {
+            return [(new ClassType($collectionClass))->setGenericTypes([$argType->keyType, $argType->valueType])];
+        }
+
+        return [new ClassType($collectionClass)];
+    }
+
+    /**
+     * Generalize a literal type to its base type (e.g., StringType('a') → StringType()).
+     * This is needed when building Collection generic types from literal array values.
+     */
+    protected function generalizeLiteralType(TypeContract $type): TypeContract
+    {
+        if ($type instanceof StringType && $type->value !== null) {
+            return new StringType;
+        }
+
+        if ($type instanceof IntType && $type->value !== null) {
+            return new IntType;
+        }
+
+        if ($type instanceof FloatType && $type->value !== null) {
+            return new FloatType;
+        }
+
+        if ($type instanceof UnionType) {
+            return Type::union(...array_map(fn ($t) => $this->generalizeLiteralType($t), $type->types));
+        }
+
+        return $type;
+    }
+
+    /**
+     * When a method is declared in a parent class, resolve the @extends chain to map
+     * the parent class's template names to the child class's resolved generic types.
+     * E.g., EloquentCollection extends Collection<TKey, TModel>, so Collection's TValue
+     * maps to EloquentCollection's TModel binding.
+     */
+    protected function resolveExtendsChain(ReflectionClass $childReflection, string $parentClassName): void
+    {
+        $extendsTypes = $this->getDocBlockParser()->parseExtendsTags($childReflection->getDocComment());
+
+        foreach ($extendsTypes as $extendsType) {
+            if (! $extendsType instanceof ClassType) {
+                continue;
+            }
+
+            // Match the @extends class name (handle leading backslash)
+            $extendsClassName = ltrim($extendsType->value, '\\');
+            if ($extendsClassName !== $parentClassName) {
+                continue;
+            }
+
+            try {
+                $parentReflection = $this->reflectClass($parentClassName);
+            } catch (Throwable $e) {
+                continue;
+            }
+
+            if (! $parentReflection->getDocComment()) {
+                continue;
+            }
+
+            $parentTemplateNames = $this->getDocBlockParser()->getAllTemplateTagNames($parentReflection->getDocComment());
+            $extendsGenericTypes = $extendsType->genericTypes();
+
+            $additionalTags = [];
+            foreach ($parentTemplateNames as $i => $parentName) {
+                if (isset($extendsGenericTypes[$i])) {
+                    $additionalTags[] = new TemplateTagType($parentName, $extendsGenericTypes[$i], null, null, null);
+                }
+            }
+
+            if (count($additionalTags) > 0) {
+                $currentTags = $this->scope->getTemplateTags();
+                $existingNames = array_map(fn ($t) => $t->name, $currentTags);
+                $newTags = array_values(array_filter($additionalTags, fn ($t) => ! in_array($t->name, $existingNames)));
+                $this->scope->setTemplateTags(array_merge($currentTags, $newTags));
+            }
+
+            break;
+        }
+    }
+
+    /**
+     * Bind method-level @template tags (like TFirstDefault) that are not already
+     * in the scope. Unbound method templates default to NullType, which correctly
+     * models optional parameters that default to null.
+     */
+    protected function bindMethodLevelTemplateTags(string $methodDocBlock): void
+    {
+        $methodTemplateNames = $this->getDocBlockParser()->getTemplateTagNames($methodDocBlock);
+
+        if (count($methodTemplateNames) === 0) {
+            return;
+        }
+
+        $currentTags = $this->scope->getTemplateTags();
+        $existingNames = array_map(fn ($t) => $t->name, $currentTags);
+
+        $newTags = [];
+        foreach ($methodTemplateNames as $name) {
+            if (! in_array($name, $existingNames)) {
+                $newTags[] = new TemplateTagType($name, Type::null(), null, null, null);
+            }
+        }
+
+        if (count($newTags) > 0) {
+            $this->scope->setTemplateTags(array_merge($currentTags, $newTags));
+        }
+    }
+
+    /**
+     * Bind method-level templates that appear as the return type of a callable @param.
+     * e.g. @param callable(TValue, TKey): TMapValue $callback — binds TMapValue to the
+     * actual return type of the closure passed at the corresponding argument position.
+     *
+     * @param  array<int, TypeContract>  $closureReturnTypes
+     */
+    protected function bindCallableArgTemplates(string $methodDocBlock, \ReflectionMethod $methodReflection, array $closureReturnTypes): void
+    {
+        $callableReturnTemplates = $this->getDocBlockParser()->getCallableParamReturnTemplates($methodDocBlock);
+
+        if (empty($callableReturnTemplates)) {
+            return;
+        }
+
+        $paramNames = array_map(
+            fn ($p) => $p->getName(),
+            $methodReflection->getParameters(),
+        );
+
+        $currentTags = $this->scope->getTemplateTags();
+        $updated = false;
+
+        foreach ($callableReturnTemplates as $paramName => $templateName) {
+            $position = array_search($paramName, $paramNames, true);
+
+            if ($position === false || ! isset($closureReturnTypes[$position])) {
+                continue;
+            }
+
+            $closureReturnType = $closureReturnTypes[$position];
+
+            foreach ($currentTags as $i => $tag) {
+                if ($tag->name === $templateName) {
+                    $currentTags[$i] = new TemplateTagType($tag->name, $closureReturnType, $tag->default, $tag->lowerBound, $tag->description);
+                    $updated = true;
+                    break;
+                }
+            }
+        }
+
+        if ($updated) {
+            $this->scope->setTemplateTags($currentTags);
+        }
+    }
+
+    /**
+     * Re-resolve closure nodes with template-aware param type hints.
+     * After the template scope is fully set up (TValue=string, TKey=int, etc.),
+     * this resolves each callable param type name to its concrete type and
+     * injects it as the closure param hint.
+     *
+     * @param  array<int, Expr>  $callableArgNodes
+     * @return array<int, TypeContract>
+     */
+    protected function resolveClosuresWithParamHints(
+        string $methodDocBlock,
+        \ReflectionMethod $methodReflection,
+        array $callableArgNodes,
+        callable $closureResolver,
+    ): array {
+        $callableInputTypeNames = $this->getDocBlockParser()->getCallableParamInputTypeNames($methodDocBlock);
+
+        if (empty($callableInputTypeNames)) {
+            return [];
+        }
+
+        $paramNames = array_map(fn ($p) => $p->getName(), $methodReflection->getParameters());
+        $result = [];
+
+        foreach ($callableArgNodes as $argIndex => $argNode) {
+            $paramName = $paramNames[$argIndex] ?? null;
+
+            if ($paramName === null || ! isset($callableInputTypeNames[$paramName])) {
+                continue;
+            }
+
+            $resolvedParamTypes = [];
+
+            foreach ($callableInputTypeNames[$paramName] as $i => $typeName) {
+                if ($typeName !== null) {
+                    $resolvedParamTypes[$i] = $this->resolveTemplateTagByName($typeName);
+                }
+            }
+
+            // Save and restore Reflector scope around the callback. When the node
+            // resolver calls AbstractResolver::setScope it also re-points the
+            // Reflector's $this->scope to the node-resolver scope, wiping the
+            // tempScope (with template-tag bindings) that we set up above.
+            $savedScope = $this->scope;
+            $returnType = $closureResolver($argNode, $resolvedParamTypes);
+            $this->setScope($savedScope);
+
+            if ($returnType !== null) {
+                $result[$argIndex] = $returnType;
+            }
+        }
+
+        return $result;
+    }
+
+    protected function resolveTemplateTagByName(string $name): TypeContract
+    {
+        foreach ($this->scope->getTemplateTags() as $tag) {
+            if ($tag->name === $name) {
+                return $tag->bound;
+            }
+        }
+
+        return Type::mixed();
     }
 
     public function propertyType(string $name, ClassType|string $class, ?Node $node = null): ?TypeContract
@@ -302,7 +554,7 @@ class Reflector
         return Type::from($constantValue);
     }
 
-    public function methodReturnType(ClassType|string $class, string $method, ?Node $node = null): array
+    public function methodReturnType(ClassType|string $class, string $method, ?Node $node = null, array $closureReturnTypes = [], array $callableArgNodes = [], ?callable $closureResolver = null): array
     {
         $className = $class instanceof ClassType ? $class->value : $class;
         $reflection = $this->reflectClass($class);
@@ -355,21 +607,59 @@ class Reflector
             if ($reflection->hasMethod($method)) {
                 $methodReflection = $reflection->getMethod($method);
 
+                // When we have a temp scope with class-level template bindings, also resolve
+                // @extends chain for inherited methods and bind method-level template tags.
+                if ($scopeToRestore !== null) {
+                    $declaringClassName = $methodReflection->getDeclaringClass()->getName();
+                    if ($declaringClassName !== $reflection->getName() && $reflection->getDocComment()) {
+                        $this->resolveExtendsChain($reflection, $declaringClassName);
+                    }
+
+                    if ($methodReflection->getDocComment()) {
+                        $this->bindMethodLevelTemplateTags($methodReflection->getDocComment());
+
+                        // Re-resolve closures with template-aware param type hints when possible.
+                        // This allows TValue/TKey to flow into untyped closure params.
+                        if (! empty($callableArgNodes) && $closureResolver !== null) {
+                            $hintedReturnTypes = $this->resolveClosuresWithParamHints(
+                                $methodReflection->getDocComment(),
+                                $methodReflection,
+                                $callableArgNodes,
+                                $closureResolver,
+                            );
+
+                            if (! empty($hintedReturnTypes)) {
+                                $this->bindCallableArgTemplates($methodReflection->getDocComment(), $methodReflection, $hintedReturnTypes);
+                            } elseif (! empty($closureReturnTypes)) {
+                                $this->bindCallableArgTemplates($methodReflection->getDocComment(), $methodReflection, $closureReturnTypes);
+                            }
+                        } elseif (! empty($closureReturnTypes)) {
+                            $this->bindCallableArgTemplates($methodReflection->getDocComment(), $methodReflection, $closureReturnTypes);
+                        }
+                    }
+                }
+
                 if ($methodReflection->hasReturnType()) {
                     $returnTypes[] = $this->returnType($methodReflection->getReturnType());
                 }
 
                 if ($methodReflection->getDocComment()) {
-                    array_push(
-                        $returnTypes,
-                        ...$this->parseDocBlock($methodReflection->getDocComment()),
-                    );
-                }
+                    $methodDocBlock = $methodReflection->getDocComment();
 
-                array_push(
-                    $returnTypes,
-                    ...$this->parseDocBlock($methodReflection->getDocComment(), $node)
-                );
+                    if ($class instanceof ClassType && $this->hasSimpleStaticReturn($methodDocBlock)) {
+                        $returnTypes[] = clone $class;
+                    } else {
+                        array_push(
+                            $returnTypes,
+                            ...$this->parseDocBlock($methodDocBlock),
+                        );
+
+                        array_push(
+                            $returnTypes,
+                            ...$this->parseDocBlock($methodDocBlock, $node)
+                        );
+                    }
+                }
             }
 
             if ($reflection->getDocComment()) {
@@ -380,9 +670,10 @@ class Reflector
             }
 
             if (count($returnTypes) === 0 && $reflection->isSubclassOf(Model::class)) {
+                $builderType = (new ClassType(Builder::class))->setGenericTypes([new ClassType($className)]);
                 array_push(
                     $returnTypes,
-                    ...$this->methodReturnType(Builder::class, $method, $node),
+                    ...$this->methodReturnType($builderType, $method, $node),
                 );
             }
 
@@ -536,6 +827,10 @@ class Reflector
     {
         if ($returnType instanceof ReflectionNamedType) {
             if (in_array($returnType->getName(), ['static', 'self'])) {
+                if ($receiverType = $this->scope->getReceiverType()) {
+                    return clone $receiverType;
+                }
+
                 return Type::from($this->scope->entityName());
             }
 
@@ -585,7 +880,16 @@ class Reflector
             return [];
         }
 
+        // Keep parser scope aligned with Reflector scope so @return static/self
+        // resolves against the current receiver type and template bindings.
+        $this->getDocBlockParser()->setScope($this->scope);
+
         return $this->getDocBlockParser()->parseReturn($docBlock, $node);
+    }
+
+    protected function hasSimpleStaticReturn(string $docBlock): bool
+    {
+        return (bool) preg_match('/@return\s+\\\\?(static|self)\s*$/m', $docBlock);
     }
 
     public function reflectClass(ClassType|string $class): ReflectionClass

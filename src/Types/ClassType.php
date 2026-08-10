@@ -62,10 +62,27 @@ class ClassType extends AbstractType implements Contracts\Type
             return false;
         }
 
-        if ($this->resolved() !== $type->resolved()) {
-            return false;
+        // Same class: more specific if we have generics and they don't
+        if ($this->resolved() === $type->resolved()) {
+            return ! empty($this->genericTypes) && empty($type->genericTypes());
         }
 
-        return ! empty($this->genericTypes) && empty($type->genericTypes());
+        // Different class: more specific if $this is a subtype of $type
+        try {
+            $selfResolved = $this->resolved();
+            $otherResolved = $type->resolved();
+
+            if (
+                $selfResolved && $otherResolved
+                && (class_exists($selfResolved) || interface_exists($selfResolved))
+                && (class_exists($otherResolved) || interface_exists($otherResolved))
+            ) {
+                return is_a($selfResolved, $otherResolved, true);
+            }
+        } catch (\Throwable) {
+            // ignore reflection errors
+        }
+
+        return false;
     }
 }
