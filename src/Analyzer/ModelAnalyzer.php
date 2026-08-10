@@ -33,10 +33,17 @@ class ModelAnalyzer
         $info = $this->modelInspector->inspect($model);
 
         foreach ($info['attributes'] as $attribute) {
-            $type = $this->resolveAttributeType($attribute, $model, $result);
+            // An annotation is a deliberate statement about the attribute, so it beats
+            // anything we infer from the cast or the column. Its nullability is part of
+            // that statement, so the column's nullability is not applied over it.
+            $type = $this->annotatedType($result, $attribute['name']);
 
-            if (isset($attribute['nullable'])) {
-                $type->nullable($attribute['nullable']);
+            if ($type === null) {
+                $type = $this->resolveAttributeType($attribute, $model, $result);
+
+                if (isset($attribute['nullable'])) {
+                    $type->nullable($attribute['nullable']);
+                }
             }
 
             $result->addProperty(new PropertyResult($attribute['name'], $type, modelAttribute: true));
@@ -76,6 +83,23 @@ class ModelAnalyzer
 
             $result->addMethod($methodResult);
         }
+    }
+
+    protected function annotatedType(ClassLikeResult $result, string $name): ?TypeContract
+    {
+        if (! $result->hasProperty($name)) {
+            return null;
+        }
+
+        $property = $result->getProperty($name);
+
+        // Eloquent's own protected properties ($casts, $fillable, ...) carry doc blocks
+        // of their own and must never be mistaken for an attribute annotation.
+        if (! $property->fromDocBlock || $property->visibility !== 'public') {
+            return null;
+        }
+
+        return $property->type;
     }
 
     protected function resolveAttributeType(array $attribute, string $model, ClassLikeResult $result): TypeContract
@@ -161,8 +185,17 @@ class ModelAnalyzer
     protected function resolveCast(string $cast): TypeContract
     {
         $result = match ($cast) {
-            'json', 'encrypted:json', 'encrypted:object' => Type::arrayShape(Type::mixed(), Type::mixed()),
-            'array', 'encrypted:array', 'encrypted:collection' => Type::array([]),
+            // These all decode JSON, which yields either a list or a keyed map. Picking one
+            // is a guess that types half of all usage wrongly, so both are offered and the
+            // consumer narrows. An annotation on the model beats this entirely.
+            'array', 'encrypted:array',
+            'json', 'json:unicode', 'encrypted:json',
+            'collection', 'encrypted:collection' => Type::union(
+                Type::arrayShape(Type::int(), Type::mixed()),
+                Type::arrayShape(Type::mixed(), Type::mixed()),
+            ),
+            // Decoded without associative mode, so always an object.
+            'object', 'encrypted:object' => Type::arrayShape(Type::mixed(), Type::mixed()),
             'timestamp', 'int', 'integer', 'float' => Type::int(),
             'attribute', 'encrypted' => Type::mixed(),
             'hashed', 'date', 'datetime', 'immutable_date', 'immutable_datetime',  'string' => Type::string(),

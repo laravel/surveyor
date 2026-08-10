@@ -1,12 +1,21 @@
 <?php
 
+use App\Models\Annotation;
 use App\Models\Post;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelInspector;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
+use Laravel\Surveyor\Analyzer\ModelAnalyzer;
+use Laravel\Surveyor\Types\ArrayShapeType;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\ClassType;
+use Laravel\Surveyor\Types\IntType;
+use Laravel\Surveyor\Types\MixedType;
+use Laravel\Surveyor\Types\StringType;
+use Laravel\Surveyor\Types\UnionType;
 
 uses()->group('integration');
 
@@ -372,69 +381,86 @@ describe('ModelInspector integration', function () {
 });
 
 describe('ModelAnalyzer resolveCast', function () {
-    it('resolves array cast to ArrayType', function () {
-        $analyzer = app(\Laravel\Surveyor\Analyzer\ModelAnalyzer::class);
-        $reflection = new \ReflectionClass($analyzer);
-        $method = $reflection->getMethod('resolveCast');
-        $method->setAccessible(true);
+    $resolve = function (string $cast) {
+        $analyzer = app(ModelAnalyzer::class);
+        $method = (new ReflectionClass($analyzer))->getMethod('resolveCast');
 
-        $result = $method->invoke($analyzer, 'array');
+        return $method->invoke($analyzer, $cast);
+    };
 
-        expect($result)->toBeInstanceOf(ArrayType::class);
+    it('offers both a list and a keyed map for JSON decoding casts', function (string $cast) use ($resolve) {
+        $result = $resolve($cast);
+
+        expect($result)->toBeInstanceOf(UnionType::class);
+        expect($result->types)->toHaveCount(2);
+
+        // A list, keyed by int...
+        expect($result->types[0])->toBeInstanceOf(ArrayShapeType::class);
+        expect($result->types[0]->keyType)->toBeInstanceOf(IntType::class);
+        expect($result->types[0]->valueType)->toBeInstanceOf(MixedType::class);
+
+        // ...or a map, keyed by anything.
+        expect($result->types[1])->toBeInstanceOf(ArrayShapeType::class);
+        expect($result->types[1]->keyType)->toBeInstanceOf(MixedType::class);
+        expect($result->types[1]->valueType)->toBeInstanceOf(MixedType::class);
+    })->with([
+        'array',
+        'encrypted:array',
+        'json',
+        'json:unicode',
+        'encrypted:json',
+        'collection',
+        'encrypted:collection',
+    ]);
+
+    it('resolves object casts to a keyed map only', function (string $cast) use ($resolve) {
+        $result = $resolve($cast);
+
+        expect($result)->toBeInstanceOf(ArrayShapeType::class);
+        expect($result->keyType)->toBeInstanceOf(MixedType::class);
+        expect($result->valueType)->toBeInstanceOf(MixedType::class);
+    })->with(['object', 'encrypted:object']);
+});
+
+describe('ModelAnalyzer attribute annotations', function () {
+    beforeEach(function () {
+        Schema::create('annotations', function (Blueprint $table) {
+            $table->id();
+            $table->json('languages');
+            $table->json('scores');
+            $table->json('meta')->nullable();
+        });
     });
 
-    it('resolves encrypted:array cast to ArrayType', function () {
-        $analyzer = app(\Laravel\Surveyor\Analyzer\ModelAnalyzer::class);
-        $reflection = new \ReflectionClass($analyzer);
-        $method = $reflection->getMethod('resolveCast');
-        $method->setAccessible(true);
-
-        $result = $method->invoke($analyzer, 'encrypted:array');
-
-        expect($result)->toBeInstanceOf(ArrayType::class);
+    afterEach(function () {
+        Schema::drop('annotations');
     });
 
-    it('resolves encrypted:collection cast to ArrayType', function () {
-        $analyzer = app(\Laravel\Surveyor\Analyzer\ModelAnalyzer::class);
-        $reflection = new \ReflectionClass($analyzer);
-        $method = $reflection->getMethod('resolveCast');
-        $method->setAccessible(true);
+    it('keeps an annotated type instead of the one inferred from the cast', function () {
+        $result = app(Analyzer::class)->analyzeClass(Annotation::class)->result();
 
-        $result = $method->invoke($analyzer, 'encrypted:collection');
+        $languages = $result->getProperty('languages')->type;
 
-        expect($result)->toBeInstanceOf(ArrayType::class);
+        expect($languages)->toBeInstanceOf(ArrayShapeType::class);
+        expect($languages->keyType)->toBeInstanceOf(IntType::class);
+        expect($languages->valueType)->toBeInstanceOf(StringType::class);
+
+        $scores = $result->getProperty('scores')->type;
+
+        expect($scores)->toBeInstanceOf(ArrayShapeType::class);
+        expect($scores->keyType)->toBeInstanceOf(StringType::class);
+        expect($scores->valueType)->toBeInstanceOf(IntType::class);
     });
 
-    it('resolves json cast to ArrayShapeType', function () {
-        $analyzer = app(\Laravel\Surveyor\Analyzer\ModelAnalyzer::class);
-        $reflection = new \ReflectionClass($analyzer);
-        $method = $reflection->getMethod('resolveCast');
-        $method->setAccessible(true);
+    it('still flags an annotated attribute as a model attribute', function () {
+        $result = app(Analyzer::class)->analyzeClass(Annotation::class)->result();
 
-        $result = $method->invoke($analyzer, 'json');
-
-        expect($result)->toBeInstanceOf(\Laravel\Surveyor\Types\ArrayShapeType::class);
+        expect($result->getProperty('languages')->modelAttribute)->toBeTrue();
     });
 
-    it('resolves encrypted:json cast to ArrayShapeType', function () {
-        $analyzer = app(\Laravel\Surveyor\Analyzer\ModelAnalyzer::class);
-        $reflection = new \ReflectionClass($analyzer);
-        $method = $reflection->getMethod('resolveCast');
-        $method->setAccessible(true);
+    it('falls back to the cast when there is no annotation', function () {
+        $result = app(Analyzer::class)->analyzeClass(Annotation::class)->result();
 
-        $result = $method->invoke($analyzer, 'encrypted:json');
-
-        expect($result)->toBeInstanceOf(\Laravel\Surveyor\Types\ArrayShapeType::class);
-    });
-
-    it('resolves encrypted:object cast to ArrayShapeType', function () {
-        $analyzer = app(\Laravel\Surveyor\Analyzer\ModelAnalyzer::class);
-        $reflection = new \ReflectionClass($analyzer);
-        $method = $reflection->getMethod('resolveCast');
-        $method->setAccessible(true);
-
-        $result = $method->invoke($analyzer, 'encrypted:object');
-
-        expect($result)->toBeInstanceOf(\Laravel\Surveyor\Types\ArrayShapeType::class);
+        expect($result->getProperty('meta')->type)->toBeInstanceOf(UnionType::class);
     });
 });
