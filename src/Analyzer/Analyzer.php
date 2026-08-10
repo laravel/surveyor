@@ -21,11 +21,19 @@ class Analyzer
 
     public function analyzeClass(string $className)
     {
-        return $this->analyze((new ReflectionClass($className))->getFileName());
+        return $this->analyze((new ReflectionClass($className))->getFileName() ?: '');
     }
 
     public function analyze(string $path)
     {
+        if ($path === '') {
+            Debug::log('⚠️ No path provided to analyze.');
+
+            $this->analyzed = new Scope;
+
+            return $this;
+        }
+
         $shortPath = str_replace($_ENV['HOME'] ?? '', '~', $path);
 
         if ($this->analyzing > 0) {
@@ -33,15 +41,6 @@ class Analyzer
         }
 
         $this->analyzing++;
-
-        if ($path === '') {
-            Debug::log('⚠️ No path provided to analyze.');
-
-            $this->analyzing--;
-            $this->analyzed = new Scope;
-
-            return $this;
-        }
 
         Debug::addPath($path);
 
@@ -57,6 +56,12 @@ class Analyzer
 
         if (AnalyzedCache::isInProgress($path)) {
             Debug::log("⏳ Waiting for analysis to complete: {$shortPath}");
+
+            // The in-progress scope isn't available yet, so anything still held
+            // in $analyzed belongs to an unrelated file.
+            $this->analyzed = new Scope;
+
+            $this->analyzing--;
 
             return $this;
         }
@@ -89,6 +94,6 @@ class Analyzer
 
     public function result()
     {
-        return $this->analyzed->result();
+        return $this->analyzed()?->result();
     }
 }

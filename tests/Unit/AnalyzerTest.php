@@ -695,4 +695,91 @@ class BeforeEmptyPath
 
         expect($analyzing->getValue($analyzer))->toBe(0);
     });
+
+    it('does not leak the analyzing counter when an internal class is reached mid-analysis', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use DateTime;
+
+class ReachesInternalClass
+{
+    public function handle(): array
+    {
+        $date = new DateTime();
+
+        return ["year" => $date->format("Y")];
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+
+        $analyzer->analyze($fixture);
+
+        $analyzing = new ReflectionProperty(Analyzer::class, 'analyzing');
+
+        expect($analyzing->getValue($analyzer))->toBe(0);
+
+        unlink($fixture);
+    });
+});
+
+describe('in progress path handling', function () {
+    it('does not leak the analyzing counter when two files reference each other', function () {
+        $directory = sys_get_temp_dir().'/surveyor_circular_'.uniqid();
+
+        mkdir($directory);
+
+        file_put_contents($directory.'/CircularA.php', '<?php
+namespace App\Circular;
+
+class CircularA
+{
+    public function toB(): CircularB
+    {
+        return new CircularB();
+    }
+
+    public function handle(): array
+    {
+        return ["label" => (new CircularB())->toA()->label()];
+    }
+
+    public function label(): string
+    {
+        return "a";
+    }
+}');
+
+        file_put_contents($directory.'/CircularB.php', '<?php
+namespace App\Circular;
+
+class CircularB
+{
+    public function toA(): CircularA
+    {
+        return new CircularA();
+    }
+
+    public function label(): string
+    {
+        return "b";
+    }
+}');
+
+        require_once $directory.'/CircularA.php';
+        require_once $directory.'/CircularB.php';
+
+        $analyzer = app(Analyzer::class);
+
+        $analyzer->analyze($directory.'/CircularA.php');
+
+        $analyzing = new ReflectionProperty(Analyzer::class, 'analyzing');
+
+        expect($analyzing->getValue($analyzer))->toBe(0);
+
+        unlink($directory.'/CircularA.php');
+        unlink($directory.'/CircularB.php');
+        rmdir($directory);
+    });
 });
