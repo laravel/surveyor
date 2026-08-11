@@ -2,7 +2,6 @@
 
 namespace Laravel\Surveyor\Types;
 
-use Illuminate\Support\Collection;
 use Laravel\Surveyor\Result\VariableState;
 use Laravel\Surveyor\Support\Util;
 use Laravel\Surveyor\Types\Contracts\CollapsibleType;
@@ -175,43 +174,98 @@ class Type
         return self::string($value);
     }
 
-    protected static function flattenUnion(array $args): Collection
+    /**
+     * Flatten nested unions into $types, dropping empty members and unwrapping
+     * variable states.
+     *
+     * @param  list<Contracts\Type|VariableState|null>  $args
+     * @param  list<Contracts\Type>  $types
+     */
+    protected static function flattenUnion(array $args, array &$types): void
     {
-        return collect($args)->flatMap(
-            fn ($type) => ($type instanceof UnionType)
-                ? self::flattenUnion($type->types)
-                : [$type]
-        );
+        foreach ($args as $type) {
+            if ($type instanceof UnionType) {
+                self::flattenUnion($type->types, $types);
+
+                continue;
+            }
+
+            if (! $type) {
+                continue;
+            }
+
+            $types[] = $type instanceof VariableState ? $type->type() : $type;
+        }
     }
 
     public static function union(...$args): Contracts\Type
     {
-        $args = self::flattenUnion($args)
-            ->filter()
-            ->map(fn ($type) => match (true) {
-                $type instanceof VariableState => $type->type(),
-                default => $type,
-            })
-            ->unique(fn ($type) => $type->toString())
-            ->values();
+        $types = [];
 
-        $nullType = $args->filter(fn ($type) => $type instanceof NullType);
+        self::flattenUnion($args, $types);
 
-        if ($nullType->isNotEmpty()) {
-            $args = $args->map(fn ($type) => $type instanceof NullType ? null : $type->nullable())->filter()->values();
+        if ($types === []) {
+            return self::mixed();
         }
 
-        // Remove types that have a more specific counterpart
-        $args = $args->filter(fn ($type) => ! $args->contains(
-            fn ($otherType) => $type !== $otherType && $otherType->isMoreSpecificThan($type)
-        ))->values();
+        // With one member there is nothing to de-duplicate or compare, so skip
+        // toString(), which is a json_encode() for array and union types.
+        if (count($types) === 1) {
+            return ($types[0] instanceof MixedType || $types[0] instanceof NullType)
+                ? self::mixed()
+                : $types[0];
+        }
 
-        $args = $args->filter(fn ($type) => ! $type instanceof MixedType)->values();
+        $unique = [];
+        $seen = [];
+        $hasNull = false;
 
-        return match ($args->count()) {
-            0 => Type::mixed(),
-            1 => $args->first(),
-            default => new UnionType($args->all()),
+        foreach ($types as $type) {
+            $key = $type->toString();
+
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $unique[] = $type;
+            $hasNull = $hasNull || $type instanceof NullType;
+        }
+
+        // Null is carried by marking the other members nullable.
+        if ($hasNull) {
+            $nullable = [];
+
+            foreach ($unique as $type) {
+                if (! $type instanceof NullType) {
+                    $nullable[] = $type->nullable();
+                }
+            }
+
+            $unique = $nullable;
+        }
+
+        $remaining = [];
+
+        foreach ($unique as $type) {
+            if ($type instanceof MixedType) {
+                continue;
+            }
+
+            // Remove types that have a more specific counterpart.
+            foreach ($unique as $other) {
+                if ($type !== $other && $other->isMoreSpecificThan($type)) {
+                    continue 2;
+                }
+            }
+
+            $remaining[] = $type;
+        }
+
+        return match (count($remaining)) {
+            0 => self::mixed(),
+            1 => $remaining[0],
+            default => new UnionType($remaining),
         };
     }
 
