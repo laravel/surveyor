@@ -22,7 +22,6 @@ use Laravel\Surveyor\Types\UnionType;
 use PhpParser\Node;
 use PhpParser\Node\Expr\CallLike;
 use PhpParser\Node\Stmt\TraitUse;
-use PhpParser\NodeFinder;
 use ReflectionClass;
 use ReflectionFunction;
 use ReflectionIntersectionType;
@@ -44,6 +43,9 @@ class Reflector
     protected array $cachedFunctions = [];
 
     protected array $cachedMacros = [];
+
+    /** @var array<string, list<string>> */
+    protected array $cachedTraitUseDocBlocks = [];
 
     public function setScope(Scope $scope)
     {
@@ -359,16 +361,18 @@ class Reflector
                     $returnTypes[] = $this->returnType($methodReflection->getReturnType());
                 }
 
-                if ($methodReflection->getDocComment()) {
+                $methodDocComment = $methodReflection->getDocComment();
+
+                if ($methodDocComment) {
                     array_push(
                         $returnTypes,
-                        ...$this->parseDocBlock($methodReflection->getDocComment()),
+                        ...$this->parseDocBlock($methodDocComment),
                     );
                 }
 
                 array_push(
                     $returnTypes,
-                    ...$this->parseDocBlock($methodReflection->getDocComment(), $node)
+                    ...$this->parseDocBlock($methodDocComment, $node)
                 );
             }
 
@@ -405,6 +409,7 @@ class Reflector
                         break;
                     }
                 }
+
             }
 
             if (count($returnTypes) > 0) {
@@ -482,28 +487,10 @@ class Reflector
      */
     protected function parseTraitUseBindings(ReflectionClass $reflection, string $fileName): array
     {
-        try {
-            $nodes = $this->getParser()->parseFile($fileName);
-        } catch (Throwable $e) {
-            return [];
-        }
-
         $bindings = [];
-        $nodeFinder = new NodeFinder;
 
-        /** @var TraitUse[] $traitUseNodes */
-        $traitUseNodes = $nodeFinder->findInstanceOf($nodes, TraitUse::class);
-
-        foreach ($traitUseNodes as $traitUseNode) {
-            $docComment = $traitUseNode->getDocComment();
-
-            if (! $docComment || ! str_contains($docComment->getText(), '@use')) {
-                continue;
-            }
-
-            $useTypes = $this->getDocBlockParser()->parseUsesTags($docComment->getText());
-
-            foreach ($useTypes as $useType) {
+        foreach ($this->traitUseDocBlocks($fileName) as $docBlock) {
+            foreach ($this->getDocBlockParser()->parseUsesTags($docBlock) as $useType) {
                 if (! $useType instanceof ClassType || count($useType->genericTypes()) === 0) {
                     continue;
                 }
@@ -513,6 +500,58 @@ class Reflector
         }
 
         return $bindings;
+    }
+
+    /**
+     * The `@use` doc blocks on a file's trait use statements.
+     *
+     * Parsing the file to find them is the slowest part of resolving a generic
+     * method call, and a file's doc blocks cannot change during a run, so they
+     * are cached. Resolving the tags is not cached, because that depends on the
+     * scope in use at the time.
+     *
+     * @return list<string>
+     */
+    protected function traitUseDocBlocks(string $fileName): array
+    {
+        if (isset($this->cachedTraitUseDocBlocks[$fileName])) {
+            return $this->cachedTraitUseDocBlocks[$fileName];
+        }
+
+        return $this->cachedTraitUseDocBlocks[$fileName] = $this->findTraitUseDocBlocks($fileName);
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function findTraitUseDocBlocks(string $fileName): array
+    {
+        try {
+            $nodes = $this->getParser()->parseFile($fileName);
+        } catch (Throwable $e) {
+            return [];
+        }
+
+        $docBlocks = [];
+
+        /** @var TraitUse[] $traitUseNodes */
+        $traitUseNodes = $this->getParser()->nodeFinder()->findInstanceOf($nodes, TraitUse::class);
+
+        foreach ($traitUseNodes as $traitUseNode) {
+            $docComment = $traitUseNode->getDocComment();
+
+            if (! $docComment) {
+                continue;
+            }
+
+            $text = $docComment->getText();
+
+            if (str_contains($text, '@use')) {
+                $docBlocks[] = $text;
+            }
+        }
+
+        return $docBlocks;
     }
 
     protected function resolveMacro(ReflectionClass $reflection, string $macroName): array
