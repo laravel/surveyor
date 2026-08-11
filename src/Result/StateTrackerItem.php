@@ -139,7 +139,7 @@ class StateTrackerItem
         $activeSnapshot = $this->getActiveSnapshotKey();
 
         if ($activeSnapshot) {
-            Debug::log('🆕 Updating snapshot', [
+            Debug::log('🆕 Updating snapshot', static fn () => [
                 'name' => $name,
                 'changes' => $variableState->toArray(),
                 'snapshot' => $activeSnapshot,
@@ -167,7 +167,7 @@ class StateTrackerItem
 
             $this->snapshots[$activeSnapshot][$name][] = $variableState;
         } else {
-            Debug::log('🆕 Updating variable', [
+            Debug::log('🆕 Updating variable', static fn () => [
                 'name' => $name,
                 'changes' => $variableState,
             ], level: 3);
@@ -318,7 +318,7 @@ class StateTrackerItem
     {
         $key = $this->getSnapshotKey($node);
 
-        Debug::log('📸 Starting snapshot', [
+        Debug::log('📸 Starting snapshot', static fn () => [
             'key' => $key,
             'node' => get_class($node),
         ], level: 3);
@@ -333,7 +333,7 @@ class StateTrackerItem
 
         $changed = $this->snapshots[$key] ?? [];
 
-        Debug::log('📷 Ending snapshot', [
+        Debug::log('📷 Ending snapshot', static fn () => [
             'key' => $key,
             'node' => get_class($node),
             'changed' => $changed,

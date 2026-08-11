@@ -430,7 +430,7 @@ class Scope
     public function startConditionAnalysis($quiet = false): void
     {
         if (! $quiet) {
-            Debug::log('🟢 Starting condition analysis: '.$this->path(), level: 3);
+            Debug::log(fn () => '🟢 Starting condition analysis: '.$this->path(), level: 3);
         }
 
         $this->analyzingCondition = true;
@@ -439,7 +439,7 @@ class Scope
     public function endConditionAnalysis($quiet = false): void
     {
         if (! $quiet) {
-            Debug::log('🔴 Ending condition analysis: '.$this->path(), level: 3);
+            Debug::log(fn () => '🔴 Ending condition analysis: '.$this->path(), level: 3);
         }
 
         $this->analyzingCondition = false;
@@ -451,7 +451,7 @@ class Scope
             return;
         }
 
-        Debug::log('🟡 Pausing condition analysis: '.$this->path(), level: 3);
+        Debug::log(fn () => '🟡 Pausing condition analysis: '.$this->path(), level: 3);
 
         $this->analyzingConditionPaused = true;
         $this->endConditionAnalysis(true);
@@ -463,7 +463,7 @@ class Scope
             return;
         }
 
-        Debug::log('🟠 Resuming condition analysis: '.$this->path(), level: 3);
+        Debug::log(fn () => '🟠 Resuming condition analysis: '.$this->path(), level: 3);
 
         $this->analyzingConditionPaused = false;
         $this->startConditionAnalysis(true);

@@ -34,8 +34,6 @@ class Analyzer
             return $this;
         }
 
-        $shortPath = str_replace($_ENV['HOME'] ?? '', '~', $path);
-
         if ($this->analyzing > 0) {
             AnalyzedCache::addDependency($path);
         }
@@ -45,7 +43,7 @@ class Analyzer
         Debug::addPath($path);
 
         if ($cached = AnalyzedCache::get($path)) {
-            Debug::log("🎁 Using cached analysis: {$shortPath}");
+            Debug::log(static fn () => '🎁 Using cached analysis: '.self::shortPath($path));
 
             $this->analyzed = $cached;
 
@@ -55,7 +53,7 @@ class Analyzer
         }
 
         if (AnalyzedCache::isInProgress($path)) {
-            Debug::log("⏳ Waiting for analysis to complete: {$shortPath}");
+            Debug::log(static fn () => '⏳ Waiting for analysis to complete: '.self::shortPath($path));
 
             // The in-progress scope isn't available yet, so anything still held
             // in $analyzed belongs to an unrelated file.
@@ -68,7 +66,7 @@ class Analyzer
 
         AnalyzedCache::inProgress($path);
 
-        Debug::log("🧠 Analyzing: {$shortPath}");
+        Debug::log(static fn () => '🧠 Analyzing: '.self::shortPath($path));
 
         $analyzed = $this->parser->parse(file_get_contents($path), $path);
 
@@ -85,6 +83,11 @@ class Analyzer
         $this->analyzing--;
 
         return $this;
+    }
+
+    protected static function shortPath(string $path): string
+    {
+        return str_replace($_ENV['HOME'] ?? '', '~', $path);
     }
 
     public function analyzed(): ?Scope
