@@ -10,11 +10,15 @@ use Laravel\Surveyor\Parser\DocBlockParser;
 use Laravel\Surveyor\Reflector\Reflector;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\NodeAbstract;
+use ReflectionMethod;
 use Throwable;
 
 class NodeResolver
 {
     protected array $resolved = [];
+
+    /** @var array<class-string<AbstractResolver>, bool> */
+    protected array $hasExitBehaviour = [];
 
     public function __construct(
         protected Container $app,
@@ -55,6 +59,15 @@ class NodeResolver
      */
     public function exitNode(NodeAbstract $node, Scope $scope)
     {
+        $className = $this->getClassName($node);
+
+        // Almost every resolver inherits onExit() and exitScope() unchanged, so
+        // exiting does nothing but hand back the same scope. Building one just
+        // to find that out costs an object on every node in the tree.
+        if (! ($this->hasExitBehaviour[$className] ??= $this->resolverHasExitBehaviour($className))) {
+            return $scope;
+        }
+
         $resolver = $this->resolveClassInstance($node);
 
         $resolver->setScope($scope);
@@ -64,13 +77,26 @@ class NodeResolver
     }
 
     /**
+     * @param  class-string<AbstractResolver>  $className
+     */
+    protected function resolverHasExitBehaviour(string $className): bool
+    {
+        try {
+            return (new ReflectionMethod($className, 'onExit'))->class !== AbstractResolver::class
+                || (new ReflectionMethod($className, 'exitScope'))->class !== AbstractResolver::class;
+        } catch (Throwable) {
+            return true;
+        }
+    }
+
+    /**
      * @return AbstractResolver
      */
     protected function resolveClassInstance(NodeAbstract $node)
     {
         $className = $this->getClassName($node);
 
-        Debug::log('🧐 Resolving Node: '.$className.' '.$node->getStartLine(), level: 3);
+        Debug::log(static fn () => '🧐 Resolving Node: '.$className.' '.$node->getStartLine(), level: 3);
 
         return new $className($this, $this->docBlockParser, $this->reflector);
     }
