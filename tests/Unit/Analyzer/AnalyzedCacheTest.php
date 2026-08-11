@@ -451,9 +451,19 @@ describe('dependency tracking', function () {
         $reflection = new ReflectionClass(AnalyzedCache::class);
         $depsProp = $reflection->getProperty('dependencies');
 
-        $deps = $depsProp->getValue();
+        $deps = array_keys($depsProp->getValue());
         expect($deps)->toContain('/path/to/dep1.php');
         expect($deps)->toContain('/path/to/dep2.php');
+    });
+
+    it('does not record a dependency twice', function () {
+        AnalyzedCache::addDependency('/path/to/dep1.php');
+        AnalyzedCache::addDependency('/path/to/dep1.php');
+
+        $reflection = new ReflectionClass(AnalyzedCache::class);
+        $depsProp = $reflection->getProperty('dependencies');
+
+        expect(array_keys($depsProp->getValue()))->toBe(['/path/to/dep1.php']);
     });
 
     it('stores dependencies when persisting to disk', function () {

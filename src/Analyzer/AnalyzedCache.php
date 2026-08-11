@@ -20,7 +20,13 @@ class AnalyzedCache
 
     protected static bool $persistToDisk = false;
 
+    /** @var array<string, true> */
     protected static array $dependencies = [];
+
+    /** @var array<string, int|null> */
+    protected static array $modifiedTimes = [];
+
+    protected static bool $fileTimesFrozen = false;
 
     protected static ?string $key = null;
 
@@ -31,7 +37,41 @@ class AnalyzedCache
 
     public static function addDependency(string $path): void
     {
-        static::$dependencies[] = $path;
+        // Keyed by path to avoid duplicates. The full list is written into
+        // every cache file, and it only grows.
+        static::$dependencies[$path] = true;
+    }
+
+    /**
+     * Look up each file's modification time once and reuse it, instead of
+     * stat'ing on every cache lookup.
+     *
+     * Off by default. Only turn it on when files cannot change while the
+     * process runs, such as in a one-shot command. With it on, editing a file
+     * mid-run will not invalidate its cache entry.
+     */
+    public static function freezeFileTimes(bool $frozen = true): void
+    {
+        static::$fileTimesFrozen = $frozen;
+
+        if (! $frozen) {
+            static::$modifiedTimes = [];
+        }
+    }
+
+    protected static function modifiedTime(string $path): ?int
+    {
+        if (static::$fileTimesFrozen && array_key_exists($path, static::$modifiedTimes)) {
+            return static::$modifiedTimes[$path];
+        }
+
+        $modifiedTime = file_exists($path) ? filemtime($path) : null;
+
+        if (static::$fileTimesFrozen) {
+            static::$modifiedTimes[$path] = $modifiedTime;
+        }
+
+        return $modifiedTime;
     }
 
     public static function setCacheDirectory(string $directory): void
@@ -71,7 +111,7 @@ class AnalyzedCache
 
     public static function add(string $path, Scope $analyzed): void
     {
-        $mtime = file_exists($path) ? filemtime($path) : null;
+        $mtime = static::modifiedTime($path);
 
         static::$cached[$path] = $analyzed;
         static::$fileTimes[$path] = $mtime;
@@ -84,11 +124,11 @@ class AnalyzedCache
 
     public static function get(string $path): ?Scope
     {
-        if (! file_exists($path)) {
+        $currentModifiedTime = static::modifiedTime($path);
+
+        if ($currentModifiedTime === null) {
             return null;
         }
-
-        $currentModifiedTime = filemtime($path);
 
         return self::tryFromMemory($path, $currentModifiedTime)
             ?? self::tryFromDisk($path, $currentModifiedTime)
@@ -151,7 +191,7 @@ class AnalyzedCache
         }
 
         foreach ($data['dependencies'] as $dependency) {
-            $currentMtime = file_exists($dependency['path']) ? filemtime($dependency['path']) : null;
+            $currentMtime = static::modifiedTime($dependency['path']);
 
             if ($dependency['mtime'] !== $currentMtime) {
                 static::invalidate($dependency['path']);
@@ -213,6 +253,7 @@ class AnalyzedCache
         static::$fileTimes = [];
         static::$inProgress = [];
         static::$dependencies = [];
+        static::$modifiedTimes = [];
     }
 
     public static function clear(): void
@@ -250,8 +291,8 @@ class AnalyzedCache
             'mtime' => $mtime,
             'dependencies' => array_values(array_filter(array_map(fn ($dep) => [
                 'path' => $dep,
-                'mtime' => file_exists($dep) ? filemtime($dep) : null,
-            ], array_values(array_unique(self::$dependencies))), fn ($dep) => $dep['mtime'] !== null)),
+                'mtime' => static::modifiedTime($dep),
+            ], array_keys(self::$dependencies)), fn ($dep) => $dep['mtime'] !== null)),
             'scope' => $analyzed,
         ];
 
