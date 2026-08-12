@@ -13,6 +13,8 @@ class Debug
 {
     public const LOG = 1;
 
+    public const VERBOSE = 2;
+
     public const TRACE = 3;
 
     public static $dump = false;

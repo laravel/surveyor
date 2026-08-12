@@ -245,7 +245,7 @@ class Scope
         $this->stateTracker->setThis($entityName);
 
         if (! $quietly) {
-            Debug::log('🔬 Scope: '.$entityName, level: 2);
+            Debug::log('🔬 Scope: '.$entityName, level: Debug::VERBOSE);
         }
     }
 
@@ -389,7 +389,7 @@ class Scope
         $this->methodName = $methodName;
 
         if (! $quietly) {
-            Debug::log("🔬 Scope: {$this->entityName}::{$methodName}", level: 2);
+            Debug::log("🔬 Scope: {$this->entityName}::{$methodName}", level: Debug::VERBOSE);
         }
     }
 
