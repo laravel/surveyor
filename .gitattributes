@@ -5,6 +5,7 @@
 .github/          export-ignore
 .gitignore        export-ignore
 .vscode/          export-ignore
+benchmarks/       export-ignore
 composer.lock     export-ignore
 phpstan.neon.dist export-ignore
 phpunit.xml       export-ignore
