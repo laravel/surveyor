@@ -42,23 +42,6 @@ class AnalyzedCache
         static::$dependencies[$path] = true;
     }
 
-    /**
-     * Look up each file's modification time once and reuse it, instead of
-     * stat'ing on every cache lookup.
-     *
-     * Off by default. Only turn it on when files cannot change while the
-     * process runs, such as in a one-shot command. With it on, editing a file
-     * mid-run will not invalidate its cache entry.
-     */
-    public static function freezeFileTimes(bool $frozen = true): void
-    {
-        static::$fileTimesFrozen = $frozen;
-
-        if (! $frozen) {
-            static::$modifiedTimes = [];
-        }
-    }
-
     protected static function modifiedTime(string $path): ?int
     {
         if (static::$fileTimesFrozen && array_key_exists($path, static::$modifiedTimes)) {
