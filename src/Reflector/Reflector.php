@@ -409,7 +409,6 @@ class Reflector
                         break;
                     }
                 }
-
             }
 
             if (count($returnTypes) > 0) {
