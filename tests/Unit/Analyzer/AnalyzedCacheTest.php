@@ -18,6 +18,9 @@ afterEach(function () {
 
 function resetCacheDirectory(): void
 {
+    // Nothing else resets this, so a frozen test would leak into every test after it.
+    AnalyzedCache::freezeFileTimes(false);
+
     $reflection = new ReflectionClass(AnalyzedCache::class);
 
     $dirProp = $reflection->getProperty('cacheDirectory');
@@ -145,6 +148,58 @@ describe('memory caching', function () {
 
         unlink($fixture1);
         unlink($fixture2);
+    });
+});
+
+describe('frozen file times', function () {
+    it('ignores modifications made while file times are frozen', function () {
+        AnalyzedCache::freezeFileTimes();
+
+        $fixture = createTestClassFixture('TestClass', 'public function test() {}');
+
+        $scope = new Scope;
+        $scope->setPath($fixture);
+        AnalyzedCache::add($fixture, $scope);
+
+        touch($fixture, time() + 10);
+
+        expect(AnalyzedCache::get($fixture))->not->toBeNull();
+
+        unlink($fixture);
+    });
+
+    it('sees modifications again once file times are unfrozen', function () {
+        AnalyzedCache::freezeFileTimes();
+
+        $fixture = createTestClassFixture('TestClass', 'public function test() {}');
+
+        $scope = new Scope;
+        $scope->setPath($fixture);
+        AnalyzedCache::add($fixture, $scope);
+
+        touch($fixture, time() + 10);
+
+        expect(AnalyzedCache::get($fixture))->not->toBeNull();
+
+        AnalyzedCache::freezeFileTimes(false);
+
+        expect(AnalyzedCache::get($fixture))->toBeNull();
+
+        unlink($fixture);
+    });
+
+    it('still invalidates on modification when not frozen', function () {
+        $fixture = createTestClassFixture('TestClass', 'public function test() {}');
+
+        $scope = new Scope;
+        $scope->setPath($fixture);
+        AnalyzedCache::add($fixture, $scope);
+
+        touch($fixture, time() + 10);
+
+        expect(AnalyzedCache::get($fixture))->toBeNull();
+
+        unlink($fixture);
     });
 });
 
