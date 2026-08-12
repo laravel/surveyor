@@ -32,7 +32,9 @@ class TypeResolver extends NodeVisitorAbstract
     public function enterNode(Node $node)
     {
         Debug::increaseDepth();
-        Debug::log(static fn () => '❗ Entering Node: '.$node->getType().' '.$node->getStartLine(), level: 3);
+        if (Debug::$logLevel >= Debug::TRACE) {
+            Debug::log('❗ Entering Node: '.$node->getType().' '.$node->getStartLine());
+        }
 
         [$_, $scope] = $this->resolver->fromWithScope($node, $this->scope);
 

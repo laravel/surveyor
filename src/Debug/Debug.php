@@ -11,6 +11,10 @@ use function Laravel\Prompts\table;
 
 class Debug
 {
+    public const LOG = 1;
+
+    public const TRACE = 3;
+
     public static $dump = false;
 
     public static $throw = false;
@@ -81,7 +85,7 @@ class Debug
         return $timings;
     }
 
-    public static function error(Throwable $e, $message, $data = null, $level = 1)
+    public static function error(Throwable $e, $message, $data = null, $level = self::LOG)
     {
         self::log(
             static fn () => '🚨 '.$message.' ['.$e->getMessage().'] at '.$e->getFile().':'.$e->getLine(),
@@ -108,7 +112,7 @@ class Debug
      * @param  Closure():mixed|string|mixed  $message
      * @param  Closure():mixed|array|object|string|null  $data
      */
-    public static function log($message, $data = null, $level = 1)
+    public static function log($message, $data = null, $level = self::LOG)
     {
         if (self::$logLevel < $level) {
             return;
@@ -213,7 +217,7 @@ class Debug
     public static function increaseDepth()
     {
         // Depth is only used to indent log output, so skip it when logging is off.
-        if (self::$logLevel < 1 || ($path = self::activePath()) === null) {
+        if (self::$logLevel < self::LOG || ($path = self::activePath()) === null) {
             return;
         }
 
@@ -222,7 +226,7 @@ class Debug
 
     public static function decreaseDepth()
     {
-        if (self::$logLevel < 1 || ($path = self::activePath()) === null) {
+        if (self::$logLevel < self::LOG || ($path = self::activePath()) === null) {
             return;
         }
 

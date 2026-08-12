@@ -96,7 +96,9 @@ class NodeResolver
     {
         $className = $this->getClassName($node);
 
-        Debug::log(static fn () => '🧐 Resolving Node: '.$className.' '.$node->getStartLine(), level: 3);
+        if (Debug::$logLevel >= Debug::TRACE) {
+            Debug::log('🧐 Resolving Node: '.$className.' '.$node->getStartLine());
+        }
 
         return new $className($this, $this->docBlockParser, $this->reflector);
     }

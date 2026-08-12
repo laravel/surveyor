@@ -40,7 +40,9 @@ abstract class AbstractResolver
 
     protected function from(NodeAbstract $node)
     {
-        Debug::log(static fn () => '🔍 Analyzing Node: '.$node->getType(), level: 3);
+        if (Debug::$logLevel >= Debug::TRACE) {
+            Debug::log('🔍 Analyzing Node: '.$node->getType());
+        }
 
         return $this->resolver->from($node, $this->scope);
     }

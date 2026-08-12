@@ -139,11 +139,13 @@ class StateTrackerItem
         $activeSnapshot = $this->getActiveSnapshotKey();
 
         if ($activeSnapshot) {
-            Debug::log('🆕 Updating snapshot', static fn () => [
-                'name' => $name,
-                'changes' => $variableState->toArray(),
-                'snapshot' => $activeSnapshot,
-            ], level: 3);
+            if (Debug::$logLevel >= Debug::TRACE) {
+                Debug::log('🆕 Updating snapshot', [
+                    'name' => $name,
+                    'changes' => $variableState->toArray(),
+                    'snapshot' => $activeSnapshot,
+                ]);
+            }
 
             $this->snapshots[$activeSnapshot][$name] ??= [];
 
@@ -167,10 +169,12 @@ class StateTrackerItem
 
             $this->snapshots[$activeSnapshot][$name][] = $variableState;
         } else {
-            Debug::log('🆕 Updating variable', static fn () => [
-                'name' => $name,
-                'changes' => $variableState,
-            ], level: 3);
+            if (Debug::$logLevel >= Debug::TRACE) {
+                Debug::log('🆕 Updating variable', [
+                    'name' => $name,
+                    'changes' => $variableState,
+                ]);
+            }
 
             $this->variables[$name] ??= [];
 
@@ -318,10 +322,12 @@ class StateTrackerItem
     {
         $key = $this->getSnapshotKey($node);
 
-        Debug::log('📸 Starting snapshot', static fn () => [
-            'key' => $key,
-            'node' => get_class($node),
-        ], level: 3);
+        if (Debug::$logLevel >= Debug::TRACE) {
+            Debug::log('📸 Starting snapshot', [
+                'key' => $key,
+                'node' => get_class($node),
+            ]);
+        }
 
         $this->snapshots[$key] = [];
         $this->activeSnapshots[] = $key;
@@ -333,11 +339,13 @@ class StateTrackerItem
 
         $changed = $this->snapshots[$key] ?? [];
 
-        Debug::log('📷 Ending snapshot', static fn () => [
-            'key' => $key,
-            'node' => get_class($node),
-            'changed' => $changed,
-        ], level: 3);
+        if (Debug::$logLevel >= Debug::TRACE) {
+            Debug::log('📷 Ending snapshot', [
+                'key' => $key,
+                'node' => get_class($node),
+                'changed' => $changed,
+            ]);
+        }
 
         array_pop($this->activeSnapshots);
         unset($this->snapshots[$key]);
