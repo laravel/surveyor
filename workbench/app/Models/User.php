@@ -142,4 +142,47 @@ class User extends Authenticatable
             ),
         );
     }
+
+    protected function attributeViaStaticGet(): Attribute
+    {
+        return Attribute::get(
+            fn (mixed $value): string => $value ?? 'fallback',
+        );
+    }
+
+    protected function attributeViaConstructor(): Attribute
+    {
+        return new Attribute(
+            get: function (): string {
+                return 'constructed';
+            },
+        );
+    }
+
+    protected function moneyViaStaticGet(): Attribute
+    {
+        return Attribute::get(
+            fn (): MoneyDTO => new MoneyDTO(
+                amount: (int) ($this->attributes['amount'] ?? 0),
+                currency: $this->attributes['currency'] ?? 'USD',
+            ),
+        );
+    }
+
+    protected function moneyViaConstructor(): Attribute
+    {
+        return new Attribute(
+            get: fn (): MoneyDTO => new MoneyDTO(
+                amount: (int) ($this->attributes['amount'] ?? 0),
+                currency: $this->attributes['currency'] ?? 'USD',
+            ),
+        );
+    }
+
+    protected function attributeWithSetterOnly(): Attribute
+    {
+        return Attribute::set(
+            fn (string $value): string => strtolower($value),
+        );
+    }
 }

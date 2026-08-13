@@ -2,9 +2,12 @@
 
 namespace Laravel\Surveyor\NodeResolvers\Expr;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
+use Laravel\Surveyor\NodeResolvers\Shared\ResolvesClosureReturnTypes;
+use Laravel\Surveyor\NodeResolvers\Shared\ResolvesEloquentAttributes;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
@@ -12,6 +15,8 @@ use Throwable;
 
 class New_ extends AbstractResolver
 {
+    use ResolvesClosureReturnTypes, ResolvesEloquentAttributes;
+
     public function resolve(Node\Expr\New_ $node)
     {
         $type = $this->from($node->class);
@@ -22,6 +27,10 @@ class New_ extends AbstractResolver
         }
 
         $classType = new ClassType($this->scope->getUse($type->value));
+
+        if ($classType->resolved() === Attribute::class) {
+            return $this->attributeTypeFrom($node->args);
+        }
 
         $classType->setConstructorArguments(array_map(
             fn ($arg) => $this->from($arg->value),

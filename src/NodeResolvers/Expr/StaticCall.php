@@ -2,7 +2,6 @@
 
 namespace Laravel\Surveyor\NodeResolvers\Expr;
 
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Surveyor\Analysis\Condition;
@@ -10,6 +9,7 @@ use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\NodeResolvers\Shared\AddsValidationRules;
 use Laravel\Surveyor\NodeResolvers\Shared\ResolvesClosureReturnTypes;
+use Laravel\Surveyor\NodeResolvers\Shared\ResolvesEloquentAttributes;
 use Laravel\Surveyor\Support\Util;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\MultiType;
@@ -23,7 +23,7 @@ use Throwable;
 
 class StaticCall extends AbstractResolver
 {
-    use AddsValidationRules, ResolvesClosureReturnTypes;
+    use AddsValidationRules, ResolvesClosureReturnTypes, ResolvesEloquentAttributes;
 
     public function resolve(Node\Expr\StaticCall $node)
     {
@@ -65,20 +65,8 @@ class StaticCall extends AbstractResolver
             $class = $class->type;
         }
 
-        if (
-            $method === 'make'
-            && $class instanceof ClassType
-            && $class->resolved() === Attribute::class
-        ) {
-            $attributeType = new ClassType(Attribute::class);
-
-            if ($getArg = $this->findGetArgument($node->args)) {
-                if ($getType = $this->resolveClosureReturnType($getArg->value)) {
-                    $attributeType->setGenericTypes([$getType]);
-                }
-            }
-
-            return $attributeType;
+        if (is_string($method) && $this->isAttributeFactory($class, $method)) {
+            return $this->attributeTypeFrom($node->args);
         }
 
         $entityReturnTypes = $this->handleEntities($class, $method, $node);
@@ -214,22 +202,6 @@ class StaticCall extends AbstractResolver
                 $args[1] ?? Type::arrayShape(Type::string(), Type::mixed()),
             ),
         ];
-    }
-
-    protected function findGetArgument(array $args): ?Node\Arg
-    {
-        foreach ($args as $arg) {
-            if ($arg->name?->name === 'get') {
-                return $arg;
-            }
-        }
-
-        // Fall back to first positional argument
-        if (isset($args[0]) && $args[0]->name === null) {
-            return $args[0];
-        }
-
-        return null;
     }
 
     public function resolveForCondition(Node\Expr\StaticCall $node)

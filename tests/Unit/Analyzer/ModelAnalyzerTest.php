@@ -234,6 +234,48 @@ describe('ModelAnalyzer computed attributes', function () {
         expect($property->type->keys())->toContain('currency_amount');
     });
 
+    it('extracts the getter type from Attribute::get()', function () {
+        $result = app(Analyzer::class)->analyzeClass(User::class)->result();
+
+        expect($result->hasProperty('attribute_via_static_get'))->toBeTrue();
+        expect($result->getProperty('attribute_via_static_get')->type->id())->toBe('string');
+    });
+
+    it('extracts the getter type from a new Attribute() constructor call', function () {
+        $result = app(Analyzer::class)->analyzeClass(User::class)->result();
+
+        expect($result->hasProperty('attribute_via_constructor'))->toBeTrue();
+        expect($result->getProperty('attribute_via_constructor')->type->id())->toBe('string');
+    });
+
+    it('resolves an Arrayable DTO through Attribute::get()', function () {
+        $result = app(Analyzer::class)->analyzeClass(User::class)->result();
+
+        $property = $result->getProperty('money_via_static_get');
+
+        expect($property->type)->toBeInstanceOf(ArrayType::class);
+        expect($property->type->keys())->toContain('amount', 'currency', 'currency_amount');
+    });
+
+    it('resolves an Arrayable DTO through a new Attribute() constructor call', function () {
+        $result = app(Analyzer::class)->analyzeClass(User::class)->result();
+
+        $property = $result->getProperty('money_via_constructor');
+
+        expect($property->type)->toBeInstanceOf(ArrayType::class);
+        expect($property->type->keys())->toContain('amount', 'currency', 'currency_amount');
+    });
+
+    it('does not treat the argument to Attribute::set() as a getter', function () {
+        $result = app(Analyzer::class)->analyzeClass(User::class)->result();
+
+        // The setter says string, but nothing describes what reading it gives
+        // back, so the getter type must not be taken from it.
+        if ($result->hasProperty('attribute_with_setter_only')) {
+            expect($result->getProperty('attribute_with_setter_only')->type->id())->not->toBe('string');
+        }
+    });
+
     it('extracts type from regular closure return type hint when no PHPDoc', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(User::class)->result();
