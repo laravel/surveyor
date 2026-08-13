@@ -68,6 +68,23 @@ describe('ModelAnalyzer relations', function () {
         expect($postsProperty->modelRelation)->toBeTrue();
     });
 
+    it('types a singular relation as nullable', function () {
+        $result = app(Analyzer::class)->analyzeClass(Post::class)->result();
+
+        expect($result->hasProperty('user'))->toBeTrue();
+
+        // The related record may not exist, so reading the relation can give
+        // back null no matter what the foreign key allows.
+        expect($result->getProperty('user')->type->isNullable())->toBeTrue();
+    });
+
+    it('does not type a collection relation as nullable', function () {
+        $result = app(Analyzer::class)->analyzeClass(User::class)->result();
+
+        expect($result->hasProperty('posts'))->toBeTrue();
+        expect($result->getProperty('posts')->type->isNullable())->toBeFalse();
+    });
+
     it('correctly identifies collection relations vs singular relations', function () {
         $analyzer = app(Analyzer::class);
 

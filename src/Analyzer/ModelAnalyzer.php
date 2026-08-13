@@ -64,7 +64,9 @@ class ModelAnalyzer
                 $result->addProperty(new PropertyResult($relation['name'], $type, modelRelation: true));
                 $scope->state()->properties()->addManually($relation['name'], $type, 0, 0, 0, 0);
             } else {
-                $type = new ClassType($relation['related']);
+                // A singular relation has nothing to return when the related
+                // record is missing, whatever the foreign key says.
+                $type = (new ClassType($relation['related']))->nullable();
                 $result->addProperty(new PropertyResult($relation['name'], $type, modelRelation: true));
                 $scope->state()->properties()->addManually($relation['name'], $type, 0, 0, 0, 0);
             }
