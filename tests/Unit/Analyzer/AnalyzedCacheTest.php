@@ -32,8 +32,26 @@ function resetCacheDirectory(): void
     $depsProp = $reflection->getProperty('dependencies');
     $depsProp->setValue(null, []);
 
+    // A test that fails mid-analysis leaves a frame open, which would then
+    // attach its dependencies to whatever runs next.
+    foreach (['frames', 'framePaths', 'frameTainted', 'deferred'] as $property) {
+        $reflection->getProperty($property)->setValue(null, []);
+    }
+
+    $reflection->getProperty('cycleFloor')->setValue(null, null);
+
     $keyProp = $reflection->getProperty('key');
     $keyProp->setValue(null, null);
+}
+
+/**
+ * @return list<string>
+ */
+function dependenciesFor(string $path): array
+{
+    $dependencies = (new ReflectionProperty(AnalyzedCache::class, 'dependencies'))->getValue();
+
+    return array_keys($dependencies[$path] ?? []);
 }
 
 function createCacheDir(): string
@@ -499,26 +517,61 @@ describe('in-progress tracking', function () {
 });
 
 describe('dependency tracking', function () {
-    it('tracks dependencies', function () {
+    it('tracks dependencies against the file being analyzed', function () {
+        AnalyzedCache::beginAnalysis('/path/to/main.php');
         AnalyzedCache::addDependency('/path/to/dep1.php');
         AnalyzedCache::addDependency('/path/to/dep2.php');
+        AnalyzedCache::endAnalysis('/path/to/main.php');
 
-        $reflection = new ReflectionClass(AnalyzedCache::class);
-        $depsProp = $reflection->getProperty('dependencies');
-
-        $deps = array_keys($depsProp->getValue());
-        expect($deps)->toContain('/path/to/dep1.php');
-        expect($deps)->toContain('/path/to/dep2.php');
+        expect(dependenciesFor('/path/to/main.php'))
+            ->toContain('/path/to/dep1.php')
+            ->toContain('/path/to/dep2.php');
     });
 
     it('does not record a dependency twice', function () {
+        AnalyzedCache::beginAnalysis('/path/to/main.php');
         AnalyzedCache::addDependency('/path/to/dep1.php');
         AnalyzedCache::addDependency('/path/to/dep1.php');
+        AnalyzedCache::endAnalysis('/path/to/main.php');
 
-        $reflection = new ReflectionClass(AnalyzedCache::class);
-        $depsProp = $reflection->getProperty('dependencies');
+        expect(dependenciesFor('/path/to/main.php'))->toBe(['/path/to/dep1.php']);
+    });
 
-        expect(array_keys($depsProp->getValue()))->toBe(['/path/to/dep1.php']);
+    it('does not record a dependency against an unrelated file', function () {
+        AnalyzedCache::beginAnalysis('/path/to/first.php');
+        AnalyzedCache::addDependency('/path/to/dep1.php');
+        AnalyzedCache::endAnalysis('/path/to/first.php');
+
+        AnalyzedCache::beginAnalysis('/path/to/second.php');
+        AnalyzedCache::addDependency('/path/to/dep2.php');
+        AnalyzedCache::endAnalysis('/path/to/second.php');
+
+        expect(dependenciesFor('/path/to/second.php'))->toBe(['/path/to/dep2.php']);
+    });
+
+    it('gives a file the dependencies of the files it depends on', function () {
+        AnalyzedCache::beginAnalysis('/path/to/a.php');
+        AnalyzedCache::addDependency('/path/to/b.php');
+
+        AnalyzedCache::beginAnalysis('/path/to/b.php');
+        AnalyzedCache::addDependency('/path/to/c.php');
+        AnalyzedCache::endAnalysis('/path/to/b.php');
+
+        AnalyzedCache::endAnalysis('/path/to/a.php');
+
+        expect(dependenciesFor('/path/to/a.php'))
+            ->toContain('/path/to/b.php')
+            ->toContain('/path/to/c.php');
+
+        expect(dependenciesFor('/path/to/b.php'))->toBe(['/path/to/c.php']);
+    });
+
+    it('does not record a file as depending on itself', function () {
+        AnalyzedCache::beginAnalysis('/path/to/a.php');
+        AnalyzedCache::addDependency('/path/to/a.php');
+        AnalyzedCache::endAnalysis('/path/to/a.php');
+
+        expect(dependenciesFor('/path/to/a.php'))->toBe([]);
     });
 
     it('stores dependencies when persisting to disk', function () {
@@ -528,11 +581,14 @@ describe('dependency tracking', function () {
         $mainFixture = createTestClassFixture('MainClass', 'public function main() {}');
         $depFixture = createTestClassFixture('DepClass', 'public function dep() {}');
 
+        AnalyzedCache::beginAnalysis($mainFixture);
         AnalyzedCache::addDependency($depFixture);
 
         $scope = new Scope;
         $scope->setPath($mainFixture);
         AnalyzedCache::add($mainFixture, $scope);
+
+        AnalyzedCache::endAnalysis($mainFixture);
 
         $cacheFiles = glob($dir.'/*.cache');
         expect($cacheFiles)->toHaveCount(1);
@@ -557,11 +613,14 @@ describe('dependency tracking', function () {
         $mainFixture = createTestClassFixture('MainClass', 'public function main() {}');
         $depFixture = createTestClassFixture('DepClass', 'public function dep() {}');
 
+        AnalyzedCache::beginAnalysis($mainFixture);
         AnalyzedCache::addDependency($depFixture);
 
         $scope = new Scope;
         $scope->setPath($mainFixture);
         AnalyzedCache::add($mainFixture, $scope);
+
+        AnalyzedCache::endAnalysis($mainFixture);
 
         AnalyzedCache::clearMemory();
 
@@ -584,11 +643,14 @@ describe('dependency tracking', function () {
         $mainFixture = createTestClassFixture('MainClass', 'public function main() {}');
         $depFixture = createTestClassFixture('DepClass', 'public function dep() {}');
 
+        AnalyzedCache::beginAnalysis($mainFixture);
         AnalyzedCache::addDependency($depFixture);
 
         $scope = new Scope;
         $scope->setPath($mainFixture);
         AnalyzedCache::add($mainFixture, $scope);
+
+        AnalyzedCache::endAnalysis($mainFixture);
 
         AnalyzedCache::clearMemory();
 
@@ -603,6 +665,116 @@ describe('dependency tracking', function () {
 
         unlink($mainFixture);
         unlink($depFixture);
+        cleanupCacheDir($dir);
+    });
+
+    it('invalidates cache when an indirect dependency changes', function () {
+        $dir = createCacheDir();
+        AnalyzedCache::enableDiskCache($dir);
+
+        $a = createTestClassFixture('AClass', 'public function a() {}');
+        $b = createTestClassFixture('BClass', 'public function b() {}');
+        $c = createTestClassFixture('CClass', 'public function c() {}');
+
+        // A uses B, B uses C. Nothing links A to C directly.
+        AnalyzedCache::beginAnalysis($a);
+        AnalyzedCache::addDependency($b);
+
+        AnalyzedCache::beginAnalysis($b);
+        AnalyzedCache::addDependency($c);
+        AnalyzedCache::add($b, tap(new Scope, fn ($scope) => $scope->setPath($b)));
+        AnalyzedCache::endAnalysis($b);
+
+        AnalyzedCache::add($a, tap(new Scope, fn ($scope) => $scope->setPath($a)));
+        AnalyzedCache::endAnalysis($a);
+
+        AnalyzedCache::clearMemory();
+
+        expect(AnalyzedCache::get($a))->not->toBeNull();
+
+        sleep(1);
+        file_put_contents($c, "<?php\nclass CClass { public function modified() {} }");
+
+        AnalyzedCache::clearMemory();
+
+        expect(AnalyzedCache::get($a))->toBeNull();
+
+        unlink($a);
+        unlink($b);
+        unlink($c);
+        cleanupCacheDir($dir);
+    });
+
+    it('invalidates every member of a cycle when one of them changes', function () {
+        $dir = createCacheDir();
+        AnalyzedCache::enableDiskCache($dir);
+
+        $a = createTestClassFixture('CycleA', 'public function a() {}');
+        $b = createTestClassFixture('CycleB', 'public function b() {}');
+
+        // A uses B, and B uses A again while A is still being analyzed.
+        AnalyzedCache::beginAnalysis($a);
+        AnalyzedCache::addDependency($b);
+
+        AnalyzedCache::beginAnalysis($b);
+        AnalyzedCache::addDependency($a);
+        AnalyzedCache::noteCycle($a);
+        AnalyzedCache::add($b, tap(new Scope, fn ($scope) => $scope->setPath($b)));
+        AnalyzedCache::endAnalysis($b);
+
+        AnalyzedCache::add($a, tap(new Scope, fn ($scope) => $scope->setPath($a)));
+        AnalyzedCache::endAnalysis($a);
+
+        AnalyzedCache::clearMemory();
+
+        expect(AnalyzedCache::get($a))->not->toBeNull();
+        expect(AnalyzedCache::get($b))->not->toBeNull();
+
+        // B is cached against A, even though A is the file that came first.
+        expect(dependenciesFor($b))->toContain($a);
+
+        sleep(1);
+        file_put_contents($a, "<?php\nclass CycleA { public function modified() {} }");
+
+        AnalyzedCache::clearMemory();
+
+        expect(AnalyzedCache::get($b))->toBeNull();
+
+        unlink($a);
+        unlink($b);
+        cleanupCacheDir($dir);
+    });
+
+    it('does not record dependencies against unrelated files analyzed later', function () {
+        $dir = createCacheDir();
+        AnalyzedCache::enableDiskCache($dir);
+
+        $first = createTestClassFixture('FirstClass', 'public function first() {}');
+        $dep = createTestClassFixture('SharedDep', 'public function dep() {}');
+        $later = createTestClassFixture('LaterClass', 'public function later() {}');
+
+        AnalyzedCache::beginAnalysis($first);
+        AnalyzedCache::addDependency($dep);
+        AnalyzedCache::add($first, tap(new Scope, fn ($scope) => $scope->setPath($first)));
+        AnalyzedCache::endAnalysis($first);
+
+        AnalyzedCache::beginAnalysis($later);
+        AnalyzedCache::add($later, tap(new Scope, fn ($scope) => $scope->setPath($later)));
+        AnalyzedCache::endAnalysis($later);
+
+        AnalyzedCache::clearMemory();
+
+        sleep(1);
+        file_put_contents($first, "<?php\nclass FirstClass { public function modified() {} }");
+
+        AnalyzedCache::clearMemory();
+
+        expect(AnalyzedCache::get($first))->toBeNull();
+        expect(AnalyzedCache::get($later))->not->toBeNull();
+
+        unlink($first);
+        unlink($dep);
+        unlink($later);
         cleanupCacheDir($dir);
     });
 });

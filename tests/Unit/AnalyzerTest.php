@@ -651,9 +651,15 @@ class AfterEmptyPath
         $analyzer->analyze('');
         $analyzer->analyze($fixture);
 
-        $dependencies = new ReflectionProperty(AnalyzedCache::class, 'dependencies');
+        $dependencies = (new ReflectionProperty(AnalyzedCache::class, 'dependencies'))->getValue();
 
-        expect($dependencies->getValue())->toBe([]);
+        // The empty path must not leave a frame open, which would make the
+        // second call look like a dependency of the first.
+        foreach ($dependencies as $path => $paths) {
+            expect(array_keys($paths))->not->toContain($fixture);
+        }
+
+        expect($dependencies[$fixture] ?? [])->toBe([]);
 
         unlink($fixture);
     });

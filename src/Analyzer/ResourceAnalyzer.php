@@ -117,7 +117,9 @@ class ResourceAnalyzer
             return $this->buildJsonApiResourceResponse($resourceClass, $isCollection);
         }
 
-        if (AnalyzedCache::isInProgress((new ReflectionClass($resourceClass))->getFileName())) {
+        if (AnalyzedCache::isInProgress($file = (new ReflectionClass($resourceClass))->getFileName())) {
+            AnalyzedCache::noteCycle($file);
+
             return null;
         }
 
@@ -518,7 +520,9 @@ class ResourceAnalyzer
             return null;
         }
 
-        if (AnalyzedCache::isInProgress((new ReflectionClass($resourceClass))->getFileName())) {
+        if (AnalyzedCache::isInProgress($file = (new ReflectionClass($resourceClass))->getFileName())) {
+            AnalyzedCache::noteCycle($file);
+
             return null;
         }
 
