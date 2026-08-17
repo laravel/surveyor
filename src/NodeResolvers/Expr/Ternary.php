@@ -31,6 +31,9 @@ class Ternary extends AbstractResolver
                 ->whenFalse(fn ($_, TypeContract $type) => $type->nullable(true));
         }
 
+        // These are the narrowed types of the value the condition tests, not
+        // the types of the branches. Record them so each branch resolves
+        // against what the condition proved, then take the branches' own types.
         $if = $result->apply();
         $else = $result->toggle()->apply();
 
@@ -38,11 +41,15 @@ class Ternary extends AbstractResolver
             $this->scope->state()->add($node->if, $if);
         }
 
+        $ifType = $this->from($node->if);
+
         if ($this->scope->state()->canHandle($node->else)) {
             $this->scope->state()->add($node->else, $else);
         }
 
-        return Type::union($if, $else);
+        $elseType = $this->from($node->else);
+
+        return Type::union($ifType, $elseType);
     }
 
     public function resolveForCondition(Node\Expr\Ternary $node)
