@@ -34,9 +34,7 @@ class Analyzer
             return $this;
         }
 
-        if ($this->analyzing > 0) {
-            AnalyzedCache::addDependency($path);
-        }
+        AnalyzedCache::addDependency($path);
 
         $this->analyzing++;
 
@@ -53,6 +51,8 @@ class Analyzer
         }
 
         if (AnalyzedCache::isInProgress($path)) {
+            AnalyzedCache::noteCycle($path);
+
             Debug::log(static fn () => '⏳ Waiting for analysis to complete: '.self::shortPath($path));
 
             // The in-progress scope isn't available yet, so anything still held
@@ -68,14 +68,20 @@ class Analyzer
 
         Debug::log(static fn () => '🧠 Analyzing: '.self::shortPath($path));
 
-        $analyzed = $this->parser->parse(file_get_contents($path), $path);
+        AnalyzedCache::beginAnalysis($path);
 
-        foreach ($analyzed as $result) {
-            if ($result->fullPath() === $path) {
-                $this->analyzed = $result;
+        try {
+            $analyzed = $this->parser->parse(file_get_contents($path), $path);
+
+            foreach ($analyzed as $result) {
+                if ($result->fullPath() === $path) {
+                    $this->analyzed = $result;
+                }
+
+                AnalyzedCache::add($result->fullPath(), $result);
             }
-
-            AnalyzedCache::add($result->fullPath(), $result);
+        } finally {
+            AnalyzedCache::endAnalysis($path);
         }
 
         Debug::removePath($path);

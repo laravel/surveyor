@@ -20,7 +20,38 @@ class AnalyzedCache
 
     protected static bool $persistToDisk = false;
 
-    /** @var array<string, true> */
+    /**
+     * Dependencies collected for each analysis currently on the stack. The
+     * innermost frame belongs to the file being analyzed right now.
+     *
+     * @var list<array<string, true>>
+     */
+    protected static array $frames = [];
+
+    /** @var list<string> */
+    protected static array $framePaths = [];
+
+    /**
+     * Whether each frame skipped a file that was still being analyzed, which
+     * leaves its dependency list incomplete.
+     *
+     * @var list<bool>
+     */
+    protected static array $frameTainted = [];
+
+    /** Index of the outermost frame taking part in an unresolved cycle. */
+    protected static ?int $cycleFloor = null;
+
+    /** @var list<array{path: string, scope: Scope, mtime: int}> */
+    protected static array $deferred = [];
+
+    /**
+     * Every file each analyzed path depends on, directly or otherwise. Stored
+     * as a closure rather than direct edges so a cache entry can be validated
+     * by stat'ing a flat list, without walking the graph.
+     *
+     * @var array<string, array<string, true>>
+     */
     protected static array $dependencies = [];
 
     /** @var array<string, int|null> */
@@ -35,11 +66,125 @@ class AnalyzedCache
         static::$key = $key;
     }
 
+    /**
+     * Record that the analysis in progress depends on the given path, along
+     * with everything that path itself depends on.
+     */
     public static function addDependency(string $path): void
     {
-        // Keyed by path to avoid duplicates. The full list is written into
-        // every cache file, and it only grows.
-        static::$dependencies[$path] = true;
+        if (static::$frames === []) {
+            return;
+        }
+
+        $frame = array_key_last(static::$frames);
+
+        static::$frames[$frame][$path] = true;
+
+        // A path resolved from cache is never pushed as a frame of its own, so
+        // its dependencies have to be folded in here or they are lost.
+        if (isset(static::$dependencies[$path])) {
+            static::$frames[$frame] += static::$dependencies[$path];
+        }
+    }
+
+    public static function beginAnalysis(string $path): void
+    {
+        static::$frames[] = [];
+        static::$framePaths[] = $path;
+        static::$frameTainted[] = false;
+    }
+
+    /**
+     * Record that the analysis in progress gave up on a file that is already
+     * being analyzed further up the stack. Everything between that file and
+     * here is mutually dependent, so none of it can be cached until the
+     * outermost member finishes and the full closure is known.
+     */
+    public static function noteCycle(string $path): void
+    {
+        if (static::$frames === []) {
+            return;
+        }
+
+        static::$frameTainted[array_key_last(static::$frameTainted)] = true;
+
+        // The file should always be somewhere on the stack, since that is what
+        // makes it in progress. Fall back to the outermost frame rather than
+        // caching a dependency list that is missing whatever it reached.
+        $root = array_search($path, static::$framePaths, true);
+
+        if ($root === false) {
+            $root = 0;
+        }
+
+        static::$cycleFloor = static::$cycleFloor === null
+            ? $root
+            : min(static::$cycleFloor, $root);
+    }
+
+    /**
+     * Close the analysis of a path, keep its dependency closure, and fold that
+     * closure into the analysis that asked for it.
+     */
+    public static function endAnalysis(string $path): void
+    {
+        if (static::$frames === []) {
+            return;
+        }
+
+        $index = array_key_last(static::$frames);
+
+        $dependencies = array_pop(static::$frames);
+        $tainted = array_pop(static::$frameTainted);
+        array_pop(static::$framePaths);
+
+        unset($dependencies[$path]);
+
+        static::$dependencies[$path] = $dependencies;
+
+        if (static::$frames !== []) {
+            $frame = array_key_last(static::$frames);
+            static::$frames[$frame] += $dependencies;
+
+            if ($tainted) {
+                static::$frameTainted[$frame] = true;
+            }
+        }
+
+        if ($index === static::$cycleFloor) {
+            static::$cycleFloor = null;
+            static::flushDeferred($dependencies, $path);
+        }
+    }
+
+    /**
+     * Write out the entries held back while a cycle was open. Every member of
+     * the cycle gets the closure of its outermost file plus every other member,
+     * since a change to any of them could change all of them.
+     *
+     * @param  array<string, true>  $dependencies
+     */
+    protected static function flushDeferred(array $dependencies, string $root): void
+    {
+        $deferred = static::$deferred;
+        static::$deferred = [];
+
+        $dependencies[$root] = true;
+
+        foreach ($deferred as $entry) {
+            $dependencies[$entry['path']] = true;
+        }
+
+        foreach ($deferred as $entry) {
+            $own = $dependencies;
+            unset($own[$entry['path']]);
+
+            static::$dependencies[$entry['path']] = $own;
+
+            if (static::$persistToDisk) {
+                static::persistToDisk($entry['path'], $entry['scope'], $entry['mtime'], $own);
+            }
+        }
     }
 
     /**
@@ -117,8 +262,19 @@ class AnalyzedCache
         static::$fileTimes[$path] = $mtime;
         unset(static::$inProgress[$path]);
 
-        if (static::$persistToDisk && $mtime !== null) {
-            static::persistToDisk($path, $analyzed, $mtime);
+        if ($mtime === null) {
+            return;
+        }
+
+        // Its dependency list is still missing whatever the cycle resolves to.
+        if (static::$cycleFloor !== null && (static::$frameTainted[array_key_last(static::$frameTainted)] ?? false)) {
+            static::$deferred[] = ['path' => $path, 'scope' => $analyzed, 'mtime' => $mtime];
+
+            return;
+        }
+
+        if (static::$persistToDisk) {
+            static::persistToDisk($path, $analyzed, $mtime, static::pendingDependencies($path));
         }
     }
 
@@ -190,6 +346,8 @@ class AnalyzedCache
             return null;
         }
 
+        $dependencies = [];
+
         foreach ($data['dependencies'] as $dependency) {
             $currentMtime = static::modifiedTime($dependency['path']);
 
@@ -199,7 +357,13 @@ class AnalyzedCache
 
                 return null;
             }
+
+            $dependencies[$dependency['path']] = true;
         }
+
+        // Whoever asked for this path inherits its dependencies, so a change
+        // further down the graph still invalidates the files above it.
+        static::$dependencies[$path] = $dependencies;
 
         $serialized = $data['scope'];
         unset($data);
@@ -253,6 +417,11 @@ class AnalyzedCache
         static::$fileTimes = [];
         static::$inProgress = [];
         static::$dependencies = [];
+        static::$frames = [];
+        static::$framePaths = [];
+        static::$frameTainted = [];
+        static::$cycleFloor = null;
+        static::$deferred = [];
         static::$modifiedTimes = [];
     }
 
@@ -278,7 +447,28 @@ class AnalyzedCache
         return self::$inProgress[$path] ?? false;
     }
 
-    protected static function persistToDisk(string $path, Scope $analyzed, int $mtime): void
+    /**
+     * The dependency closure for a path that is being cached. Entries are
+     * written while their frame is still open, so the open frame is the
+     * authoritative list.
+     *
+     * @return array<string, true>
+     */
+    protected static function pendingDependencies(string $path): array
+    {
+        $dependencies = static::$frames === []
+            ? (static::$dependencies[$path] ?? [])
+            : static::$frames[array_key_last(static::$frames)];
+
+        unset($dependencies[$path]);
+
+        return $dependencies;
+    }
+
+    /**
+     * @param  array<string, true>  $dependencies
+     */
+    protected static function persistToDisk(string $path, Scope $analyzed, int $mtime, array $dependencies): void
     {
         // Ensure cache directory exists
         if (! is_dir(static::$cacheDirectory)) {
@@ -292,7 +482,7 @@ class AnalyzedCache
             'dependencies' => array_values(array_filter(array_map(fn ($dep) => [
                 'path' => $dep,
                 'mtime' => static::modifiedTime($dep),
-            ], array_keys(self::$dependencies)), fn ($dep) => $dep['mtime'] !== null)),
+            ], array_keys($dependencies)), fn ($dep) => $dep['mtime'] !== null)),
             'scope' => $analyzed,
         ];
 

@@ -50,7 +50,9 @@ class ArrayableResolver
         }
 
         try {
-            if (AnalyzedCache::isInProgress((new ReflectionClass($className))->getFileName())) {
+            if (AnalyzedCache::isInProgress($file = (new ReflectionClass($className))->getFileName())) {
+                AnalyzedCache::noteCycle($file);
+
                 return null;
             }
         } catch (Throwable $e) {
