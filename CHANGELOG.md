@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.2.8 - 2026-08-18
+
+### What's Changed
+
+* Resolve Eloquent attributes built with Attribute::get() or new Attribute() by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/67
+* Type singular model relations as nullable by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/70
+* Resolve ternary branches instead of the compared value by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/71
+* Invalidate the analysis cache per file by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/72
+* Stop string literals from becoming class types by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/73
+
+**Full Changelog**: https://github.com/laravel/surveyor/compare/v0.2.7...v0.2.8
+
 ## v0.2.7 - 2026-08-12
 
 ### What's Changed
