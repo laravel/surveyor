@@ -4,6 +4,7 @@ namespace Laravel\Surveyor\Parser;
 
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Resolvers\NodeResolver;
+use Laravel\Surveyor\Support\Markers;
 use Laravel\Surveyor\Visitors\TypeResolver;
 use PhpParser\NodeFinder;
 use PhpParser\NodeTraverser;
@@ -69,6 +70,7 @@ class Parser
 
         $typeResolver = new TypeResolver($this->resolver);
         $typeResolver->newScope($path);
+        $typeResolver->scope()->setIgnoreMarkerComments(Markers::markerComments($code));
 
         $traverser = new NodeTraverser;
         $traverser->addVisitor(new NameResolver(null, ['preserveOriginalNames' => true]));

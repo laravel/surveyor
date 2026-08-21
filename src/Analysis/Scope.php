@@ -64,6 +64,9 @@ class Scope
 
     protected ?ClassType $receiverType = null;
 
+    /** @var list<array{pos: int, line: int}>|null */
+    protected ?array $ignoreMarkerComments = null;
+
     public function __construct(protected ?Scope $parent = null)
     {
         $this->stateTracker = new StateTracker;
@@ -161,6 +164,22 @@ class Scope
         }
 
         return $this->path;
+    }
+
+    /**
+     * @param  list<array{pos: int, line: int}>  $comments
+     */
+    public function setIgnoreMarkerComments(array $comments): void
+    {
+        $this->ignoreMarkerComments = $comments;
+    }
+
+    /**
+     * @return list<array{pos: int, line: int}>
+     */
+    public function ignoreMarkerComments(): array
+    {
+        return $this->ignoreMarkerComments ?? $this->parent?->ignoreMarkerComments() ?? [];
     }
 
     public function path(): ?string

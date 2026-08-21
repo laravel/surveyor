@@ -10,6 +10,13 @@ use function Illuminate\Filesystem\join_paths;
 
 class AnalyzedCache
 {
+    /**
+     * The shape of what gets written to disk. Bump it whenever a serialized
+     * class changes, so an upgrade reads its own entries and not ones left by
+     * a version whose objects no longer unserialize cleanly.
+     */
+    public const SCHEMA = 4;
+
     protected static array $cached = [];
 
     protected static array $fileTimes = [];
@@ -363,6 +370,12 @@ class AnalyzedCache
             return null;
         }
 
+        if (($data['schema'] ?? null) !== static::SCHEMA) {
+            static::invalidate($path);
+
+            return null;
+        }
+
         if ($data['mtime'] !== $currentModifiedTime) {
             static::invalidate($path);
 
@@ -502,6 +515,7 @@ class AnalyzedCache
         $cacheFile = static::getCacheFilePath($path);
 
         $data = [
+            'schema' => static::SCHEMA,
             'mtime' => $mtime,
             'dependencies' => array_values(array_filter(array_map(fn ($dep) => [
                 'path' => $dep,

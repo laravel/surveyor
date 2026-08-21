@@ -6,14 +6,19 @@ use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\ModelInspector;
+use Illuminate\Support\Str;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Analyzed\ClassLikeResult;
+use Laravel\Surveyor\Analyzed\IgnoreMarker;
 use Laravel\Surveyor\Analyzed\MethodResult;
 use Laravel\Surveyor\Analyzed\PropertyResult;
 use Laravel\Surveyor\Reflector\Reflector;
+use Laravel\Surveyor\Support\Markers;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Type;
+use ReflectionClass;
+use Throwable;
 
 class ModelAnalyzer
 {
@@ -46,7 +51,12 @@ class ModelAnalyzer
                 }
             }
 
-            $result->addProperty(new PropertyResult($attribute['name'], $type, modelAttribute: true));
+            $result->addProperty(new PropertyResult(
+                $attribute['name'],
+                $type,
+                modelAttribute: true,
+                ignore: $this->inheritedMarker($model, $result, $attribute['name']),
+            ));
             $scope->state()->properties()->addManually($attribute['name'], $type, 0, 0, 0, 0);
         }
 
@@ -61,13 +71,23 @@ class ModelAnalyzer
 
             if ($isCollection) {
                 $type = Type::arrayShape(Type::int(), new ClassType($relation['related']));
-                $result->addProperty(new PropertyResult($relation['name'], $type, modelRelation: true));
+                $result->addProperty(new PropertyResult(
+                    $relation['name'],
+                    $type,
+                    modelRelation: true,
+                    ignore: $this->inheritedMarker($model, $result, $relation['name']),
+                ));
                 $scope->state()->properties()->addManually($relation['name'], $type, 0, 0, 0, 0);
             } else {
                 // A singular relation has nothing to return when the related
                 // record is missing, whatever the foreign key says.
                 $type = (new ClassType($relation['related']))->nullable();
-                $result->addProperty(new PropertyResult($relation['name'], $type, modelRelation: true));
+                $result->addProperty(new PropertyResult(
+                    $relation['name'],
+                    $type,
+                    modelRelation: true,
+                    ignore: $this->inheritedMarker($model, $result, $relation['name']),
+                ));
                 $scope->state()->properties()->addManually($relation['name'], $type, 0, 0, 0, 0);
             }
 
@@ -85,6 +105,59 @@ class ModelAnalyzer
 
             $result->addMethod($methodResult);
         }
+    }
+
+    /**
+     * Attributes and relations are named by the model inspector, not by the
+     * file, so a marker put on the accessor or the relation method has to be
+     * carried across to the member it produces.
+     */
+    protected function inheritedMarker(string $model, ClassLikeResult $result, string $name): ?IgnoreMarker
+    {
+        if ($result->property($name)?->ignoreMarker() !== null) {
+            return $result->property($name)->ignoreMarker();
+        }
+
+        $methods = [
+            $name,
+            Str::camel($name),
+            'get'.Str::studly($name).'Attribute',
+        ];
+
+        foreach ($methods as $method) {
+            if ($result->method($method)?->ignoreMarker() !== null) {
+                return $result->method($method)->ignoreMarker();
+            }
+        }
+
+        return $this->reflectedMarker($model, $name, $methods);
+    }
+
+    /**
+     * The analyzed result only holds what the model's own file declares, so a
+     * marker on a member reached through a trait or a parent class is only
+     * visible through reflection.
+     *
+     * @param  list<string>  $methods
+     */
+    protected function reflectedMarker(string $model, string $name, array $methods): ?IgnoreMarker
+    {
+        try {
+            $reflection = new ReflectionClass($model);
+        } catch (Throwable) {
+            return null;
+        }
+
+        foreach ($methods as $method) {
+            if ($reflection->hasMethod($method)
+                && $marker = Markers::fromReflection($reflection->getMethod($method))) {
+                return $marker;
+            }
+        }
+
+        return $reflection->hasProperty($name)
+            ? Markers::fromReflection($reflection->getProperty($name))
+            : null;
     }
 
     protected function annotatedType(ClassLikeResult $result, string $name): ?TypeContract
@@ -224,11 +297,11 @@ class ModelAnalyzer
             return Type::string($cast);
         }
 
-        if ($analyzed->implements(CastsAttributes::class)) {
+        if ($analyzed->implements(CastsAttributes::class) && $analyzed->hasMethod('get')) {
             return $analyzed->getMethod('get')->returnType();
         }
 
-        if ($analyzed->implements(Arrayable::class)) {
+        if ($analyzed->implements(Arrayable::class) && $analyzed->hasMethod('toArray')) {
             return $analyzed->getMethod('toArray')->returnType();
         }
 

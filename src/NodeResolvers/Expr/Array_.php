@@ -3,6 +3,7 @@
 namespace Laravel\Surveyor\NodeResolvers\Expr;
 
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
+use Laravel\Surveyor\NodeResolvers\Shared\ResolvesIgnoreMarkers;
 use Laravel\Surveyor\Result\VariableState;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
@@ -11,6 +12,8 @@ use PhpParser\Node;
 
 class Array_ extends AbstractResolver
 {
+    use ResolvesIgnoreMarkers;
+
     public function resolve(Node\Expr\Array_ $node)
     {
         if ($this->isListArray($node)) {
@@ -48,9 +51,10 @@ class Array_ extends AbstractResolver
     protected function resolveListArray(Node\Expr\Array_ $node)
     {
         $result = [];
+        $ignored = $this->ignoredArrayItems($node);
 
-        foreach ($node->items as $item) {
-            if ($item === null) {
+        foreach ($node->items as $index => $item) {
+            if ($item === null || isset($ignored[$index])) {
                 continue;
             }
 
@@ -75,9 +79,10 @@ class Array_ extends AbstractResolver
     protected function resolveKeyedArray(Node\Expr\Array_ $node)
     {
         $result = [];
+        $ignored = $this->ignoredArrayItems($node);
 
-        foreach ($node->items as $item) {
-            if ($item === null) {
+        foreach ($node->items as $index => $item) {
+            if ($item === null || isset($ignored[$index])) {
                 continue;
             }
 
