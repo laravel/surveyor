@@ -232,13 +232,16 @@ class Type
             $hasNull = $hasNull || $type instanceof NullType;
         }
 
-        // Null is carried by marking the other members nullable.
+        // Null is carried by marking the other members nullable. The members
+        // belong to whoever passed them in, and one of them may be the type
+        // recorded for a model's property or a method's return, so they are
+        // copied before the flag is set rather than marked in place.
         if ($hasNull) {
             $nullable = [];
 
             foreach ($unique as $type) {
                 if (! $type instanceof NullType) {
-                    $nullable[] = $type->nullable();
+                    $nullable[] = $type->isNullable() ? $type : (clone $type)->nullable();
                 }
             }
 
