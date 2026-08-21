@@ -13,6 +13,8 @@ class Analyzer
 
     protected int $analyzing = 0;
 
+    protected bool $settling = false;
+
     public function __construct(
         protected Parser $parser,
     ) {
@@ -84,11 +86,59 @@ class Analyzer
             AnalyzedCache::endAnalysis($path);
         }
 
+        $this->settle();
+
         Debug::removePath($path);
 
         $this->analyzing--;
 
         return $this;
+    }
+
+    /**
+     * Analyze the members of a cycle again now that it has closed.
+     *
+     * Each of them ran while another member was still open, so wherever they
+     * reached for it they resolved against an empty scope. Which member that
+     * was depends on where the analysis happened to start, so leaving those
+     * answers in place makes the cache depend on visit order. One member is
+     * re-analyzed at a time, with the rest left in the cache, so each of them
+     * sees a finished answer for everything it reaches.
+     */
+    protected function settle(): void
+    {
+        if ($this->settling) {
+            return;
+        }
+
+        $members = AnalyzedCache::takeSettled();
+
+        if ($members === []) {
+            return;
+        }
+
+        $mine = $this->analyzed ?? null;
+        $this->settling = true;
+
+        try {
+            foreach ($members as $member) {
+                AnalyzedCache::invalidate($member);
+
+                Debug::log(static fn () => '♻️ Re-analyzing settled cycle member: '.self::shortPath($member));
+
+                $this->analyze($member);
+            }
+        } finally {
+            $this->settling = false;
+
+            // Anything a member reached while settling has been analyzed with
+            // the cycle closed, so there is nothing left to settle.
+            AnalyzedCache::takeSettled();
+
+            if ($mine !== null) {
+                $this->analyzed = $mine;
+            }
+        }
     }
 
     protected static function shortPath(string $path): string

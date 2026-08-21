@@ -46,6 +46,14 @@ class AnalyzedCache
     protected static array $deferred = [];
 
     /**
+     * Members of cycles that have just closed. Each was analyzed while another
+     * member was still open, so it resolved part of its work against nothing.
+     *
+     * @var list<string>
+     */
+    protected static array $settled = [];
+
+    /**
      * Every file each analyzed path depends on, directly or otherwise. Stored
      * as a closure rather than direct edges so a cache entry can be validated
      * by stat'ing a flat list, without walking the graph.
@@ -180,11 +188,26 @@ class AnalyzedCache
             unset($own[$entry['path']]);
 
             static::$dependencies[$entry['path']] = $own;
+            static::$settled[] = $entry['path'];
 
             if (static::$persistToDisk) {
                 static::persistToDisk($entry['path'], $entry['scope'], $entry['mtime'], $own);
             }
         }
+    }
+
+    /**
+     * Hand back the members of any cycle that has closed since this was last
+     * called, and forget them.
+     *
+     * @return list<string>
+     */
+    public static function takeSettled(): array
+    {
+        $settled = static::$settled;
+        static::$settled = [];
+
+        return $settled;
     }
 
     /**
@@ -422,6 +445,7 @@ class AnalyzedCache
         static::$frameTainted = [];
         static::$cycleFloor = null;
         static::$deferred = [];
+        static::$settled = [];
         static::$modifiedTimes = [];
     }
 
