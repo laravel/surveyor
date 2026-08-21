@@ -68,7 +68,7 @@ class ClassLikeResult
         return $this->name;
     }
 
-    public function namespace(): string
+    public function namespace(): ?string
     {
         return $this->namespace;
     }
@@ -211,6 +211,14 @@ class ClassLikeResult
         $this->properties[$property->name] = $property;
     }
 
+    /**
+     * @return array<string, PropertyResult>
+     */
+    public function properties(): array
+    {
+        return $this->properties;
+    }
+
     public function hasConstant(string $name): bool
     {
         return isset($this->constants[$name]);
@@ -224,6 +232,14 @@ class ClassLikeResult
     public function addConstant(ConstantResult $constant): void
     {
         $this->constants[$constant->name] = $constant;
+    }
+
+    /**
+     * @return array<string, ConstantResult>
+     */
+    public function constants(): array
+    {
+        return $this->constants;
     }
 
     public function hasUse(string $name): bool
