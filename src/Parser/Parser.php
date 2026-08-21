@@ -22,11 +22,8 @@ class Parser
         protected NodeResolver $resolver,
         protected PhpParserParser $parser,
         protected NodeFinder $nodeFinder,
-        protected NodeTraverser $nodeTraverser,
-        protected TypeResolver $typeResolver,
     ) {
-        $this->nodeTraverser->addVisitor(new NameResolver(null, ['preserveOriginalNames' => true]));
-        $this->nodeTraverser->addVisitor($this->typeResolver);
+        //
     }
 
     /**
@@ -36,9 +33,7 @@ class Parser
         string|ReflectionClass|ReflectionFunction|ReflectionMethod|SplFileInfo $code,
         string $path,
     ): array {
-        $this->parseCode($code, $path);
-
-        return [$this->flipScope($this->typeResolver->scope())];
+        return [$this->flipScope($this->parseCode($code, $path))];
     }
 
     protected function flipScope(Scope $scope)
@@ -55,19 +50,33 @@ class Parser
         return $this->parser->parse(file_get_contents($path));
     }
 
+    /**
+     * Resolving a node can analyze another file, which lands back here while
+     * this traversal is still running. The traverser and both visitors carry
+     * the state of the file they are walking, so each parse gets its own set
+     * rather than having the nested file overwrite the outer file's imports
+     * halfway through.
+     */
     protected function parseCode(
         string|ReflectionClass|ReflectionFunction|ReflectionMethod|SplFileInfo $code,
         string $path,
-    ): array {
+    ): Scope {
         $code = match (true) {
             is_string($code) => $code,
             $code instanceof SplFileInfo => file_get_contents($code->getPathname()),
             default => file_get_contents($code->getFileName()),
         };
 
-        $this->typeResolver->newScope($path);
+        $typeResolver = new TypeResolver($this->resolver);
+        $typeResolver->newScope($path);
 
-        return $this->nodeTraverser->traverse($this->parser->parse($code));
+        $traverser = new NodeTraverser;
+        $traverser->addVisitor(new NameResolver(null, ['preserveOriginalNames' => true]));
+        $traverser->addVisitor($typeResolver);
+
+        $traverser->traverse($this->parser->parse($code));
+
+        return $typeResolver->scope();
     }
 
     public function nodeFinder()

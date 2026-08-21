@@ -1,2 +1,8 @@
 vendor
 examples
+
+# Scratch caches and generated output left behind by benchmarks/cache scripts
+benchmarks/cache/*/
+benchmarks/cache/*.orig
+benchmarks/cache/*.diff
+benchmarks/cache/*.patch

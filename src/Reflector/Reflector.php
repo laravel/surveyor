@@ -309,15 +309,18 @@ class Reflector
         $className = $class instanceof ClassType ? $class->value : $class;
         $reflection = $this->reflectClass($class);
 
+        $scopeToRestore = null;
+
+        // Looking at another class means resolving names against that class's
+        // imports, so the scope in hand is put back before returning.
         if ($this->scope->entityName() !== $reflection->getName()) {
             $analyzed = $this->getAnalyzer()->analyze($reflection->getFileName());
 
             if ($scope = $analyzed->analyzed()) {
+                $scopeToRestore = $this->scope;
                 $this->setScope($scope);
             }
         }
-
-        $scopeToRestore = null;
 
         if ($class instanceof ClassType && count($class->genericTypes()) > 0) {
             $templateTags = $this->scope->getTemplateTags();
@@ -337,7 +340,7 @@ class Reflector
                     $templateTags,
                 );
 
-                $scopeToRestore = $this->scope;
+                $scopeToRestore ??= $this->scope;
                 $tempScope = clone $this->scope;
                 $tempScope->setTemplateTags(array_values($overriddenTags));
                 $tempScope->setReceiverType($class);

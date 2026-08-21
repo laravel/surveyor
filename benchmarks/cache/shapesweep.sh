@@ -20,13 +20,24 @@ SHAPES=(append-method remove-method edit-enum-case add-file remove-file rename-f
 
 cd "$APP" || exit 1
 
-if ! git diff --quiet; then
-  echo "ABORT: tracked files in cloud are modified"
-  exit 1
-fi
+# The shapes edit two tracked files. Both are copied first and restored from
+# those copies, so uncommitted work elsewhere in the app is left alone.
+MUTATED=(app/Models/Instance.php app/Enums/InstanceType.php)
+ORIGINALS=$S/sh-$LABEL-originals
+rm -rf "$ORIGINALS"; mkdir -p "$ORIGINALS"
+
+for file in "${MUTATED[@]}"; do
+  cp "$APP/$file" "$ORIGINALS/$(basename "$file")"
+done
+
+restore() {
+  for file in "${MUTATED[@]}"; do
+    cp "$ORIGINALS/$(basename "$file")" "$APP/$file"
+  done
+}
 
 cleanup() {
-  cd "$APP" && git checkout -- . 2>/dev/null
+  restore
   python3 "$S/mutate.py" cleanup apply
 }
 trap cleanup EXIT
@@ -46,7 +57,7 @@ mask() {
 printf '%-16s %14s %8s %s\n' shape warm-vs-cold raw effect
 
 for shape in "${SHAPES[@]}"; do
-  cd "$APP" && git checkout -- . 2>/dev/null
+  restore
   python3 "$S/mutate.py" cleanup apply
 
   python3 "$S/mutate.py" "$shape" pre
