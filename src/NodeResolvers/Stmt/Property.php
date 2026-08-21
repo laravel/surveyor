@@ -5,11 +5,14 @@ namespace Laravel\Surveyor\NodeResolvers\Stmt;
 use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Analyzed\PropertyResult;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
+use Laravel\Surveyor\NodeResolvers\Shared\ResolvesIgnoreMarkers;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
 
 class Property extends AbstractResolver
 {
+    use ResolvesIgnoreMarkers;
+
     public function resolve(Node\Stmt\Property $node)
     {
         foreach ($node->props as $prop) {
@@ -54,6 +57,7 @@ class Property extends AbstractResolver
                         default => 'public',
                     },
                     fromDocBlock: $node->getDocComment() ? true : false,
+                    ignore: $this->ignoreMarker($node),
                 ),
             );
         }

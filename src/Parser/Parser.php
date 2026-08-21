@@ -4,6 +4,7 @@ namespace Laravel\Surveyor\Parser;
 
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Resolvers\NodeResolver;
+use Laravel\Surveyor\Support\Markers;
 use Laravel\Surveyor\Visitors\TypeResolver;
 use PhpParser\NodeFinder;
 use PhpParser\NodeTraverser;
@@ -66,6 +67,7 @@ class Parser
         };
 
         $this->typeResolver->newScope($path);
+        $this->typeResolver->scope()->setIgnoreMarkerComments(Markers::markerComments($code));
 
         return $this->nodeTraverser->traverse($this->parser->parse($code));
     }

@@ -11,6 +11,7 @@ use Laravel\Surveyor\Analyzer\ModelAnalyzer;
 use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\NodeResolvers\Shared\ParsesClassLikeDocBlock;
+use Laravel\Surveyor\NodeResolvers\Shared\ResolvesIgnoreMarkers;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
 use PhpParser\NodeAbstract;
@@ -19,6 +20,7 @@ use Throwable;
 class Class_ extends AbstractResolver
 {
     use ParsesClassLikeDocBlock;
+    use ResolvesIgnoreMarkers;
 
     public function resolve(Node\Stmt\Class_ $node)
     {
@@ -45,6 +47,10 @@ class Class_ extends AbstractResolver
             filePath: $this->scope->fullPath(),
             entityType: EntityType::CLASS_TYPE,
         );
+
+        if ($marker = $this->ignoreMarker($node)) {
+            $result->flagAsIgnored($marker);
+        }
 
         $this->scope->attachResult($result);
 

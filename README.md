@@ -99,6 +99,8 @@ if ($classResult->implements(JsonSerializable::class)) {
 
 Access information about class methods:
 
+A method marked to be left out is hidden from every one of these, so `hasMethod()` returns false for it and `getMethod()` returns null. See [Ignore Markers](#ignore-markers).
+
 ```php
 // Check if a method exists
 if ($classResult->hasMethod('store')) {
@@ -119,11 +121,16 @@ if ($classResult->hasMethod('store')) {
 
 // Get all public methods
 $publicMethods = $classResult->publicMethods();
+
+// Read a method past the marker filter, to inspect a marker rather than act on it
+$raw = $classResult->method('store');
 ```
 
 ### Properties
 
 Access information about class properties:
+
+As with methods, a property marked to be left out is hidden from these, and `getProperty()` returns null for it.
 
 ```php
 // Check if a property exists
@@ -137,6 +144,9 @@ if ($classResult->hasProperty('email')) {
 
 // Get all public properties
 $publicProperties = $classResult->publicProperties();
+
+// Read a property past the marker filter
+$raw = $classResult->property('email');
 ```
 
 ### Constants
@@ -148,6 +158,100 @@ if ($classResult->hasConstant('STATUS_ACTIVE')) {
     $constant = $classResult->getConstant('STATUS_ACTIVE');
 }
 ```
+
+## Ignore Markers
+
+A tool that turns an application into client-side code needs a way for the author of that application to say "leave this one out". Surveyor recognizes the marker and hides what it covers; it does not decide what the marker is called, so each consumer ships an attribute in its own vocabulary.
+
+An attribute class is a marker if it implements `Laravel\Surveyor\Contracts\Ignored`. Nothing needs registering:
+
+```php
+use Attribute;
+use Laravel\Surveyor\Contracts\Ignored;
+
+#[Attribute(Attribute::TARGET_ALL)]
+final class Ignore implements Ignored
+{
+    //
+}
+```
+
+Marked members are hidden wherever a result hands members out: `publicMethods()`, `publicProperties()`, `hasMethod()`, `getMethod()`, `hasProperty()`, `getProperty()`, `asArray()`, and `asJson()`. A marked class, interface, or method is reported by `isIgnored()`. To read a member past the filter, ask for it by name through `method()` or `property()`.
+
+### Conditions
+
+A marker can apply only some of the time. Implement `ConditionallyIgnored` and the two conditions are read from the attribute as written:
+
+```php
+use Laravel\Surveyor\Contracts\ConditionallyIgnored;
+
+#[Attribute(Attribute::TARGET_ALL)]
+final class Ignore implements ConditionallyIgnored
+{
+    public function __construct(
+        public readonly string|array|null $unless = null,
+        public readonly string|array|null $when = null,
+    ) {
+    }
+
+    public function unless(): string|array|null
+    {
+        return $this->unless;
+    }
+
+    public function when(): string|array|null
+    {
+        return $this->when;
+    }
+}
+```
+
+`unless` keeps the declaration while its condition passes; `when` leaves it out while its condition passes. A condition is a config key or a `[class, method]` callable — nothing else counts as one, so a marker given anything else still hides. Surveyor does not decide what a condition means, so register a resolver:
+
+```php
+use Laravel\Surveyor\Support\Markers;
+
+Markers::registerConditionResolver(fn (string|array $condition) => is_string($condition)
+    ? (bool) config($condition, false)
+    : (bool) app()->call($condition));
+```
+
+Register the resolver before reading results. Until one is registered nothing can answer a condition, and an unanswerable condition is not a failing one: every conditional marker hides, the same as one whose condition could not be read.
+
+Conditions are resolved when a member is read, not while the file is analyzed, so a cached analysis holds the condition and never the answer to it. A condition that cannot be read at all — an expression surveyor cannot evaluate — leaves the declaration out whichever argument carried it.
+
+Only a marker implementing `ConditionallyIgnored` carries conditions. An argument on any other marker is left alone, so an attribute that is unconditional by contract cannot be switched off by one. Name the constructor parameters `unless` and `when`. A positional argument is matched against the marker's own constructor parameters, but both readers then look for those two names: reading an attribute out of a file goes by the parameter name, while instantiating it goes through the contract methods. Parameters named anything else are not seen by the file reader, which leaves the marker unconditional there while instantiating it honors the condition.
+
+### Comment Tags
+
+An array key cannot carry an attribute, so register a comment tag instead:
+
+```php
+Markers::registerTags('ignore');
+```
+
+The tag can sit above the key or at the end of its line, and keys are matched by position rather than by what the parser attached the comment to:
+
+```php
+return [
+    'name' => $this->name,
+    'ssn' => $this->ssn, // @ignore
+    // @ignore
+    'token' => $this->token,
+];
+```
+
+A tag in a doc block also marks the declaration it belongs to. No tag is honored until it is registered.
+
+### Markers You Cannot Change
+
+To treat an attribute from another package as a marker, register it by name:
+
+```php
+Markers::registerAttributes(\Vendor\Package\Attributes\Internal::class);
+```
+
+Markers on declarations reached through reflection rather than through the file — a member from a trait or a parent class — are read with `Markers::fromReflection($reflection)`, which returns an `IgnoreMarker` or null.
 
 ## Type System
 

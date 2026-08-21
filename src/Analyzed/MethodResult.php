@@ -2,11 +2,14 @@
 
 namespace Laravel\Surveyor\Analyzed;
 
+use Laravel\Surveyor\Concerns\HasIgnoreMarker;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Type;
 
 class MethodResult
 {
+    use HasIgnoreMarker;
+
     /** @var array<string, TypeContract> */
     protected array $parameters = [];
 

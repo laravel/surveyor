@@ -6,6 +6,7 @@ use Laravel\Surveyor\Analysis\EntityType;
 use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\NodeResolvers\Shared\ParsesClassLikeDocBlock;
+use Laravel\Surveyor\NodeResolvers\Shared\ResolvesIgnoreMarkers;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
 use Throwable;
@@ -13,6 +14,7 @@ use Throwable;
 class Interface_ extends AbstractResolver
 {
     use ParsesClassLikeDocBlock;
+    use ResolvesIgnoreMarkers;
 
     public function resolve(Node\Stmt\Interface_ $node)
     {
@@ -30,6 +32,10 @@ class Interface_ extends AbstractResolver
             filePath: $this->scope->fullPath(),
             entityType: EntityType::INTERFACE_TYPE,
         );
+
+        if ($marker = $this->ignoreMarker($node)) {
+            $result->flagAsIgnored($marker);
+        }
 
         $this->scope->attachResult($result);
 

@@ -10,6 +10,7 @@ use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Analyzed\MethodResult;
 use Laravel\Surveyor\Analyzed\PropertyResult;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
+use Laravel\Surveyor\NodeResolvers\Shared\ResolvesIgnoreMarkers;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\StringType;
@@ -18,6 +19,8 @@ use PhpParser\Node;
 
 class ClassMethod extends AbstractResolver
 {
+    use ResolvesIgnoreMarkers;
+
     public function resolve(Node\Stmt\ClassMethod $node)
     {
         $this->scope->setMethodName($node->name);
@@ -26,6 +29,10 @@ class ClassMethod extends AbstractResolver
         $result = new MethodResult(
             name: $this->scope->methodName(),
         );
+
+        if ($marker = $this->ignoreMarker($node)) {
+            $result->flagAsIgnored($marker);
+        }
 
         $this->scope->attachResult($result);
 
@@ -48,6 +55,7 @@ class ClassMethod extends AbstractResolver
                             $param->isPrivate() => 'private',
                             default => 'public',
                         },
+                        ignore: $this->ignoreMarker($param),
                     ),
                 );
             }

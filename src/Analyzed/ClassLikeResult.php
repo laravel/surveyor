@@ -5,10 +5,13 @@ namespace Laravel\Surveyor\Analyzed;
 use Illuminate\Contracts\Support\Arrayable;
 use JsonSerializable;
 use Laravel\Surveyor\Analysis\EntityType;
+use Laravel\Surveyor\Concerns\HasIgnoreMarker;
 use Laravel\Surveyor\Types\Type;
 
 class ClassLikeResult
 {
+    use HasIgnoreMarker;
+
     /** @var array<string, PropertyResult> */
     protected array $properties = [];
 
@@ -107,6 +110,10 @@ class ClassLikeResult
                 $method->flagAsModelRelation();
             }
 
+            if ($existing->ignoreMarker() !== null) {
+                $method->flagAsIgnored($existing->ignoreMarker());
+            }
+
             $existingTypes = array_column($existing->returnTypes(), 'type');
             $newTypes = array_column($method->returnTypes(), 'type');
             $mergedType = Type::union(...$existingTypes, ...$newTypes);
@@ -135,32 +142,55 @@ class ClassLikeResult
         return count(array_intersect($implements, $this->implements)) > 0;
     }
 
+    /**
+     * Every way of reading a member out of a result hides the ones marked to be
+     * left out: looking one up by name as much as listing them. A caller that
+     * needs to see past that, to read a marker rather than act on one, asks for
+     * it by name through method() or property().
+     */
     public function hasMethod(string $name): bool
     {
-        return isset($this->methods[$name]);
+        return $this->getMethod($name) !== null;
     }
 
-    public function getMethod(string $name): MethodResult
+    public function getMethod(string $name): ?MethodResult
     {
-        return $this->methods[$name];
+        $method = $this->method($name);
+
+        return $method === null || $method->isIgnored() ? null : $method;
+    }
+
+    public function method(string $name): ?MethodResult
+    {
+        return $this->methods[$name] ?? null;
     }
 
     public function hasProperty(string $name): bool
     {
-        return isset($this->properties[$name]);
+        return $this->getProperty($name) !== null;
     }
 
-    public function getProperty(string $name): PropertyResult
+    public function getProperty(string $name): ?PropertyResult
     {
-        return $this->properties[$name];
+        $property = $this->property($name);
+
+        return $property === null || $property->isIgnored() ? null : $property;
+    }
+
+    public function property(string $name): ?PropertyResult
+    {
+        return $this->properties[$name] ?? null;
     }
 
     /**
-     * @return list<MethodResult>
+     * @return array<string, MethodResult>
      */
     public function publicMethods(): array
     {
-        return $this->methods;
+        return array_filter(
+            $this->methods,
+            fn (MethodResult $method) => ! $method->isIgnored(),
+        );
     }
 
     /**
@@ -171,7 +201,7 @@ class ClassLikeResult
         return array_values(
             array_filter(
                 $this->properties,
-                fn (PropertyResult $property) => $property->visibility === 'public',
+                fn (PropertyResult $property) => $property->visibility === 'public' && ! $property->isIgnored(),
             ),
         );
     }
