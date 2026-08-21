@@ -174,10 +174,23 @@ determinism still clean, all tests pass.
    small side index of path to surface hash so a dependency can be checked
    without loading its whole entry.
 
-   `benchmarks/cache/surfacedump.php` already computes the surface of every
-   entry in a cache directory, and its `--fields` mode hashes each `Scope`
-   property on its own. Whatever the fingerprint ends up hashing should agree
-   with what that script calls a surface, or one of the two is wrong.
+   **Slice 1 is done.** `Analyzer\Surface` is the one definition of what a
+   dependent can see, `surfacedump.php` calls it rather than keeping its own
+   copy, and `tests/Unit/Analyzer/SurfaceTest.php` pins the properties the
+   design needs: a body edit leaves the hash alone, a new public method or a
+   changed return type or a changed import moves it.
+
+   It also turned up the hole that would have sunk the design. 205 of 3,149
+   entries record no result at all, almost all of them enums: nothing analyzes
+   an enum's cases, dependents read them off PHP's reflection, so 89 enums in
+   `App\Enums` all hashed the same and an enum edit moved nothing. Files with
+   nothing observable now hash their own bytes instead, which makes any edit to
+   them count. All 3,149 surfaces are distinct again, and the `edit-enum-case`
+   shape in `shapesweep.sh` is what guards it.
+
+   `ClassLikeResult::namespace()` was declared `: string` while the property is
+   nullable, so asking a class in the global namespace for its namespace was a
+   fatal error. Fixed on the way past.
 
 3. **Loose ends, any time.** A regression test for the `Type::union` fix. It
    needs a shared type object reachable from two places, which no current test
