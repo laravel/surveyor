@@ -7,13 +7,13 @@
 #
 # Usage: shapesweep.sh <label>
 #
-# Runs against the Cloud checkout unless SURVEYOR_BENCH_APP points elsewhere,
-# with SURVEYOR_BENCH_PRESET naming the set of files to edit.
+# SURVEYOR_BENCH_APP names the application to build, and SURVEYOR_BENCH_PRESET
+# the set of declarations in it to edit.
 
 set -u
 
 S="$(cd "$(dirname "$0")" && pwd)"
-APP=${SURVEYOR_BENCH_APP:-/Users/joetannenbaum/Herd/cloud}
+APP=${SURVEYOR_BENCH_APP:?set SURVEYOR_BENCH_APP to the application to build}
 LABEL=$1
 KEEP=$S/sh-$LABEL
 CACHE_W=$S/sh-cache-w

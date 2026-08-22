@@ -10,9 +10,9 @@
 set -u
 
 S="$(cd "$(dirname "$0")" && pwd)"
-APP=/Users/joetannenbaum/Herd/cloud
+APP=${SURVEYOR_BENCH_APP:?set SURVEYOR_BENCH_APP to the application to build}
 LABEL=$1
-TARGET=${2:-app/Models/Instance.php}
+TARGET=${2:-$(python3 "$S/mutate.py" targets list | awk '{print $1}')}
 
 CACHE_WARM=$S/dv-$LABEL-cache-warm
 CACHE_COLD=$S/dv-$LABEL-cache-cold

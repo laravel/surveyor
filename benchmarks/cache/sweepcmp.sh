@@ -13,7 +13,7 @@
 set -u
 
 S="$(cd "$(dirname "$0")" && pwd)"
-APP=/Users/joetannenbaum/Herd/cloud
+APP=${SURVEYOR_BENCH_APP:?set SURVEYOR_BENCH_APP to the application to build}
 LABEL=$1
 KEEP=$S/sw-$LABEL
 CACHE_W=$S/sw-cache-w

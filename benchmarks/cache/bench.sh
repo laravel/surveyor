@@ -14,10 +14,10 @@
 set -u
 
 S="$(cd "$(dirname "$0")" && pwd)"
-APP=/Users/joetannenbaum/Herd/cloud
+APP=${SURVEYOR_BENCH_APP:?set SURVEYOR_BENCH_APP to the application to build}
 LABEL=$1
 RUNS=${2:-3}
-TARGET=app/Models/Instance.php
+TARGET=$(python3 "$S/mutate.py" targets list | awk '{print $1}')
 
 cd "$APP" || exit 1
 
@@ -51,13 +51,18 @@ for i in $(seq 1 "$RUNS"); do
   find "$CACHE" -name '*.cache' -exec stat -f '%N %m' {} \; | sort > "$before"
 
   sleep 1
-  python3 - "$APP/$TARGET" <<'PY'
+  python3 - "$APP/$TARGET" "$S" <<'PY'
+import json
+import os
 import sys
-p = sys.argv[1]
-s = open(p).read()
+
+path, here = sys.argv[1], sys.argv[2]
+targets = json.load(open(os.path.join(here, 'targets.json')))
+probe = targets[os.environ.get('SURVEYOR_BENCH_PRESET', 'default')]['relation']
+
+s = open(path).read()
 i = s.rstrip().rfind('\n}')
-probe = "\n    public function benchProbeRelation(): HasOne\n    {\n        return $this->hasOne(Daemon::class);\n    }\n"
-open(p, 'w').write(s[:i] + probe + s[i:])
+open(path, 'w').write(s[:i] + probe + s[i:])
 PY
 
   edit=$(time_run "$CACHE" "$S/bn-out")

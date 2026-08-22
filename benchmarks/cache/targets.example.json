@@ -1,0 +1,12 @@
+{
+    "default": {
+        "model": "app/Models/Example.php",
+        "relation": "\n    public function sweepProbeRelation(): HasOne\n    {\n        return $this->hasOne(Related::class);\n    }\n",
+        "remove_method": "someRelationTheOutputShows",
+        "enum": "app/Enums/ExampleStatus.php",
+        "enum_case": ["case Active = 'active'", "case Active = 'active_probe'"],
+        "body": ["return $this->identifier;", "$identifier = $this->identifier;\n\n        return $identifier;"],
+        "probe_dir": "app/Enums",
+        "probe_namespace": "App\\Enums"
+    }
+}

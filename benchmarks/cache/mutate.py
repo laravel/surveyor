@@ -6,48 +6,37 @@ Phases: `pre` runs before the base cache is built, `apply` is the change under
 test. Most shapes only use `apply`; the removal and rename shapes need the file
 to exist in the base build first.
 
-Which application, and which files inside it to touch, comes from the
-environment: SURVEYOR_BENCH_APP for the checkout and SURVEYOR_BENCH_PRESET for
-the set of targets. Every shape has to change generated output, or it proves
-nothing, which is why the targets are named per application rather than guessed.
+The application comes from SURVEYOR_BENCH_APP, and the declarations to edit
+inside it from a `targets.json` beside this script, which is not tracked. Every
+shape has to change generated output or it proves nothing, so the edits have to
+name real declarations in a real application, and those belong to whoever owns
+that application rather than to this repository. Copy `targets.example.json` and
+fill it in; SURVEYOR_BENCH_PRESET picks an entry from it, defaulting to
+`default`.
 """
 
+import json
 import os
 import re
 import sys
 
-APP = os.environ.get("SURVEYOR_BENCH_APP", "/Users/joetannenbaum/Herd/cloud")
+APP = os.environ.get("SURVEYOR_BENCH_APP")
 
-PRESETS = {
-    "cloud": {
-        "model": "app/Models/Instance.php",
-        "relation": "\n    public function sweepProbeRelation(): HasOne\n    {\n        return $this->hasOne(Daemon::class);\n    }\n",
-        "remove_method": "activeScheduledAutoscaleOverride",
-        "enum": "app/Enums/InstanceType.php",
-        "enum_case": ("MANAGED_QUEUE = 'managed_queue'", "MANAGED_QUEUE = 'managed_queue_probe'"),
-        "body": (
-            "return $this->identifier;",
-            "$identifier = $this->identifier;\n\n        return $identifier;",
-        ),
-        "probe_namespace": "App\\Enums",
-        "probe_dir": "app/Enums",
-    },
-    "forge": {
-        "model": "app/Models/Server.php",
-        "relation": "\n    public function sweepProbeRelation(): HasOne\n    {\n        return $this->hasOne(ServerActivation::class);\n    }\n",
-        "remove_method": "activation",
-        "enum": "app/Enums/ServerType.php",
-        "enum_case": ("case Cache = 'cache'", "case Cache = 'cache_probe'"),
-        "body": (
-            "return $this->hasOne(ServerActivation::class);",
-            "$activation = $this->hasOne(ServerActivation::class);\n\n        return $activation;",
-        ),
-        "probe_namespace": "App\\Enums",
-        "probe_dir": "app/Enums",
-    },
-}
+if not APP:
+    sys.exit("set SURVEYOR_BENCH_APP to the application to mutate")
 
-preset = PRESETS[os.environ.get("SURVEYOR_BENCH_PRESET", "cloud")]
+TARGETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "targets.json")
+
+if not os.path.exists(TARGETS):
+    sys.exit(f"copy targets.example.json to {TARGETS} and fill it in")
+
+named = json.load(open(TARGETS))
+which = os.environ.get("SURVEYOR_BENCH_PRESET", "default")
+
+if which not in named:
+    sys.exit(f"no targets named {which} in {TARGETS}")
+
+preset = named[which]
 
 MODEL = f"{APP}/{preset['model']}"
 ENUM = f"{APP}/{preset['enum']}"

@@ -7,15 +7,19 @@
 #
 # Usage: determinism.sh <label> [target-relative-path]
 #
-# Runs against the Cloud checkout unless SURVEYOR_BENCH_APP points elsewhere.
+# SURVEYOR_BENCH_APP names the application to build.
 
 set -u
 
 S="$(cd "$(dirname "$0")" && pwd)"
-SUR=/Users/joetannenbaum/Dev/surveyor
-APP=${SURVEYOR_BENCH_APP:-/Users/joetannenbaum/Herd/cloud}
+SUR="$(cd "$S/../.." && pwd)"
+APP=${SURVEYOR_BENCH_APP:?set SURVEYOR_BENCH_APP to the application to build}
 LABEL=$1
-TARGET=${2:-app/Models/User.php}
+TARGET=${2:-$(python3 "$S/mutate.py" targets list | awk '{print $1}')}
+
+# surfacedump.php builds the cached objects back up, so it boots the same
+# autoloader the application does.
+export SURFACE_AUTOLOAD="$APP/vendor/autoload.php"
 
 CACHE=$S/dt-$LABEL-cache
 KEEP=$S/dt-$LABEL
