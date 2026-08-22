@@ -10,7 +10,7 @@
 set -u
 
 S="$(cd "$(dirname "$0")" && pwd)"
-APP=/Users/joetannenbaum/Herd/cloud
+APP=${SURVEYOR_BENCH_APP:?set SURVEYOR_BENCH_APP to the application to build}
 LABEL=$1
 TARGET=${2:-app/Models/Instance.php}
 

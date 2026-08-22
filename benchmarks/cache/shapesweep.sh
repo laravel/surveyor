@@ -10,7 +10,7 @@
 set -u
 
 S="$(cd "$(dirname "$0")" && pwd)"
-APP=/Users/joetannenbaum/Herd/cloud
+APP=${SURVEYOR_BENCH_APP:?set SURVEYOR_BENCH_APP to the application to build}
 LABEL=$1
 KEEP=$S/sh-$LABEL
 CACHE_W=$S/sh-cache-w
@@ -22,7 +22,7 @@ cd "$APP" || exit 1
 
 # The shapes edit two tracked files. Both are copied first and restored from
 # those copies, so uncommitted work elsewhere in the app is left alone.
-MUTATED=(app/Models/Instance.php app/Enums/InstanceType.php)
+MUTATED=($(python3 "$S/mutate.py" targets list))
 ORIGINALS=$S/sh-$LABEL-originals
 rm -rf "$ORIGINALS"; mkdir -p "$ORIGINALS"
 

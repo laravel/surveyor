@@ -1,6 +1,11 @@
 vendor
 examples
 
+# Notes about a specific application, and the declarations in it that the
+# benchmark mutations edit. Both describe somebody else's codebase.
+benchmarks/FINDINGS.md
+benchmarks/cache/targets.json
+
 # Scratch caches and generated output left behind by benchmarks/cache scripts
 benchmarks/cache/*/
 benchmarks/cache/*.orig

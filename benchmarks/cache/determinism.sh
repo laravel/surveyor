@@ -10,8 +10,8 @@
 set -u
 
 S="$(cd "$(dirname "$0")" && pwd)"
-SUR=/Users/joetannenbaum/Dev/surveyor
-APP=/Users/joetannenbaum/Herd/cloud
+SUR="$(cd "$S/../.." && pwd)"
+APP=${SURVEYOR_BENCH_APP:?set SURVEYOR_BENCH_APP to the application to build}
 LABEL=$1
 TARGET=${2:-app/Models/User.php}
 

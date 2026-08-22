@@ -9,7 +9,8 @@
  * Without --detail: one `path<TAB>surface-hash<TAB>entry-hash` row per entry.
  * With --detail: the canonical surface lines themselves, prefixed by path.
  *
- * The autoloader defaults to the Cloud checkout; override with SURFACE_AUTOLOAD.
+ * SURFACE_AUTOLOAD names the autoloader to boot, which has to be the one of the
+ * application whose cache is being read, so the classes in it can be built.
  */
 
 use Laravel\Surveyor\Analysis\Scope;
@@ -17,7 +18,10 @@ use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Analyzed\MethodResult;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 
-require getenv('SURFACE_AUTOLOAD') ?: '/Users/joetannenbaum/Herd/cloud/vendor/autoload.php';
+$autoload = getenv('SURFACE_AUTOLOAD')
+    ?: exit("set SURFACE_AUTOLOAD to the vendor/autoload.php of the application being read\n");
+
+require $autoload;
 
 error_reporting(E_ALL & ~E_DEPRECATED);
 

@@ -1,0 +1,11 @@
+{
+    "default": {
+        "model": "app/Models/Example.php",
+        "append": "\n    public function sweepProbeRelation(): HasOne\n    {\n        return $this->hasOne(Related::class);\n    }\n",
+        "remove_method": "someExistingRelation",
+        "enum": "app/Enums/ExampleStatus.php",
+        "enum_case": ["case Active = 'active'", "case Active = 'active_probe'"],
+        "probe_dir": "app/Enums",
+        "probe_namespace": "App\\Enums"
+    }
+}

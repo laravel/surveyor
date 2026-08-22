@@ -11,9 +11,9 @@
 set -u
 
 S="$(cd "$(dirname "$0")" && pwd)"
-APP=/Users/joetannenbaum/Herd/cloud
+APP=${SURVEYOR_BENCH_APP:?set SURVEYOR_BENCH_APP to the application to build}
 LABEL=$1
-SRC=${2:-/Users/joetannenbaum/Dev/surveyor/src}
+SRC=${2:-$SUR/src}
 RUNS=${3:-2}
 TARGET=$APP/${4:-app/Models/Instance.php}
 BACKUP=$S/tm-$LABEL-$(basename "${4:-Instance.php}").orig
