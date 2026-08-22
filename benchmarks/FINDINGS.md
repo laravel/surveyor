@@ -142,10 +142,25 @@ determinism still clean, all tests pass.
    analyzed first, one that a cycle member is answered against the finished
    analysis of the other member. Each fails without the change it covers.
 
-2. **Fingerprint invalidation.** Store **direct** dependencies only, each keyed
-   by that dependency's public surface hash rather than its modification time or
-   its bytes. A body edit changes the file's own hash so that file is
-   re-analysed, its surface is unchanged, so its dependents stay valid.
+2. **Fingerprint invalidation.** Done, in three slices. Store **direct**
+   dependencies only, each keyed by that dependency's public surface hash rather
+   than its modification time or its bytes. A body edit changes the file's own
+   hash so that file is re-analysed, its surface is unchanged, so its dependents
+   stay valid.
+
+   | touched | rewritten before | rewritten now | time before | time now |
+   |---|---|---|---|---|
+   | `Instance.php` | 258 | 61 | 3.7s | 2.0s |
+   | `User.php` | 1,370 | 147 | 11.2s | 2.0s |
+   | `Environment.php` | 1,366 | 230 | 16.9s | 2.7s |
+   | `Organization.php` | 1,370 | 319 | 19.5s | 2.9s |
+
+   Cold and warm are unchanged, 17.5s to 19.1s and 1.2s to 1.35s. The cache went
+   from 290MB to 62MB. Touching a file without editing it rewrites 3 entries
+   where it used to rewrite 1,366.
+
+   All seven shapes in `shapesweep.sh` agree between warm and cold, including a
+   new body-only edit shape that exists to test exactly what this bets on.
 
    Measured ceiling, on a settled cache:
 
@@ -164,15 +179,13 @@ determinism still clean, all tests pass.
    Cache size falls out of this for free. Of 272MB, 85% is dependency
    bookkeeping: 1.6M path and mtime pairs. Dependencies **recorded** per entry:
    median 92, mean 489, max 1,803. Dependencies **actually used**: median 2,
-   mean 4, max 63. The closure is 129 times the direct edges, so direct edges
-   take the cache to roughly 42MB.
+   mean 4, max 63. The closure is 129 times the direct edges. The estimate from
+   that was roughly 42MB; it came out at 62MB, 12MB of which is the records
+   taking a filesystem block each.
 
-   Note why the closure is there: the comment in `AnalyzedCache` says it is
-   stored flat so an entry can be validated by stat'ing a list without walking
-   the graph. Direct edges break that unless validity is decided by the
-   dependency's surface hash, which keeps the check one level deep. That needs a
-   small side index of path to surface hash so a dependency can be checked
-   without loading its whole entry.
+   The closure was there so an entry could be validated by stat'ing a flat list
+   without walking the graph. Nothing replaces that: the walk came back, over
+   records rather than entries. See the slice 3 note below.
 
    **Slice 1 is done.** `Analyzer\Surface` is the one definition of what a
    dependent can see, `surfacedump.php` calls it rather than keeping its own
@@ -192,7 +205,7 @@ determinism still clean, all tests pass.
    nullable, so asking a class in the global namespace for its namespace was a
    fatal error. Fixed on the way past.
 
-   **Slice 2 is done.** Every persisted entry now has a `<md5>.surface` file
+   **Slice 2 is done, and slice 3 replaced its file format.** Every persisted entry now has a `<md5>.surface` file
    beside it holding its surface hash, so a dependency can be checked with one
    small read instead of unserializing its entry. `AnalyzedCache::surfaceHash()`
    answers from memory, then that file, then by hashing an entry already in
@@ -200,11 +213,31 @@ determinism still clean, all tests pass.
 
    It costs nothing in time: cold 18.5s against 18.6s for the same tree without
    it, warm and edit unchanged. On disk the 3,149 files hold 100KB of hashes and
-   occupy 12MB, all of it filesystem block overhead. That is noise against
-   today's 278MB and about a quarter of what the cache should weigh after slice
-   3, so if it starts to look expensive the answer is one index file rather than
-   3,149 small ones. Kept as files for now: they are written and deleted with
-   the entry they describe, so there is no index to keep in step or repair.
+   occupy 12MB, all of it filesystem block overhead.
+
+   **Slice 3 is done, and it corrected the plan above.** Direct edges cannot be
+   validated by stat'ing them. With the closure gone, a dependency whose own
+   bytes are untouched can still have moved, because something under *it*
+   changed. Validity has to walk, so the file beside each entry holds the edges
+   as well as the hash: the entry's own time and surface, and every file it
+   reached with the surface that file showed. It is a `.record` now, not a
+   `.surface`, and the entry itself no longer carries a dependency list at all,
+   which is where the 62MB comes from.
+
+   Deciding whether an entry holds reads records, never entries: the file is
+   unchanged and every file it reached is unchanged, or one of them changed and
+   has to be analyzed to find out whether the change reached its surface. Each
+   answer is worked out once per run and remembered. A file with no record of
+   its own has nothing underneath it, so its bytes are the whole answer. Cycles
+   in the recorded graph are handled by counting a path as holding while it is
+   being decided; every member is checked on its own terms anyway.
+
+   Analyzing a changed dependency mid-check needs the analyzer, which the cache
+   has no business knowing about, so the analyzer hands it a closure on
+   construction. One consequence worth remembering: an analysis started from
+   inside a validity check records itself against whatever frame is open, which
+   over-records an edge that is real but indirect. That can only cause extra
+   invalidation, never stale output.
 
 3. **Loose ends, any time.** A regression test for the `Type::union` fix. It
    needs a shared type object reachable from two places, which no current test

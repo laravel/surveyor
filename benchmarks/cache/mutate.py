@@ -60,6 +60,21 @@ def remove_method(name):
     write(INSTANCE, s[: m.start()] + s[end:])
 
 
+def edit_body():
+    """Rewrite a method body without changing anything a dependent can see.
+
+    The point of surface fingerprints is that this invalidates the file itself
+    and nothing else, so warm output has to match cold anyway.
+    """
+    s = read(INSTANCE)
+    if "return $this->identifier;" not in s:
+        sys.exit("body to rewrite not found")
+    write(INSTANCE, s.replace(
+        "return $this->identifier;",
+        "$identifier = $this->identifier;\n\n        return $identifier;",
+    ))
+
+
 def edit_enum_case():
     s = read(ENUM)
     if "MANAGED_QUEUE = 'managed_queue'" not in s:
@@ -79,6 +94,7 @@ def remove(path):
 actions = {
     ("append-method", "apply"): append_method,
     ("remove-method", "apply"): lambda: remove_method("activeScheduledAutoscaleOverride"),
+    ("edit-body", "apply"): edit_body,
     ("edit-enum-case", "apply"): edit_enum_case,
     ("add-file", "apply"): lambda: add_probe(PROBE, "SweepProbeEnum"),
     ("remove-file", "pre"): lambda: add_probe(PROBE, "SweepProbeEnum"),

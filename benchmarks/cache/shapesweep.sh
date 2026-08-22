@@ -16,7 +16,7 @@ KEEP=$S/sh-$LABEL
 CACHE_W=$S/sh-cache-w
 CACHE_C=$S/sh-cache-c
 
-SHAPES=(append-method remove-method edit-enum-case add-file remove-file rename-file)
+SHAPES=(append-method remove-method edit-body edit-enum-case add-file remove-file rename-file)
 
 cd "$APP" || exit 1
 
@@ -81,7 +81,16 @@ for shape in "${SHAPES[@]}"; do
   moved=$(diff "$KEEP/$shape.base" "$KEEP/$shape.cold" | grep -c '^[<>]')
 
   effect="changed $moved lines"
-  [ "$moved" -eq 0 ] && effect="NO EFFECT ON OUTPUT (vacuous test)"
+
+  if [ "$moved" -eq 0 ]; then
+    # A body edit is meant to leave the output alone. Anywhere else, no change
+    # means the shape tested nothing.
+    if [ "$shape" = "edit-body" ]; then
+      effect="no output change, as intended"
+    else
+      effect="NO EFFECT ON OUTPUT (vacuous test)"
+    fi
+  fi
 
   printf '%-16s %14s %8s %s\n' "$shape" "$sorted" "$raw" "$effect"
 
