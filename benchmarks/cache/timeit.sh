@@ -11,14 +11,19 @@
 set -u
 
 S="$(cd "$(dirname "$0")" && pwd)"
-APP=/Users/joetannenbaum/Herd/cloud
+APP=${SURVEYOR_BENCH_APP:-/Users/joetannenbaum/Herd/cloud}
 LABEL=$1
 SRC=${2:-/Users/joetannenbaum/Dev/surveyor/src}
 RUNS=${3:-2}
 TARGET=$APP/${4:-app/Models/Instance.php}
 BACKUP=$S/tm-$LABEL-$(basename "${4:-Instance.php}").orig
 
-rsync -a --delete "$SRC/" "$APP/vendor/laravel/surveyor/src/"
+# Some checkouts symlink the package straight at a working copy, in which case
+# there is nothing to copy and copying would mean writing a directory onto
+# itself.
+if [ "$(cd "$SRC" && pwd -P)" != "$(cd "$APP/vendor/laravel/surveyor/src" && pwd -P)" ]; then
+  rsync -a --delete "$SRC/" "$APP/vendor/laravel/surveyor/src/"
+fi
 cp "$TARGET" "$BACKUP"
 trap 'cp "$BACKUP" "$TARGET"' EXIT
 
