@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.3.0 - 2026-08-22
+
+### What's Changed
+
+* Stop Type::union marking its arguments nullable in place by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/75
+* Make analysis deterministic by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/76
+* Recognize ignore markers during analysis by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/77
+* Validate cached analyses against dependency surfaces by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/78
+* Update benchmarks by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/80
+* Type union regression test by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/81
+
+**Full Changelog**: https://github.com/laravel/surveyor/compare/v0.2.8...v0.3.0
+
 ## v0.2.8 - 2026-08-18
 
 ### What's Changed
