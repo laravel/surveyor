@@ -192,6 +192,20 @@ determinism still clean, all tests pass.
    nullable, so asking a class in the global namespace for its namespace was a
    fatal error. Fixed on the way past.
 
+   **Slice 2 is done.** Every persisted entry now has a `<md5>.surface` file
+   beside it holding its surface hash, so a dependency can be checked with one
+   small read instead of unserializing its entry. `AnalyzedCache::surfaceHash()`
+   answers from memory, then that file, then by hashing an entry already in
+   memory. Invalidating an entry takes its surface with it.
+
+   It costs nothing in time: cold 18.5s against 18.6s for the same tree without
+   it, warm and edit unchanged. On disk the 3,149 files hold 100KB of hashes and
+   occupy 12MB, all of it filesystem block overhead. That is noise against
+   today's 278MB and about a quarter of what the cache should weigh after slice
+   3, so if it starts to look expensive the answer is one index file rather than
+   3,149 small ones. Kept as files for now: they are written and deleted with
+   the entry they describe, so there is no index to keep in step or repair.
+
 3. **Loose ends, any time.** A regression test for the `Type::union` fix. It
    needs a shared type object reachable from two places, which no current test
    sets up. Debouncing the Vite plugin, which today runs one full build per saved
