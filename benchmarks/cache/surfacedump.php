@@ -12,13 +12,18 @@
  * What counts as a surface is Surveyor's own `Analyzer\Surface`, so this script
  * and the cache cannot disagree about it.
  *
- * The autoloader defaults to the Cloud checkout; override with SURFACE_AUTOLOAD.
+ * SURFACE_AUTOLOAD names the autoloader to boot. It has to be the one belonging
+ * to the application whose cache is being read, so the classes inside it can be
+ * built back up.
  */
 
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Analyzer\Surface;
 
-require getenv('SURFACE_AUTOLOAD') ?: '/Users/joetannenbaum/Herd/cloud/vendor/autoload.php';
+$autoload = getenv('SURFACE_AUTOLOAD')
+    ?: exit("set SURFACE_AUTOLOAD to the vendor/autoload.php of the application being read\n");
+
+require $autoload;
 
 error_reporting(E_ALL & ~E_DEPRECATED);
 

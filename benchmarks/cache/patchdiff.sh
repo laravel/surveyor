@@ -10,7 +10,7 @@
 set -u
 
 S="$(cd "$(dirname "$0")" && pwd)"
-SUR=/Users/joetannenbaum/Dev/surveyor
+SUR="$(cd "$S/../.." && pwd)"
 LABEL=$1
 APP=$2
 FILE=${3:-src/NodeResolvers/Expr/Ternary.php}
