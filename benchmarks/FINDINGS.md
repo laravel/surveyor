@@ -223,6 +223,10 @@ determinism still clean, all tests pass.
    `.surface`, and the entry itself no longer carries a dependency list at all,
    which is where the 62MB comes from.
 
+   Both the entry and the record carry `AnalyzedCache::SCHEMA`, bumped to 5 by
+   this work, so entries written before it are read as invalid and analyzed
+   again rather than unserialized into a shape that no longer fits.
+
    Deciding whether an entry holds reads records, never entries: the file is
    unchanged and every file it reached is unchanged, or one of them changed and
    has to be analyzed to find out whether the change reached its surface. Each
@@ -280,7 +284,21 @@ determinism still clean, all tests pass.
    `composer.json` by hand and their providers registered in
    `bootstrap/providers.php`.
 
-5. **What is left.**
+5. **Ignore markers, after rebasing.** Markers landed on main while this was
+   being written, and they take a declaration out of everything a dependent can
+   read. So the surface carries each member's marker: whether it hides right
+   now, and the conditions it hides on. Without that, adding `#[Ignore]` to a
+   property left the surface where it was and dependents kept output for a
+   member that had just been hidden.
+
+   Recording the conditions as well as the answer is deliberate. Whether a
+   condition holds is decided when the marker is read, not when the file was
+   analyzed, so a run whose conditions answer differently sees different
+   surfaces and re-analyzes. That does not make the cache aware of config
+   changes on its own, since an unchanged file is never re-read, but it stops a
+   marker change from passing unnoticed.
+
+6. **What is left.**
 
    `StateTracker` is serialised into every cache entry. It holds the variable
    state of the run that produced the entry, nothing reads it back, and it is
