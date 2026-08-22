@@ -68,6 +68,30 @@ describe('return types', function () {
         $returnType = $method->returnType();
         expect($returnType)->toBeInstanceOf(StringType::class);
     });
+
+    it('leaves what it recorded alone when asked what it returns', function () {
+        // Asking for the return type unions the recorded types, and one of the
+        // recorded objects can be the same object as a property's type
+        // somewhere else. Marking it nullable here would change that answer
+        // too, which cold builds used to do and warm builds did not.
+        $method = new MethodResult('test');
+        $recorded = Type::string();
+
+        $method->addReturnType($recorded, 10);
+        $method->addReturnType(Type::null(), 12);
+
+        expect($method->returnType()->isNullable())->toBeTrue();
+        expect($recorded->isNullable())->toBeFalse();
+        expect($method->returnTypes()[0]['type']->isNullable())->toBeFalse();
+    });
+
+    it('answers the same way however many times it is asked', function () {
+        $method = new MethodResult('test');
+        $method->addReturnType(Type::string(), 10);
+        $method->addReturnType(Type::null(), 12);
+
+        expect($method->returnType()->id())->toBe($method->returnType()->id());
+    });
 });
 
 describe('validation rules', function () {
