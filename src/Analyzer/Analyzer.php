@@ -18,7 +18,13 @@ class Analyzer
     public function __construct(
         protected Parser $parser,
     ) {
-        //
+        // Deciding whether a cached entry still holds means knowing what its
+        // dependencies look like now, and only an analysis can say.
+        AnalyzedCache::resolveSurfaceUsing(function (string $path): ?string {
+            $analyzed = $this->analyze($path)->analyzed();
+
+            return $analyzed === null ? null : Surface::hash($analyzed);
+        });
     }
 
     public function analyzeClass(string $className)

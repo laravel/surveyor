@@ -30,8 +30,13 @@ function resetCacheDirectory(): void
     $persistProp = $reflection->getProperty('persistToDisk');
     $persistProp->setValue(null, false);
 
-    $depsProp = $reflection->getProperty('dependencies');
-    $depsProp->setValue(null, []);
+    foreach (['dependencies', 'records', 'current', 'surfaces'] as $property) {
+        $reflection->getProperty($property)->setValue(null, []);
+    }
+
+    // Registered by the analyzer's constructor, so it outlives the test that
+    // built one and would decide validity for every test after it.
+    AnalyzedCache::resolveSurfaceUsing(null);
 
     // A test that fails mid-analysis leaves a frame open, which would then
     // attach its dependencies to whatever runs next.
@@ -69,7 +74,7 @@ function createCacheDir(): string
 function cleanupCacheDir(string $dir): void
 {
     if (is_dir($dir)) {
-        foreach ([...glob($dir.'/*.cache'), ...glob($dir.'/*.surface')] as $file) {
+        foreach ([...glob($dir.'/*.cache'), ...glob($dir.'/*.record')] as $file) {
             unlink($file);
         }
 
@@ -550,7 +555,7 @@ describe('dependency tracking', function () {
         expect(dependenciesFor('/path/to/second.php'))->toBe(['/path/to/dep2.php']);
     });
 
-    it('gives a file the dependencies of the files it depends on', function () {
+    it('records only the files a file reached itself', function () {
         AnalyzedCache::beginAnalysis('/path/to/a.php');
         AnalyzedCache::addDependency('/path/to/b.php');
 
@@ -560,10 +565,7 @@ describe('dependency tracking', function () {
 
         AnalyzedCache::endAnalysis('/path/to/a.php');
 
-        expect(dependenciesFor('/path/to/a.php'))
-            ->toContain('/path/to/b.php')
-            ->toContain('/path/to/c.php');
-
+        expect(dependenciesFor('/path/to/a.php'))->toBe(['/path/to/b.php']);
         expect(dependenciesFor('/path/to/b.php'))->toBe(['/path/to/c.php']);
     });
 
@@ -594,12 +596,13 @@ describe('dependency tracking', function () {
         $cacheFiles = glob($dir.'/*.cache');
         expect($cacheFiles)->toHaveCount(1);
 
-        $content = file_get_contents($cacheFiles[0]);
-        $cacheData = unserialize(getCacheFilePayload($content));
-        expect($cacheData)->toHaveKey('dependencies');
-        expect(count($cacheData['dependencies']))->toBeGreaterThanOrEqual(1);
+        $recordFiles = glob($dir.'/*.record');
+        expect($recordFiles)->toHaveCount(1);
 
-        $depPaths = array_column($cacheData['dependencies'], 'path');
+        $record = unserialize(getCacheFilePayload(file_get_contents($recordFiles[0])));
+        expect($record)->toHaveKey('dependencies');
+
+        $depPaths = array_column($record['dependencies'], 'path');
         expect($depPaths)->toContain($depFixture);
 
         unlink($mainFixture);
@@ -818,14 +821,14 @@ describe('integration with Analyzer', function () {
 });
 
 describe('surface hashes', function () {
-    it('writes a surface alongside a persisted entry', function () {
+    it('writes a record alongside a persisted entry', function () {
         $dir = createCacheDir();
         AnalyzedCache::enableDiskCache($dir);
 
         $fixture = createTestClassFixture('SurfaceSubject', 'public function test(): string { return "x"; }');
         $analyzed = app(Analyzer::class)->analyze($fixture);
 
-        expect(glob($dir.'/*.surface'))->toHaveCount(1);
+        expect(glob($dir.'/*.record'))->toHaveCount(1);
         expect(AnalyzedCache::surfaceHash($fixture))->toBe(Surface::hash($analyzed->analyzed()));
 
         unlink($fixture);
@@ -871,7 +874,7 @@ describe('surface hashes', function () {
 
         AnalyzedCache::invalidate($fixture);
 
-        expect(glob($dir.'/*.surface'))->toBeEmpty();
+        expect(glob($dir.'/*.record'))->toBeEmpty();
         expect(AnalyzedCache::surfaceHash($fixture))->toBeNull();
 
         unlink($fixture);
@@ -884,6 +887,144 @@ describe('surface hashes', function () {
 
         expect(AnalyzedCache::surfaceHash('/nowhere/Missing.php'))->toBeNull();
 
+        cleanupCacheDir($dir);
+    });
+});
+
+describe('validity by surface', function () {
+    /**
+     * Two files, one reaching the other, both persisted.
+     *
+     * @return array{0: string, 1: string}
+     */
+    function dependentPair(): array
+    {
+        $dependent = createTestClassFixture('Dependent', 'public function value() {}');
+        $dependency = createTestClassFixture('Dependency', 'public function number() {}');
+
+        AnalyzedCache::beginAnalysis($dependency);
+        AnalyzedCache::add($dependency, tap(new Scope, fn ($scope) => $scope->setPath($dependency)));
+        AnalyzedCache::endAnalysis($dependency);
+
+        AnalyzedCache::beginAnalysis($dependent);
+        AnalyzedCache::addDependency($dependency);
+        AnalyzedCache::add($dependent, tap(new Scope, fn ($scope) => $scope->setPath($dependent)));
+        AnalyzedCache::endAnalysis($dependent);
+
+        return [$dependent, $dependency];
+    }
+
+    it('keeps a dependent when the dependency changed but its surface did not', function () {
+        $dir = createCacheDir();
+        AnalyzedCache::enableDiskCache($dir);
+
+        [$dependent, $dependency] = dependentPair();
+        $unmoved = AnalyzedCache::surfaceHash($dependency);
+
+        sleep(1);
+        file_put_contents($dependency, "<?php\nclass Dependency { public function number() { return 2; } }");
+
+        AnalyzedCache::clearMemory();
+
+        // Analyzing the changed file lands on the same surface it had before.
+        AnalyzedCache::resolveSurfaceUsing(fn () => $unmoved);
+
+        expect(AnalyzedCache::get($dependent))->not->toBeNull();
+
+        unlink($dependent);
+        unlink($dependency);
+        cleanupCacheDir($dir);
+    });
+
+    it('drops a dependent when the dependency surface moves', function () {
+        $dir = createCacheDir();
+        AnalyzedCache::enableDiskCache($dir);
+
+        [$dependent, $dependency] = dependentPair();
+
+        sleep(1);
+        file_put_contents($dependency, "<?php\nclass Dependency { public function other(): string { return 'x'; } }");
+
+        AnalyzedCache::clearMemory();
+
+        AnalyzedCache::resolveSurfaceUsing(fn () => 'a-different-surface');
+
+        expect(AnalyzedCache::get($dependent))->toBeNull();
+
+        unlink($dependent);
+        unlink($dependency);
+        cleanupCacheDir($dir);
+    });
+
+    it('drops a dependent two levels up when a surface moves', function () {
+        $dir = createCacheDir();
+        AnalyzedCache::enableDiskCache($dir);
+
+        $a = createTestClassFixture('AClass', 'public function a() {}');
+        $b = createTestClassFixture('BClass', 'public function b() {}');
+        $c = createTestClassFixture('CClass', 'public function c() {}');
+
+        // A reaches B, B reaches C. Nothing links A to C.
+        AnalyzedCache::beginAnalysis($a);
+        AnalyzedCache::addDependency($b);
+
+        AnalyzedCache::beginAnalysis($b);
+        AnalyzedCache::addDependency($c);
+        AnalyzedCache::add($b, tap(new Scope, fn ($scope) => $scope->setPath($b)));
+        AnalyzedCache::endAnalysis($b);
+
+        AnalyzedCache::add($a, tap(new Scope, fn ($scope) => $scope->setPath($a)));
+        AnalyzedCache::endAnalysis($a);
+
+        sleep(1);
+        file_put_contents($c, "<?php\nclass CClass { public function moved(): string { return 'x'; } }");
+
+        AnalyzedCache::clearMemory();
+
+        AnalyzedCache::resolveSurfaceUsing(fn () => 'a-different-surface');
+
+        expect(AnalyzedCache::get($a))->toBeNull();
+
+        unlink($a);
+        unlink($b);
+        unlink($c);
+        cleanupCacheDir($dir);
+    });
+
+    it('keeps a dependent two levels up when only a body changes', function () {
+        $dir = createCacheDir();
+        AnalyzedCache::enableDiskCache($dir);
+
+        $a = createTestClassFixture('AClass', 'public function a() {}');
+        $b = createTestClassFixture('BClass', 'public function b() {}');
+        $c = createTestClassFixture('CClass', 'public function c() {}');
+
+        AnalyzedCache::beginAnalysis($a);
+        AnalyzedCache::addDependency($b);
+
+        AnalyzedCache::beginAnalysis($b);
+        AnalyzedCache::addDependency($c);
+        AnalyzedCache::add($b, tap(new Scope, fn ($scope) => $scope->setPath($b)));
+        AnalyzedCache::endAnalysis($b);
+
+        AnalyzedCache::add($a, tap(new Scope, fn ($scope) => $scope->setPath($a)));
+        AnalyzedCache::endAnalysis($a);
+
+        $unmovedB = AnalyzedCache::surfaceHash($b);
+        $unmovedC = AnalyzedCache::surfaceHash($c);
+
+        sleep(1);
+        file_put_contents($c, "<?php\nclass CClass { public function c() { return 2; } }");
+
+        AnalyzedCache::clearMemory();
+
+        AnalyzedCache::resolveSurfaceUsing(fn (string $path) => $path === $b ? $unmovedB : $unmovedC);
+
+        expect(AnalyzedCache::get($a))->not->toBeNull();
+
+        unlink($a);
+        unlink($b);
+        unlink($c);
         cleanupCacheDir($dir);
     });
 });
