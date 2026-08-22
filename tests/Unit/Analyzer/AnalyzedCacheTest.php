@@ -3,6 +3,7 @@
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
+use Laravel\Surveyor\Analyzer\Surface;
 
 uses()->group('cache');
 
@@ -68,7 +69,7 @@ function createCacheDir(): string
 function cleanupCacheDir(string $dir): void
 {
     if (is_dir($dir)) {
-        foreach (glob($dir.'/*.cache') as $file) {
+        foreach ([...glob($dir.'/*.cache'), ...glob($dir.'/*.surface')] as $file) {
             unlink($file);
         }
 
@@ -813,5 +814,76 @@ describe('integration with Analyzer', function () {
         expect($scope1)->not->toBe($scope2);
 
         unlink($fixture);
+    });
+});
+
+describe('surface hashes', function () {
+    it('writes a surface alongside a persisted entry', function () {
+        $dir = createCacheDir();
+        AnalyzedCache::enableDiskCache($dir);
+
+        $fixture = createTestClassFixture('SurfaceSubject', 'public function test(): string { return "x"; }');
+        $analyzed = app(Analyzer::class)->analyze($fixture);
+
+        expect(glob($dir.'/*.surface'))->toHaveCount(1);
+        expect(AnalyzedCache::surfaceHash($fixture))->toBe(Surface::hash($analyzed->analyzed()));
+
+        unlink($fixture);
+        cleanupCacheDir($dir);
+    });
+
+    it('reads a surface back without loading the entry', function () {
+        $dir = createCacheDir();
+        AnalyzedCache::enableDiskCache($dir);
+
+        $fixture = createTestClassFixture('SurfaceSubject', 'public function test(): string { return "x"; }');
+        app(Analyzer::class)->analyze($fixture);
+
+        $expected = AnalyzedCache::surfaceHash($fixture);
+
+        AnalyzedCache::clearMemory();
+
+        expect(AnalyzedCache::surfaceHash($fixture))->toBe($expected);
+
+        // Reading the surface must not pull the entry into memory.
+        $cached = (new ReflectionProperty(AnalyzedCache::class, 'cached'))->getValue();
+        expect($cached)->toBe([]);
+
+        unlink($fixture);
+        cleanupCacheDir($dir);
+    });
+
+    it('answers from memory when nothing is persisted', function () {
+        $fixture = createTestClassFixture('SurfaceSubject', 'public function test(): string { return "x"; }');
+        $analyzed = app(Analyzer::class)->analyze($fixture);
+
+        expect(AnalyzedCache::surfaceHash($fixture))->toBe(Surface::hash($analyzed->analyzed()));
+
+        unlink($fixture);
+    });
+
+    it('forgets the surface when the entry is invalidated', function () {
+        $dir = createCacheDir();
+        AnalyzedCache::enableDiskCache($dir);
+
+        $fixture = createTestClassFixture('SurfaceSubject', 'public function test(): string { return "x"; }');
+        app(Analyzer::class)->analyze($fixture);
+
+        AnalyzedCache::invalidate($fixture);
+
+        expect(glob($dir.'/*.surface'))->toBeEmpty();
+        expect(AnalyzedCache::surfaceHash($fixture))->toBeNull();
+
+        unlink($fixture);
+        cleanupCacheDir($dir);
+    });
+
+    it('has no surface for a path it never analyzed', function () {
+        $dir = createCacheDir();
+        AnalyzedCache::enableDiskCache($dir);
+
+        expect(AnalyzedCache::surfaceHash('/nowhere/Missing.php'))->toBeNull();
+
+        cleanupCacheDir($dir);
     });
 });

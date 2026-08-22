@@ -72,6 +72,14 @@ class AnalyzedCache
     /** @var array<string, int|null> */
     protected static array $modifiedTimes = [];
 
+    /**
+     * The surface hash of each entry seen this run, whether it was analyzed or
+     * read back from disk.
+     *
+     * @var array<string, string>
+     */
+    protected static array $surfaces = [];
+
     protected static bool $fileTimesFrozen = false;
 
     protected static ?string $key = null;
@@ -308,6 +316,30 @@ class AnalyzedCache
         }
     }
 
+    /**
+     * The hash of what dependents can see of a path, without unserializing its
+     * entry. An analyzed entry answers from memory; anything else is read from
+     * the small file written alongside the entry.
+     */
+    public static function surfaceHash(string $path): ?string
+    {
+        if (isset(static::$surfaces[$path])) {
+            return static::$surfaces[$path];
+        }
+
+        // Reading the small file beats hashing an entry that was loaded from
+        // disk, which is why it is written in the first place.
+        if (static::$persistToDisk && file_exists($surfaceFile = static::getSurfaceFilePath($path))) {
+            return static::$surfaces[$path] = file_get_contents($surfaceFile);
+        }
+
+        if (isset(static::$cached[$path])) {
+            return static::$surfaces[$path] = Surface::hash(static::$cached[$path]);
+        }
+
+        return null;
+    }
+
     public static function get(string $path): ?Scope
     {
         $currentModifiedTime = static::modifiedTime($path);
@@ -437,12 +469,13 @@ class AnalyzedCache
 
     public static function invalidate(string $path): void
     {
-        unset(static::$cached[$path], static::$fileTimes[$path]);
+        unset(static::$cached[$path], static::$fileTimes[$path], static::$surfaces[$path]);
 
         if (static::$persistToDisk) {
-            $cacheFile = static::getCacheFilePath($path);
-            if (file_exists($cacheFile)) {
-                unlink($cacheFile);
+            foreach ([static::getCacheFilePath($path), static::getSurfaceFilePath($path)] as $file) {
+                if (file_exists($file)) {
+                    unlink($file);
+                }
             }
         }
     }
@@ -460,6 +493,7 @@ class AnalyzedCache
         static::$deferred = [];
         static::$settled = [];
         static::$modifiedTimes = [];
+        static::$surfaces = [];
     }
 
     public static function clear(): void
@@ -467,7 +501,11 @@ class AnalyzedCache
         static::clearMemory();
 
         if (static::$cacheDirectory && is_dir(static::$cacheDirectory)) {
-            $files = glob(static::$cacheDirectory.'/*.cache');
+            $files = [
+                ...glob(static::$cacheDirectory.'/*.cache'),
+                ...glob(static::$cacheDirectory.'/*.surface'),
+            ];
+
             foreach ($files as $file) {
                 unlink($file);
             }
@@ -531,10 +569,19 @@ class AnalyzedCache
         }
 
         file_put_contents($cacheFile, $serialized);
+
+        static::$surfaces[$path] = $surface = Surface::hash($analyzed);
+
+        file_put_contents(static::getSurfaceFilePath($path), $surface);
     }
 
     protected static function getCacheFilePath(string $path): string
     {
         return static::$cacheDirectory.'/'.md5($path).'.cache';
+    }
+
+    protected static function getSurfaceFilePath(string $path): string
+    {
+        return static::$cacheDirectory.'/'.md5($path).'.surface';
     }
 }
