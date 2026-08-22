@@ -174,3 +174,35 @@ enum Kind: string
 
     unlink($fixture);
 });
+
+it('moves the surface when a member is marked to be left out', function () {
+    $subject = '
+namespace App\Surface;
+
+use App\Attributes\Ignore;
+
+class Marked
+{
+    %s
+    public string $name = "marked";
+
+    %s
+    public function label(): string
+    {
+        return "label";
+    }
+}';
+
+    $plain = createPhpFixture(sprintf($subject, '', ''));
+    $ignoredProperty = createPhpFixture(sprintf($subject, '#[Ignore]', ''));
+    $ignoredMethod = createPhpFixture(sprintf($subject, '', '#[Ignore]'));
+
+    $before = surfaceHashOf($plain);
+
+    expect(surfaceHashOf($ignoredProperty))->not->toBe($before);
+    expect(surfaceHashOf($ignoredMethod))->not->toBe($before);
+
+    unlink($plain);
+    unlink($ignoredProperty);
+    unlink($ignoredMethod);
+});

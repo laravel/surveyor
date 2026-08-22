@@ -212,6 +212,19 @@ class ClassLikeResult
     }
 
     /**
+     * Every method, including the ones marked to be left out. Callers acting on
+     * a result want publicMethods(); this is for describing one.
+     *
+     * @return array<string, MethodResult>
+     */
+    public function methods(): array
+    {
+        return $this->methods;
+    }
+
+    /**
+     * Every property, including the ones marked to be left out.
+     *
      * @return array<string, PropertyResult>
      */
     public function properties(): array

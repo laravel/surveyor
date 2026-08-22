@@ -121,7 +121,9 @@ class Surface
             'arrayable '.var_export($result->isArrayable(), true),
         ];
 
-        foreach ($result->publicMethods() as $name => $method) {
+        $lines[] = 'class ignore'.static::ignoreState($result);
+
+        foreach ($result->methods() as $name => $method) {
             $lines = [...$lines, ...static::methodLines('method '.$name, $method)];
         }
 
@@ -131,7 +133,8 @@ class Surface
                 .' attribute='.var_export($property->modelAttribute, true)
                 .' relation='.var_export($property->modelRelation, true)
                 .' readonly='.var_export($property->readOnly, true)
-                .' writeonly='.var_export($property->writeOnly, true);
+                .' writeonly='.var_export($property->writeOnly, true)
+                .static::ignoreState($property);
         }
 
         foreach ($result->constants() as $name => $constant) {
@@ -160,7 +163,8 @@ class Surface
 
         $lines = [
             $prefix.' ('.implode(', ', $parameters).') -> '.implode(' + ', $returns)
-                .' relation='.var_export($method->isModelRelation(), true),
+                .' relation='.var_export($method->isModelRelation(), true)
+                .static::ignoreState($method),
         ];
 
         foreach ($method->validationRules() as $key => $rules) {
@@ -168,6 +172,28 @@ class Surface
         }
 
         return $lines;
+    }
+
+    /**
+     * An ignore marker takes a declaration out of everything a dependent can
+     * read, so putting one on, taking one off, or changing what it is
+     * conditional on all move the surface.
+     *
+     * Whether a condition holds is answered when the marker is read, not when
+     * the file was analyzed, so the answer is recorded alongside the condition
+     * itself. A run that answers differently sees a different surface.
+     */
+    protected static function ignoreState(object $subject): string
+    {
+        $marker = $subject->ignoreMarker();
+
+        if ($marker === null) {
+            return ' ignored=false';
+        }
+
+        return ' ignored='.var_export($marker->hides(), true)
+            .' unless='.json_encode($marker->unless)
+            .' when='.json_encode($marker->when);
     }
 
     protected static function fileHash(?string $path): string

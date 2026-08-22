@@ -15,7 +15,7 @@ class AnalyzedCache
      * class changes, so an upgrade reads its own entries and not ones left by
      * a version whose objects no longer unserialize cleanly.
      */
-    public const SCHEMA = 4;
+    public const SCHEMA = 5;
 
     protected static array $cached = [];
 
@@ -104,7 +104,7 @@ class AnalyzedCache
      * enough to read while deciding whether the entry still holds, which is
      * the point of keeping it out of the entry itself.
      *
-     * @var array<string, array{mtime: int, surface: string, dependencies: list<array{path: string, mtime: int, surface: string|null}>}|false>
+     * @var array<string, array{schema: int, mtime: int, surface: string, dependencies: list<array{path: string, mtime: int, surface: string|null}>}|false>
      */
     protected static array $records = [];
 
@@ -730,6 +730,7 @@ class AnalyzedCache
         }
 
         static::$records[$path] = [
+            'schema' => static::SCHEMA,
             'mtime' => $mtime,
             'surface' => static::$surfaces[$path],
             'dependencies' => $recorded,
@@ -744,7 +745,7 @@ class AnalyzedCache
     }
 
     /**
-     * @return array{mtime: int, surface: string, dependencies: list<array{path: string, mtime: int, surface: string|null}>}|null
+     * @return array{schema: int, mtime: int, surface: string, dependencies: list<array{path: string, mtime: int, surface: string|null}>}|null
      */
     protected static function readRecord(string $path): ?array
     {
@@ -772,7 +773,10 @@ class AnalyzedCache
             $record = null;
         }
 
-        if (! is_array($record) || ! isset($record['mtime'], $record['surface'], $record['dependencies'])) {
+        if (! is_array($record)
+            || ($record['schema'] ?? null) !== static::SCHEMA
+            || ! isset($record['mtime'], $record['surface'], $record['dependencies'])
+        ) {
             static::$records[$path] = false;
 
             return null;
