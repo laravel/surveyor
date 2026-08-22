@@ -1028,3 +1028,50 @@ describe('validity by surface', function () {
         cleanupCacheDir($dir);
     });
 });
+
+describe('settling cycles', function () {
+    it('says which members gave up on a file themselves', function () {
+        $root = createTestClassFixture('RootClass', 'public function root() {}');
+        $middle = createTestClassFixture('MiddleClass', 'public function middle() {}');
+        $inner = createTestClassFixture('InnerClass', 'public function inner() {}');
+
+        // Root reaches middle, middle reaches inner, and inner asks for root
+        // while root is still open.
+        AnalyzedCache::beginAnalysis($root);
+        AnalyzedCache::addDependency($middle);
+
+        AnalyzedCache::beginAnalysis($middle);
+        AnalyzedCache::addDependency($inner);
+
+        AnalyzedCache::beginAnalysis($inner);
+        AnalyzedCache::addDependency($root);
+        AnalyzedCache::noteCycle($root);
+        AnalyzedCache::add($inner, tap(new Scope, fn ($scope) => $scope->setPath($inner)));
+        AnalyzedCache::endAnalysis($inner);
+
+        AnalyzedCache::add($middle, tap(new Scope, fn ($scope) => $scope->setPath($middle)));
+        AnalyzedCache::endAnalysis($middle);
+
+        AnalyzedCache::add($root, tap(new Scope, fn ($scope) => $scope->setPath($root)));
+        AnalyzedCache::endAnalysis($root);
+
+        $settled = collect(AnalyzedCache::takeSettled())->pluck('bailed', 'path');
+
+        expect($settled[$inner])->toBeTrue();
+        expect($settled[$middle])->toBeFalse();
+        expect($settled[$root])->toBeFalse();
+
+        unlink($root);
+        unlink($middle);
+        unlink($inner);
+    });
+
+    it('reports what a member reached, so settling can follow the edges', function () {
+        AnalyzedCache::beginAnalysis('/path/to/middle.php');
+        AnalyzedCache::addDependency('/path/to/inner.php');
+        AnalyzedCache::endAnalysis('/path/to/middle.php');
+
+        expect(AnalyzedCache::dependenciesOf('/path/to/middle.php'))->toBe(['/path/to/inner.php']);
+        expect(AnalyzedCache::dependenciesOf('/path/to/unknown.php'))->toBe([]);
+    });
+});

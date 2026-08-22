@@ -39,24 +39,34 @@ class AnalyzedCache
     protected static array $framePaths = [];
 
     /**
-     * Whether each frame skipped a file that was still being analyzed, which
-     * leaves its dependency list incomplete.
+     * Whether each frame took part in a cycle, whether by giving up on a file
+     * itself or by asking one that did.
      *
      * @var list<bool>
      */
     protected static array $frameTainted = [];
 
+    /**
+     * Whether each frame gave up on a file itself. Those are the files that
+     * resolved something against nothing, so they are where a second look
+     * starts.
+     *
+     * @var list<bool>
+     */
+    protected static array $frameBailed = [];
+
     /** Index of the outermost frame taking part in an unresolved cycle. */
     protected static ?int $cycleFloor = null;
 
-    /** @var list<array{path: string, scope: Scope, mtime: int}> */
+    /** @var list<array{path: string, scope: Scope, mtime: int, bailed: bool}> */
     protected static array $deferred = [];
 
     /**
      * Members of cycles that have just closed. Each was analyzed while another
-     * member was still open, so it resolved part of its work against nothing.
+     * member was still open, so part of its work was resolved against nothing,
+     * either its own or that of a file it asked.
      *
-     * @var list<string>
+     * @var list<array{path: string, bailed: bool}>
      */
     protected static array $settled = [];
 
@@ -136,6 +146,7 @@ class AnalyzedCache
         static::$frames[] = [];
         static::$framePaths[] = $path;
         static::$frameTainted[] = false;
+        static::$frameBailed[] = false;
     }
 
     /**
@@ -151,6 +162,7 @@ class AnalyzedCache
         }
 
         static::$frameTainted[array_key_last(static::$frameTainted)] = true;
+        static::$frameBailed[array_key_last(static::$frameBailed)] = true;
 
         // The file should always be somewhere on the stack, since that is what
         // makes it in progress. Fall back to the outermost frame rather than
@@ -179,6 +191,7 @@ class AnalyzedCache
 
         $dependencies = array_pop(static::$frames);
         $tainted = array_pop(static::$frameTainted);
+        array_pop(static::$frameBailed);
         array_pop(static::$framePaths);
 
         unset($dependencies[$path]);
@@ -211,7 +224,7 @@ class AnalyzedCache
         static::$deferred = [];
 
         foreach ($deferred as $entry) {
-            static::$settled[] = $entry['path'];
+            static::$settled[] = ['path' => $entry['path'], 'bailed' => $entry['bailed']];
 
             if (static::$persistToDisk) {
                 static::persistToDisk(
@@ -226,9 +239,9 @@ class AnalyzedCache
 
     /**
      * Hand back the members of any cycle that has closed since this was last
-     * called, and forget them.
+     * called, and forget them. Each says whether it gave up on a file itself.
      *
-     * @return list<string>
+     * @return list<array{path: string, bailed: bool}>
      */
     public static function takeSettled(): array
     {
@@ -319,7 +332,12 @@ class AnalyzedCache
 
         // Its dependency list is still missing whatever the cycle resolves to.
         if (static::$cycleFloor !== null && (static::$frameTainted[array_key_last(static::$frameTainted)] ?? false)) {
-            static::$deferred[] = ['path' => $path, 'scope' => $analyzed, 'mtime' => $mtime];
+            static::$deferred[] = [
+                'path' => $path,
+                'scope' => $analyzed,
+                'mtime' => $mtime,
+                'bailed' => static::$frameBailed[array_key_last(static::$frameBailed)] ?? false,
+            ];
 
             return;
         }
@@ -327,6 +345,16 @@ class AnalyzedCache
         if (static::$persistToDisk) {
             static::persistToDisk($path, $analyzed, $mtime, static::pendingDependencies($path));
         }
+    }
+
+    /**
+     * The files a path reached, as recorded when it was analyzed.
+     *
+     * @return list<string>
+     */
+    public static function dependenciesOf(string $path): array
+    {
+        return array_keys(static::$dependencies[$path] ?? []);
     }
 
     /**
@@ -593,6 +621,7 @@ class AnalyzedCache
         static::$frames = [];
         static::$framePaths = [];
         static::$frameTainted = [];
+        static::$frameBailed = [];
         static::$cycleFloor = null;
         static::$deferred = [];
         static::$settled = [];
