@@ -7,29 +7,28 @@ Where something is a calculation rather than a measurement it says so.
 
 ## Where it stands
 
-| | before this work | after discovery and caching | after determinism |
-|---|---|---|---|
-| cold, empty cache | 17.4s | 15.6s | 18.8s |
-| warm, nothing changed | 4.6s | 1.24s | 1.28s |
-| warm, one edit to `Instance.php` | 7.0s | 3.8s | 4.1s |
+| | before this work | after discovery and caching | after determinism | after fingerprints |
+|---|---|---|---|---|
+| cold, empty cache | 17.4s | 15.6s | 18.8s | 16.3s |
+| warm, nothing changed | 4.6s | 1.24s | 1.28s | 1.19s |
+| warm, one edit to `Instance.php` | 7.0s | 3.8s | 4.1s | 1.7s |
 
-The first column predates all of this. The other two are medians of three runs
-each, taken back to back on the same machine.
+The first column predates all of this. The rest are medians of three runs each,
+taken back to back on the same machine. The cache is 62MB, down from 278MB.
 
 Which file you edit still decides the edit path, and closing that spread is what
 step 2 below is for:
 
 | touched | entries rewritten (of 3,149) | time |
 |---|---|---|
-| `app/Models/Instance.php` | 258 | 3.7s |
-| `app/Models/User.php` | 1,370 | 11.2s |
-| `app/Models/Environment.php` | 1,366 | 16.9s |
-| `app/Models/Organization.php` | 1,370 | 19.5s |
+| `app/Models/Instance.php` | 61 | 2.0s |
+| `app/Models/User.php` | 147 | 2.0s |
+| `app/Models/Environment.php` | 230 | 2.7s |
+| `app/Models/Organization.php` | 319 | 2.9s |
 
-One run each. Before the determinism work the same four measured 3.9s, 9.1s,
-15.2s and 16.3s against a nearly identical count of rewritten entries, so
-settling the cycles costs on the edit path too, everywhere except the file whose
-dependents are few.
+One run each, and this is what fingerprinting bought: the same four used to
+rewrite 258, 1,370, 1,366 and 1,370 entries and take 3.7s, 11.2s, 16.9s and
+19.5s. What is left is the file's own dependents whose surfaces really did move.
 
 Analysis is now deterministic: the same bytes give the same answers whatever
 order the files are visited in. That was the blocker on fingerprinting, so
@@ -239,16 +238,43 @@ determinism still clean, all tests pass.
    over-records an edge that is real but indirect. That can only cause extra
    invalidation, never stale output.
 
-3. **Loose ends, any time.** A regression test for the `Type::union` fix. It
-   needs a shared type object reachable from two places, which no current test
-   sets up. Debouncing the Vite plugin, which today runs one full build per saved
-   file, serially.
+3. **Settling narrowed to what moved.** Settling re-analyzed all 333 cycle
+   members. Only 214 of them gave up on a file themselves; the other 119 merely
+   asked one that did, and most of those were handed the same answer either way.
+   Surface hashes make that checkable, so settling now starts with the 214 and
+   pulls in a member only when a file it reached came back with a different
+   surface. That took 16 more, in 7 of the 80 cycles, and never needed a third
+   round: 230 re-analyses instead of 333.
+
+   Cold went from 18.0s to 16.3s, which is 0.7s off the 15.6s from before any of
+   the determinism work. Output is byte identical to settling all 333, checked
+   over the whole of Cloud. Determinism holds at zero flapping surfaces across
+   three targets, and all seven shapes still agree warm against cold.
+
+   The 214 are irreducible while a file is the unit of re-analysis: each of them
+   really did resolve something against nothing. Going below that means the
+   surface pass and body pass split, which is a much larger change and no longer
+   has a measured problem to justify it.
+
+4. **What is left.**
+
+   Every number here comes from one application. The fingerprint rules are fitted
+   to the shape of `laravel/cloud`, and if they are wrong somewhere else the
+   symptom is stale generated types, which is quiet. Pointing `shapesweep.sh`
+   and `determinism.sh` at a second real application is the cheapest insurance
+   available and has not been done.
 
    `StateTracker` is serialised into every cache entry. It holds the variable
    state of the run that produced the entry, nothing reads it back, and it is
    the only thing that still differs between two analyses of the same bytes: 3
-   of 3,149 entries after editing `Organization.php`. Dropping it from what gets
-   persisted would shrink the cache and take those 3 to zero.
+   of 3,149 entries after editing `Organization.php`. It is also held in memory
+   for every entry for the whole run, so dropping it from what gets persisted is
+   about memory and serialisation time more than the 62MB.
+
+   A regression test for the `Type::union` fix. It needs a shared type object
+   reachable from two places, which no current test sets up.
+
+   Debouncing the Vite plugin is done and merged.
 
 ## Dead ends, with numbers
 
