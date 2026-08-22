@@ -256,13 +256,31 @@ determinism still clean, all tests pass.
    surface pass and body pass split, which is a much larger change and no longer
    has a measured problem to justify it.
 
-4. **What is left.**
+4. **Checked against a second application.** Everything above was fitted to
+   `laravel/cloud`, so `laravel/forge` was run through the same guardrails:
+   2,330 files in `app/`, 2,633 cache entries.
 
-   Every number here comes from one application. The fingerprint rules are fitted
-   to the shape of `laravel/cloud`, and if they are wrong somewhere else the
-   symptom is stale generated types, which is quiet. Pointing `shapesweep.sh`
-   and `determinism.sh` at a second real application is the cheapest insurance
-   available and has not been done.
+   | | main | this work |
+   |---|---|---|
+   | cold | 14.3s | 13.5s |
+   | warm, nothing changed | 1.33s | 1.30s |
+   | warm, method added to `Server.php` | 22.7s | 2.7s |
+   | entries rewritten by that edit | 1,269 | 449 |
+   | cache | 258MB | 52MB |
+
+   Determinism holds on four targets, zero flapping surfaces, warm output equal
+   to cold. All seven shapes agree. Nothing about the rules turned out to be
+   specific to Cloud.
+
+   Forge needed setting up first, and its checkout was left alone: its
+   `composer.lock` has no `laravel/wayfinder`, `laravel/surveyor` or
+   `laravel/ranger` in it even though `vendor` symlinks all three, so
+   `composer install` there would delete them. The work was done on a copy, with
+   the three packages plus `spatie/php-structure-discoverer` mapped into
+   `composer.json` by hand and their providers registered in
+   `bootstrap/providers.php`.
+
+5. **What is left.**
 
    `StateTracker` is serialised into every cache entry. It holds the variable
    state of the run that produced the entry, nothing reads it back, and it is
@@ -324,6 +342,10 @@ alongside a timing run reads as a regression.
 - `determinism.sh <label> [target]` builds a cold cache, touches one file
   without changing it, rebuilds, and reports how many entries came back with a
   different surface. Zero is the bar.
+- `SURVEYOR_BENCH_APP` points any of these at another application, and
+  `SURVEYOR_BENCH_PRESET` names the set of files `mutate.py` should edit there.
+  Presets are spelled out per application rather than guessed, because every
+  shape has to change generated output or it proves nothing.
 - `surfacedump.php <cache-dir> [--detail|--fields]` renders a cache directory
   as canonical text: one hash per entry, the surface lines themselves, or a
   hash per `Scope` property to say which part of an entry moved.
@@ -340,7 +362,8 @@ alongside a timing run reads as a regression.
 
 The app loads Surveyor from `vendor`, not from this checkout, so a change here
 reaches a build only after `rsync -a --delete src/ <app>/vendor/laravel/surveyor/src/`.
-`determinism.sh` and `timeit.sh` do that themselves.
+`determinism.sh` and `timeit.sh` do that themselves, and skip it when the app
+symlinks the package straight at a working copy, as Forge does.
 
 Two habits that this work depended on:
 
