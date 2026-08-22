@@ -205,6 +205,24 @@ describe('Type::union()', function () {
         expect($union)->toBeInstanceOf(StringType::class);
         expect($union->isNullable())->toBeTrue();
     });
+
+    it('leaves the types it was handed alone when carrying null', function () {
+        // The types passed in belong to their caller. One of them can be the
+        // type already recorded for a property or a return, so marking it
+        // nullable in place would change an answer somewhere else.
+        $recorded = Type::from(ClassType::class);
+
+        $union = Type::union($recorded, Type::null());
+
+        expect($union->isNullable())->toBeTrue();
+        expect($recorded->isNullable())->toBeFalse();
+    });
+
+    it('hands back the type it was given when it is already nullable', function () {
+        $recorded = Type::from(ClassType::class)->nullable();
+
+        expect(Type::union($recorded, Type::null()))->toBe($recorded);
+    });
 });
 
 describe('Type::isSame()', function () {
