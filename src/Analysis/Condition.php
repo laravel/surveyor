@@ -97,7 +97,7 @@ class Condition
                 fn ($t) => ! Type::is($t, $type),
             ));
         } else {
-            $newType = Type::is($this->type, $type) ? Type::mixed() : $type;
+            $newType = Type::is($this->type, $type) ? Type::mixed() : $this->type;
         }
 
         $this->type = $newType;
