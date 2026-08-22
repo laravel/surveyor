@@ -68,7 +68,7 @@ class ClassLikeResult
         return $this->name;
     }
 
-    public function namespace(): string
+    public function namespace(): ?string
     {
         return $this->namespace;
     }
@@ -211,6 +211,27 @@ class ClassLikeResult
         $this->properties[$property->name] = $property;
     }
 
+    /**
+     * Every method, including the ones marked to be left out. Callers acting on
+     * a result want publicMethods(); this is for describing one.
+     *
+     * @return array<string, MethodResult>
+     */
+    public function methods(): array
+    {
+        return $this->methods;
+    }
+
+    /**
+     * Every property, including the ones marked to be left out.
+     *
+     * @return array<string, PropertyResult>
+     */
+    public function properties(): array
+    {
+        return $this->properties;
+    }
+
     public function hasConstant(string $name): bool
     {
         return isset($this->constants[$name]);
@@ -224,6 +245,14 @@ class ClassLikeResult
     public function addConstant(ConstantResult $constant): void
     {
         $this->constants[$constant->name] = $constant;
+    }
+
+    /**
+     * @return array<string, ConstantResult>
+     */
+    public function constants(): array
+    {
+        return $this->constants;
     }
 
     public function hasUse(string $name): bool

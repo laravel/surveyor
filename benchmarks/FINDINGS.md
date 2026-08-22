@@ -7,29 +7,28 @@ Where something is a calculation rather than a measurement it says so.
 
 ## Where it stands
 
-| | before this work | after discovery and caching | after determinism |
-|---|---|---|---|
-| cold, empty cache | 17.4s | 15.6s | 18.8s |
-| warm, nothing changed | 4.6s | 1.24s | 1.28s |
-| warm, one edit to `Instance.php` | 7.0s | 3.8s | 4.1s |
+| | before this work | after discovery and caching | after determinism | after fingerprints |
+|---|---|---|---|---|
+| cold, empty cache | 17.4s | 15.6s | 18.8s | 16.3s |
+| warm, nothing changed | 4.6s | 1.24s | 1.28s | 1.19s |
+| warm, one edit to `Instance.php` | 7.0s | 3.8s | 4.1s | 1.7s |
 
-The first column predates all of this. The other two are medians of three runs
-each, taken back to back on the same machine.
+The first column predates all of this. The rest are medians of three runs each,
+taken back to back on the same machine. The cache is 62MB, down from 278MB.
 
 Which file you edit still decides the edit path, and closing that spread is what
 step 2 below is for:
 
 | touched | entries rewritten (of 3,149) | time |
 |---|---|---|
-| `app/Models/Instance.php` | 258 | 3.7s |
-| `app/Models/User.php` | 1,370 | 11.2s |
-| `app/Models/Environment.php` | 1,366 | 16.9s |
-| `app/Models/Organization.php` | 1,370 | 19.5s |
+| `app/Models/Instance.php` | 61 | 2.0s |
+| `app/Models/User.php` | 147 | 2.0s |
+| `app/Models/Environment.php` | 230 | 2.7s |
+| `app/Models/Organization.php` | 319 | 2.9s |
 
-One run each. Before the determinism work the same four measured 3.9s, 9.1s,
-15.2s and 16.3s against a nearly identical count of rewritten entries, so
-settling the cycles costs on the edit path too, everywhere except the file whose
-dependents are few.
+One run each, and this is what fingerprinting bought: the same four used to
+rewrite 258, 1,370, 1,366 and 1,370 entries and take 3.7s, 11.2s, 16.9s and
+19.5s. What is left is the file's own dependents whose surfaces really did move.
 
 Analysis is now deterministic: the same bytes give the same answers whatever
 order the files are visited in. That was the blocker on fingerprinting, so
@@ -142,10 +141,25 @@ determinism still clean, all tests pass.
    analyzed first, one that a cycle member is answered against the finished
    analysis of the other member. Each fails without the change it covers.
 
-2. **Fingerprint invalidation.** Store **direct** dependencies only, each keyed
-   by that dependency's public surface hash rather than its modification time or
-   its bytes. A body edit changes the file's own hash so that file is
-   re-analysed, its surface is unchanged, so its dependents stay valid.
+2. **Fingerprint invalidation.** Done, in three slices. Store **direct**
+   dependencies only, each keyed by that dependency's public surface hash rather
+   than its modification time or its bytes. A body edit changes the file's own
+   hash so that file is re-analysed, its surface is unchanged, so its dependents
+   stay valid.
+
+   | touched | rewritten before | rewritten now | time before | time now |
+   |---|---|---|---|---|
+   | `Instance.php` | 258 | 61 | 3.7s | 2.0s |
+   | `User.php` | 1,370 | 147 | 11.2s | 2.0s |
+   | `Environment.php` | 1,366 | 230 | 16.9s | 2.7s |
+   | `Organization.php` | 1,370 | 319 | 19.5s | 2.9s |
+
+   Cold and warm are unchanged, 17.5s to 19.1s and 1.2s to 1.35s. The cache went
+   from 290MB to 62MB. Touching a file without editing it rewrites 3 entries
+   where it used to rewrite 1,366.
+
+   All seven shapes in `shapesweep.sh` agree between warm and cold, including a
+   new body-only edit shape that exists to test exactly what this bets on.
 
    Measured ceiling, on a settled cache:
 
@@ -164,31 +178,139 @@ determinism still clean, all tests pass.
    Cache size falls out of this for free. Of 272MB, 85% is dependency
    bookkeeping: 1.6M path and mtime pairs. Dependencies **recorded** per entry:
    median 92, mean 489, max 1,803. Dependencies **actually used**: median 2,
-   mean 4, max 63. The closure is 129 times the direct edges, so direct edges
-   take the cache to roughly 42MB.
+   mean 4, max 63. The closure is 129 times the direct edges. The estimate from
+   that was roughly 42MB; it came out at 62MB, 12MB of which is the records
+   taking a filesystem block each.
 
-   Note why the closure is there: the comment in `AnalyzedCache` says it is
-   stored flat so an entry can be validated by stat'ing a list without walking
-   the graph. Direct edges break that unless validity is decided by the
-   dependency's surface hash, which keeps the check one level deep. That needs a
-   small side index of path to surface hash so a dependency can be checked
-   without loading its whole entry.
+   The closure was there so an entry could be validated by stat'ing a flat list
+   without walking the graph. Nothing replaces that: the walk came back, over
+   records rather than entries. See the slice 3 note below.
 
-   `benchmarks/cache/surfacedump.php` already computes the surface of every
-   entry in a cache directory, and its `--fields` mode hashes each `Scope`
-   property on its own. Whatever the fingerprint ends up hashing should agree
-   with what that script calls a surface, or one of the two is wrong.
+   **Slice 1 is done.** `Analyzer\Surface` is the one definition of what a
+   dependent can see, `surfacedump.php` calls it rather than keeping its own
+   copy, and `tests/Unit/Analyzer/SurfaceTest.php` pins the properties the
+   design needs: a body edit leaves the hash alone, a new public method or a
+   changed return type or a changed import moves it.
 
-3. **Loose ends, any time.** A regression test for the `Type::union` fix. It
-   needs a shared type object reachable from two places, which no current test
-   sets up. Debouncing the Vite plugin, which today runs one full build per saved
-   file, serially.
+   It also turned up the hole that would have sunk the design. 205 of 3,149
+   entries record no result at all, almost all of them enums: nothing analyzes
+   an enum's cases, dependents read them off PHP's reflection, so 89 enums in
+   `App\Enums` all hashed the same and an enum edit moved nothing. Files with
+   nothing observable now hash their own bytes instead, which makes any edit to
+   them count. All 3,149 surfaces are distinct again, and the `edit-enum-case`
+   shape in `shapesweep.sh` is what guards it.
+
+   `ClassLikeResult::namespace()` was declared `: string` while the property is
+   nullable, so asking a class in the global namespace for its namespace was a
+   fatal error. Fixed on the way past.
+
+   **Slice 2 is done, and slice 3 replaced its file format.** Every persisted entry now has a `<md5>.surface` file
+   beside it holding its surface hash, so a dependency can be checked with one
+   small read instead of unserializing its entry. `AnalyzedCache::surfaceHash()`
+   answers from memory, then that file, then by hashing an entry already in
+   memory. Invalidating an entry takes its surface with it.
+
+   It costs nothing in time: cold 18.5s against 18.6s for the same tree without
+   it, warm and edit unchanged. On disk the 3,149 files hold 100KB of hashes and
+   occupy 12MB, all of it filesystem block overhead.
+
+   **Slice 3 is done, and it corrected the plan above.** Direct edges cannot be
+   validated by stat'ing them. With the closure gone, a dependency whose own
+   bytes are untouched can still have moved, because something under *it*
+   changed. Validity has to walk, so the file beside each entry holds the edges
+   as well as the hash: the entry's own time and surface, and every file it
+   reached with the surface that file showed. It is a `.record` now, not a
+   `.surface`, and the entry itself no longer carries a dependency list at all,
+   which is where the 62MB comes from.
+
+   Both the entry and the record carry `AnalyzedCache::SCHEMA`, bumped to 5 by
+   this work, so entries written before it are read as invalid and analyzed
+   again rather than unserialized into a shape that no longer fits.
+
+   Deciding whether an entry holds reads records, never entries: the file is
+   unchanged and every file it reached is unchanged, or one of them changed and
+   has to be analyzed to find out whether the change reached its surface. Each
+   answer is worked out once per run and remembered. A file with no record of
+   its own has nothing underneath it, so its bytes are the whole answer. Cycles
+   in the recorded graph are handled by counting a path as holding while it is
+   being decided; every member is checked on its own terms anyway.
+
+   Analyzing a changed dependency mid-check needs the analyzer, which the cache
+   has no business knowing about, so the analyzer hands it a closure on
+   construction. One consequence worth remembering: an analysis started from
+   inside a validity check records itself against whatever frame is open, which
+   over-records an edge that is real but indirect. That can only cause extra
+   invalidation, never stale output.
+
+3. **Settling narrowed to what moved.** Settling re-analyzed all 333 cycle
+   members. Only 214 of them gave up on a file themselves; the other 119 merely
+   asked one that did, and most of those were handed the same answer either way.
+   Surface hashes make that checkable, so settling now starts with the 214 and
+   pulls in a member only when a file it reached came back with a different
+   surface. That took 16 more, in 7 of the 80 cycles, and never needed a third
+   round: 230 re-analyses instead of 333.
+
+   Cold went from 18.0s to 16.3s, which is 0.7s off the 15.6s from before any of
+   the determinism work. Output is byte identical to settling all 333, checked
+   over the whole of Cloud. Determinism holds at zero flapping surfaces across
+   three targets, and all seven shapes still agree warm against cold.
+
+   The 214 are irreducible while a file is the unit of re-analysis: each of them
+   really did resolve something against nothing. Going below that means the
+   surface pass and body pass split, which is a much larger change and no longer
+   has a measured problem to justify it.
+
+4. **Checked against a second application.** Everything above was fitted to
+   `laravel/cloud`, so `laravel/forge` was run through the same guardrails:
+   2,330 files in `app/`, 2,633 cache entries.
+
+   | | main | this work |
+   |---|---|---|
+   | cold | 14.3s | 13.5s |
+   | warm, nothing changed | 1.33s | 1.30s |
+   | warm, method added to `Server.php` | 22.7s | 2.7s |
+   | entries rewritten by that edit | 1,269 | 449 |
+   | cache | 258MB | 52MB |
+
+   Determinism holds on four targets, zero flapping surfaces, warm output equal
+   to cold. All seven shapes agree. Nothing about the rules turned out to be
+   specific to Cloud.
+
+   Forge needed setting up first, and its checkout was left alone: its
+   `composer.lock` has no `laravel/wayfinder`, `laravel/surveyor` or
+   `laravel/ranger` in it even though `vendor` symlinks all three, so
+   `composer install` there would delete them. The work was done on a copy, with
+   the three packages plus `spatie/php-structure-discoverer` mapped into
+   `composer.json` by hand and their providers registered in
+   `bootstrap/providers.php`.
+
+5. **Ignore markers, after rebasing.** Markers landed on main while this was
+   being written, and they take a declaration out of everything a dependent can
+   read. So the surface carries each member's marker: whether it hides right
+   now, and the conditions it hides on. Without that, adding `#[Ignore]` to a
+   property left the surface where it was and dependents kept output for a
+   member that had just been hidden.
+
+   Recording the conditions as well as the answer is deliberate. Whether a
+   condition holds is decided when the marker is read, not when the file was
+   analyzed, so a run whose conditions answer differently sees different
+   surfaces and re-analyzes. That does not make the cache aware of config
+   changes on its own, since an unchanged file is never re-read, but it stops a
+   marker change from passing unnoticed.
+
+6. **What is left.**
 
    `StateTracker` is serialised into every cache entry. It holds the variable
    state of the run that produced the entry, nothing reads it back, and it is
    the only thing that still differs between two analyses of the same bytes: 3
-   of 3,149 entries after editing `Organization.php`. Dropping it from what gets
-   persisted would shrink the cache and take those 3 to zero.
+   of 3,149 entries after editing `Organization.php`. It is also held in memory
+   for every entry for the whole run, so dropping it from what gets persisted is
+   about memory and serialisation time more than the 62MB.
+
+   A regression test for the `Type::union` fix. It needs a shared type object
+   reachable from two places, which no current test sets up.
+
+   Debouncing the Vite plugin is done and merged.
 
 ## Dead ends, with numbers
 
@@ -238,6 +360,10 @@ alongside a timing run reads as a regression.
 - `determinism.sh <label> [target]` builds a cold cache, touches one file
   without changing it, rebuilds, and reports how many entries came back with a
   different surface. Zero is the bar.
+- `SURVEYOR_BENCH_APP` points any of these at another application, and
+  `SURVEYOR_BENCH_PRESET` names the set of files `mutate.py` should edit there.
+  Presets are spelled out per application rather than guessed, because every
+  shape has to change generated output or it proves nothing.
 - `surfacedump.php <cache-dir> [--detail|--fields]` renders a cache directory
   as canonical text: one hash per entry, the surface lines themselves, or a
   hash per `Scope` property to say which part of an entry moved.
@@ -254,7 +380,8 @@ alongside a timing run reads as a regression.
 
 The app loads Surveyor from `vendor`, not from this checkout, so a change here
 reaches a build only after `rsync -a --delete src/ <app>/vendor/laravel/surveyor/src/`.
-`determinism.sh` and `timeit.sh` do that themselves.
+`determinism.sh` and `timeit.sh` do that themselves, and skip it when the app
+symlinks the package straight at a working copy, as Forge does.
 
 Two habits that this work depended on:
 

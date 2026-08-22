@@ -18,7 +18,13 @@ class Analyzer
     public function __construct(
         protected Parser $parser,
     ) {
-        //
+        // Deciding whether a cached entry still holds means knowing what its
+        // dependencies look like now, and only an analysis can say.
+        AnalyzedCache::resolveSurfaceUsing(function (string $path): ?string {
+            $analyzed = $this->analyze($path)->analyzed();
+
+            return $analyzed === null ? null : Surface::hash($analyzed);
+        });
     }
 
     public function analyzeClass(string $className)
@@ -101,9 +107,13 @@ class Analyzer
      * Each of them ran while another member was still open, so wherever they
      * reached for it they resolved against an empty scope. Which member that
      * was depends on where the analysis happened to start, so leaving those
-     * answers in place makes the cache depend on visit order. One member is
-     * re-analyzed at a time, with the rest left in the cache, so each of them
-     * sees a finished answer for everything it reaches.
+     * answers in place makes the cache depend on visit order.
+     *
+     * Only the members that gave up on a file themselves are looked at to begin
+     * with. A member that merely asked one of those is looked at when, and only
+     * when, the answer it was given moved, which is what the surface hashes are
+     * for. One member is analyzed at a time with the rest left in the cache, so
+     * each sees a finished answer for everything it reaches.
      */
     protected function settle(): void
     {
@@ -121,13 +131,7 @@ class Analyzer
         $this->settling = true;
 
         try {
-            foreach ($members as $member) {
-                AnalyzedCache::invalidate($member);
-
-                Debug::log(static fn () => '♻️ Re-analyzing settled cycle member: '.self::shortPath($member));
-
-                $this->analyze($member);
-            }
+            $this->settleMembers($members);
         } finally {
             $this->settling = false;
 
@@ -139,6 +143,60 @@ class Analyzer
                 $this->analyzed = $mine;
             }
         }
+    }
+
+    /**
+     * @param  list<array{path: string, bailed: bool}>  $members
+     */
+    protected function settleMembers(array $members): void
+    {
+        $waiting = [];
+
+        foreach ($members as $member) {
+            $waiting[$member['path']] = $member['bailed'];
+        }
+
+        $queue = array_keys(array_filter($waiting));
+
+        while ($queue !== []) {
+            $moved = [];
+
+            foreach ($queue as $path) {
+                unset($waiting[$path]);
+
+                if ($this->reanalyze($path)) {
+                    $moved[$path] = true;
+                }
+            }
+
+            $queue = [];
+
+            foreach ($waiting as $path => $bailed) {
+                foreach (AnalyzedCache::dependenciesOf($path) as $dependency) {
+                    if (isset($moved[$dependency])) {
+                        $queue[] = $path;
+
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Analyze a path again, and say whether what dependents can see of it moved.
+     */
+    protected function reanalyze(string $path): bool
+    {
+        $before = AnalyzedCache::surfaceHash($path);
+
+        AnalyzedCache::invalidate($path);
+
+        Debug::log(static fn () => '♻️ Re-analyzing settled cycle member: '.self::shortPath($path));
+
+        $this->analyze($path);
+
+        return AnalyzedCache::surfaceHash($path) !== $before;
     }
 
     protected static function shortPath(string $path): string

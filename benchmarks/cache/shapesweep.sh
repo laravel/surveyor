@@ -6,23 +6,26 @@
 # editing in place, adding a file, deleting a file, renaming a file.
 #
 # Usage: shapesweep.sh <label>
+#
+# Runs against the Cloud checkout unless SURVEYOR_BENCH_APP points elsewhere,
+# with SURVEYOR_BENCH_PRESET naming the set of files to edit.
 
 set -u
 
 S="$(cd "$(dirname "$0")" && pwd)"
-APP=/Users/joetannenbaum/Herd/cloud
+APP=${SURVEYOR_BENCH_APP:-/Users/joetannenbaum/Herd/cloud}
 LABEL=$1
 KEEP=$S/sh-$LABEL
 CACHE_W=$S/sh-cache-w
 CACHE_C=$S/sh-cache-c
 
-SHAPES=(append-method remove-method edit-enum-case add-file remove-file rename-file)
+SHAPES=(append-method remove-method edit-body edit-enum-case add-file remove-file rename-file)
 
 cd "$APP" || exit 1
 
 # The shapes edit two tracked files. Both are copied first and restored from
 # those copies, so uncommitted work elsewhere in the app is left alone.
-MUTATED=(app/Models/Instance.php app/Enums/InstanceType.php)
+MUTATED=($(python3 "$S/mutate.py" targets list))
 ORIGINALS=$S/sh-$LABEL-originals
 rm -rf "$ORIGINALS"; mkdir -p "$ORIGINALS"
 
@@ -81,7 +84,16 @@ for shape in "${SHAPES[@]}"; do
   moved=$(diff "$KEEP/$shape.base" "$KEEP/$shape.cold" | grep -c '^[<>]')
 
   effect="changed $moved lines"
-  [ "$moved" -eq 0 ] && effect="NO EFFECT ON OUTPUT (vacuous test)"
+
+  if [ "$moved" -eq 0 ]; then
+    # A body edit is meant to leave the output alone. Anywhere else, no change
+    # means the shape tested nothing.
+    if [ "$shape" = "edit-body" ]; then
+      effect="no output change, as intended"
+    else
+      effect="NO EFFECT ON OUTPUT (vacuous test)"
+    fi
+  fi
 
   printf '%-16s %14s %8s %s\n' "$shape" "$sorted" "$raw" "$effect"
 

@@ -6,12 +6,14 @@
 # source analysed twice, two answers.
 #
 # Usage: determinism.sh <label> [target-relative-path]
+#
+# Runs against the Cloud checkout unless SURVEYOR_BENCH_APP points elsewhere.
 
 set -u
 
 S="$(cd "$(dirname "$0")" && pwd)"
 SUR=/Users/joetannenbaum/Dev/surveyor
-APP=/Users/joetannenbaum/Herd/cloud
+APP=${SURVEYOR_BENCH_APP:-/Users/joetannenbaum/Herd/cloud}
 LABEL=$1
 TARGET=${2:-app/Models/User.php}
 
@@ -21,14 +23,19 @@ KEEP=$S/dt-$LABEL
 cd "$APP" || exit 1
 
 # Nothing here edits app source, it only touches a file, so a dirty tree is
-# reported rather than treated as fatal.
-if ! git diff --quiet; then
+# reported rather than treated as fatal. The app need not be a repository at all.
+if git rev-parse --git-dir > /dev/null 2>&1 && ! git diff --quiet; then
   echo "note: cloud has modified tracked files:"
   git diff --name-only | sed 's/^/  /'
 fi
 
 # The app loads Surveyor from vendor, so the working tree has to be copied in.
-rsync -a --delete "$SUR/src/" "$APP/vendor/laravel/surveyor/src/"
+# Some checkouts symlink the package straight at a working copy, in which case
+# there is nothing to copy and copying would mean writing a directory onto
+# itself.
+if [ "$(cd "$SUR/src" && pwd -P)" != "$(cd "$APP/vendor/laravel/surveyor/src" && pwd -P)" ]; then
+  rsync -a --delete "$SUR/src/" "$APP/vendor/laravel/surveyor/src/"
+fi
 
 rm -rf "$KEEP"; mkdir -p "$KEEP"
 rm -rf "$CACHE"; mkdir -p "$CACHE"
