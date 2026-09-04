@@ -18,18 +18,20 @@
     ],
     "require": {
         "php": "^8.2",
-        "illuminate/console": "^12.0|^13.0",
+        "illuminate/auth": "^12.0|^13.0",
+        "illuminate/container": "^12.0|^13.0",
         "illuminate/contracts": "^12.0|^13.0",
-        "illuminate/routing": "^12.0|^13.0",
+        "illuminate/database": "^12.0|^13.0",
+        "illuminate/filesystem": "^12.0|^13.0",
+        "illuminate/http": "^12.0|^13.0",
         "illuminate/support": "^12.0|^13.0",
+        "illuminate/validation": "^12.0|^13.0",
         "nikic/php-parser": "^5.4",
-        "phpstan/phpdoc-parser": "^2.1",
-        "spatie/php-structure-discoverer": "^2.3"
+        "phpstan/phpdoc-parser": "^2.1"
     },
     "require-dev": {
         "inertiajs/inertia-laravel": "^3.1",
         "laravel/pint": "^1.22",
-        "mockery/mockery": "^1.6",
         "orchestra/testbench": "^10.0|^11.0",
         "pestphp/pest": "^3.0",
         "phpstan/phpstan": "^2.1"
