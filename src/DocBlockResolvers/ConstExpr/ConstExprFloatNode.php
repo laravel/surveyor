@@ -10,6 +10,6 @@ class ConstExprFloatNode extends AbstractResolver
 {
     public function resolve(Ast\ConstExpr\ConstExprFloatNode $node)
     {
-        return Type::float($node->value);
+        return Type::float((float) str_replace('_', '', $node->value));
     }
 }

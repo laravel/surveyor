@@ -10,18 +10,20 @@ class Global_ extends AbstractResolver
     public function resolve(Node\Stmt\Global_ $node)
     {
         foreach ($node->vars as $var) {
-            if (! $var instanceof Node\Expr\Variable) {
+            if (! $var instanceof Node\Expr\Variable || ! is_string($var->name)) {
                 continue;
             }
 
             $scope = $this->scope;
 
-            while ($scope && ! $scope->variables()->get($var->name)) {
+            while ($scope && ! $scope->state()->variables()->get($var->name)) {
                 $scope = $scope->parent();
             }
 
-            if ($scope) {
-                $this->scope->state()->add($var, $scope->state()->get($var->name), $node);
+            $type = $scope?->state()->variables()->get($var->name);
+
+            if ($type) {
+                $this->scope->state()->add($var, $type);
             }
         }
 

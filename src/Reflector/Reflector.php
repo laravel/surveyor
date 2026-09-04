@@ -206,6 +206,7 @@ class Reflector
                 'm' => Type::int(),
                 's' => Type::int(),
                 'y' => Type::int(),
+                default => null,
             };
         }
 
@@ -213,10 +214,12 @@ class Reflector
             return match ($name) {
                 'current' => Type::from(DateTimeInterface::class),
                 'end' => Type::from(DateTimeInterface::class),
+                'include_end_date' => Type::bool(),
                 'include_start_date' => Type::bool(),
                 'interval' => Type::from(DateInterval::class),
                 'recurrences' => Type::int(),
                 'start' => Type::from(DateTimeInterface::class),
+                default => null,
             };
         }
 
