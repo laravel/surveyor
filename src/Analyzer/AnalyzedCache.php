@@ -274,6 +274,11 @@ class AnalyzedCache
             return static::$modifiedTimes[$path];
         }
 
+        // PHP 8.2 serves a stale mtime here: writing or touching a file does
+        // not evict it from the stat cache, so an entry would survive an edit.
+        // No path argument, so the realpath cache is left alone.
+        clearstatcache();
+
         $modifiedTime = file_exists($path) ? filemtime($path) : null;
 
         if (static::$fileTimesFrozen) {
