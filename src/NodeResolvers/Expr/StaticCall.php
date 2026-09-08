@@ -51,10 +51,16 @@ class StaticCall extends AbstractResolver
         if ($method instanceof MultiType) {
             $returnTypes = [];
 
-            foreach ($method->types as $type) {
+            foreach ($method->getTypes() as $type) {
+                $methodName = Type::stringValue($type);
+
+                if ($methodName === null) {
+                    continue;
+                }
+
                 $returnTypes = array_merge(
                     $returnTypes,
-                    $this->reflector->methodReturnType($class, $type->value, $node),
+                    $this->reflector->methodReturnType($class, $methodName, $node),
                 );
             }
 

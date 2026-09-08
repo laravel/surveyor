@@ -19,7 +19,7 @@ class UnaryMinus extends AbstractResolver
         if ($result instanceof MultiType) {
             return Type::union(...array_map(
                 fn ($type) => $this->negate($type),
-                $result->types,
+                $result->getTypes(),
             ));
         }
 

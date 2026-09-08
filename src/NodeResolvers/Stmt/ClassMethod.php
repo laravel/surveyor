@@ -110,7 +110,7 @@ class ClassMethod extends AbstractResolver
 
     protected function parseSubRule(TypeContract $subRule)
     {
-        if (Type::is($subRule, StringType::class)) {
+        if ($subRule instanceof StringType) {
             return ValidationRuleParser::parse($subRule->value);
         }
 

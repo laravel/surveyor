@@ -5,11 +5,10 @@ namespace Laravel\Surveyor\DocBlockResolvers\Type;
 use Laravel\Surveyor\DocBlockResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\ArrayShapeType;
 use Laravel\Surveyor\Types\ClassType;
+use Laravel\Surveyor\Types\Contracts\MultiType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
-use Laravel\Surveyor\Types\IntersectionType;
 use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
-use Laravel\Surveyor\Types\UnionType;
 use PHPStan\PhpDocParser\Ast;
 
 class GenericTypeNode extends AbstractResolver
@@ -74,8 +73,8 @@ class GenericTypeNode extends AbstractResolver
 
     protected function resolveClassStringType(TypeContract $type)
     {
-        if (Type::is($type, IntersectionType::class, UnionType::class)) {
-            return Type::intersection(...array_map(fn ($t) => $this->resolveClassStringType($t), $type->types));
+        if ($type instanceof MultiType) {
+            return Type::intersection(...array_map(fn ($t) => $this->resolveClassStringType($t), $type->getTypes()));
         }
 
         if (! property_exists($type, 'value')) {

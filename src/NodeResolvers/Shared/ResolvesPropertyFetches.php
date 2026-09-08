@@ -5,6 +5,7 @@ namespace Laravel\Surveyor\NodeResolvers\Shared;
 use Laravel\Surveyor\Analysis\Condition;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\MultiType;
+use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\MixedType;
 use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
@@ -51,8 +52,8 @@ trait ResolvesPropertyFetches
 
             if ($nameType instanceof MultiType) {
                 return Type::union(...array_map(
-                    fn ($t) => $this->reflector->propertyType($t->value, $type, $node) ?? Type::mixed(),
-                    $nameType->types,
+                    fn ($t) => $this->propertyTypeForName($t, $type, $node),
+                    $nameType->getTypes(),
                 ));
             }
 
@@ -64,5 +65,16 @@ trait ResolvesPropertyFetches
         }
 
         return $this->reflector->propertyType($node->name, $type, $node) ?? Type::mixed();
+    }
+
+    protected function propertyTypeForName(TypeContract $name, ClassType|string $class, Node $node): TypeContract
+    {
+        $propertyName = Type::stringValue($name);
+
+        if ($propertyName === null) {
+            return Type::mixed();
+        }
+
+        return $this->reflector->propertyType($propertyName, $class, $node) ?? Type::mixed();
     }
 }
