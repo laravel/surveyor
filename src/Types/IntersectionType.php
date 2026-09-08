@@ -9,6 +9,14 @@ class IntersectionType extends AbstractType implements Contracts\MultiType, Cont
         //
     }
 
+    /**
+     * @return Contracts\Type[]
+     */
+    public function getTypes(): array
+    {
+        return $this->types;
+    }
+
     public function id(): string
     {
         return json_encode($this->types);

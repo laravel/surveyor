@@ -165,8 +165,8 @@ class StateTracker
     }
 
     /**
-     * @param  callable(Node\Expr\Variable|Node\Param|Node\StaticVar|Node\Arg)  $onVariable
-     * @param  callable(Node\Expr\PropertyFetch)  $onProperty
+     * @param  callable(Node\Expr\Variable|Node\Param|Node\StaticVar|Node\Arg): mixed  $onVariable
+     * @param  callable(Node\Expr\PropertyFetch): mixed  $onProperty
      */
     protected function route(NodeAbstract $node, callable $onVariable, callable $onProperty): mixed
     {

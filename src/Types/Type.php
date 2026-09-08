@@ -59,6 +59,15 @@ class Type
         return new StringType($value);
     }
 
+    public static function stringValue(?Contracts\Type $type): ?string
+    {
+        if ($type instanceof StringType || $type instanceof ClassType) {
+            return $type->value;
+        }
+
+        return null;
+    }
+
     public static function isSame(Contracts\Type $type1, Contracts\Type $type2): bool
     {
         return $type1->toString() === $type2->toString();

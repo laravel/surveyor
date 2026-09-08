@@ -104,15 +104,15 @@ class Reflector
             ->map(fn ($arg) => $this->getNodeResolver()->from($arg->value, $this->scope))
             ->filter(fn ($arg) => Type::is($arg, ArrayType::class, UnionType::class));
 
-        if ($args->every(fn ($arg) => Type::is($arg, ArrayType::class))) {
+        if ($args->every(fn ($arg) => $arg instanceof ArrayType)) {
             return [
-                Type::array($args->flatMap(fn ($arg) => $arg->value)->all()),
+                Type::array($args->flatMap(fn (ArrayType $arg) => $arg->value)->all()),
             ];
         }
 
         $possibilities = $args->map(function ($arg) {
-            if (Type::is($arg, UnionType::class)) {
-                return collect($arg->types)->filter(fn ($type) => Type::is($type, ArrayType::class))->all();
+            if ($arg instanceof UnionType) {
+                return collect($arg->getTypes())->filter(fn ($type) => $type instanceof ArrayType)->all();
             }
 
             return [$arg];
@@ -122,7 +122,7 @@ class Reflector
         $cartesian = collect($firstSet)->crossJoin(...$possibilities);
 
         $results = $cartesian->map(fn ($combination) => Type::array(
-            collect($combination)->flatMap(fn ($arrType) => $arrType->value)->all()
+            collect($combination)->flatMap(fn (ArrayType $arrType) => $arrType->value)->all()
         ));
 
         return [Type::union(...$results)];
@@ -174,7 +174,7 @@ class Reflector
             $this->scope,
         );
 
-        if (! Type::is($result, ClassType::class)) {
+        if (! $result instanceof ClassType) {
             return null;
         }
 
@@ -421,11 +421,13 @@ class Reflector
                 return $returnTypes;
             }
 
-            if (! $node || ! $reflection->isInstantiable() || ! $this->hasMacro($className, $node)) {
+            $macroName = $node ? $this->macroName($node) : null;
+
+            if ($macroName === null || ! $reflection->isInstantiable() || ! $this->hasMacro($className, $macroName)) {
                 return [Type::mixed()];
             }
 
-            return $this->cachedMacros[$className][$node->name->name] ??= $this->resolveMacro($reflection, $node->name->name);
+            return $this->cachedMacros[$className][$macroName] ??= $this->resolveMacro($reflection, $macroName);
         } finally {
             if ($scopeToRestore !== null) {
                 $this->setScope($scopeToRestore);
@@ -651,13 +653,25 @@ class Reflector
         return new ReflectionClass($className);
     }
 
-    protected function hasMacro(string $className, Node $node): bool
+    protected function hasMacro(string $className, string $macroName): bool
     {
         try {
-            return method_exists($className, 'hasMacro') && $className::hasMacro($node->name->name);
+            return method_exists($className, 'hasMacro') && $className::hasMacro($macroName);
         } catch (Throwable $e) {
             return false;
         }
+    }
+
+    protected function macroName(Node $node): ?string
+    {
+        $name = match (true) {
+            $node instanceof Node\Expr\MethodCall,
+            $node instanceof Node\Expr\NullsafeMethodCall,
+            $node instanceof Node\Expr\StaticCall => $node->name,
+            default => null,
+        };
+
+        return $name instanceof Node\Identifier ? $name->name : null;
     }
 
     protected function getAppBinding($key)

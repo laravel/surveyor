@@ -25,7 +25,7 @@ class Unset_ extends AbstractResolver
             $dim = $this->from($var->dim);
 
             if ($dim instanceof MultiType) {
-                $dim = array_filter($dim->types, fn ($type) => $type instanceof StringType && $type->value !== null)[0] ?? null;
+                $dim = array_filter($dim->getTypes(), fn ($type) => $type instanceof StringType && $type->value !== null)[0] ?? null;
 
                 if ($dim === null) {
                     continue;

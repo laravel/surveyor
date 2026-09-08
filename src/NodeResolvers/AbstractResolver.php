@@ -9,6 +9,13 @@ use Laravel\Surveyor\Reflector\Reflector;
 use Laravel\Surveyor\Resolvers\NodeResolver;
 use PhpParser\NodeAbstract;
 
+/**
+ * Every resolver implements resolve(), but each one narrows the parameter to
+ * the node type it handles, so the base class cannot declare it without
+ * breaking parameter contravariance.
+ *
+ * @method mixed resolve(NodeAbstract $node)
+ */
 abstract class AbstractResolver
 {
     protected Scope $scope;

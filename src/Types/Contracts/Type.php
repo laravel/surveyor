@@ -14,6 +14,8 @@ interface Type
 
     public function nullable(bool $nullable = true): static;
 
+    public function isMoreSpecificThan(Type $type): bool;
+
     public function id(): string;
 
     public function toString(): string;

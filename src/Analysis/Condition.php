@@ -44,9 +44,6 @@ class Condition
         return $this;
     }
 
-    /**
-     * @param  callable(self, TypeContract): void  $callback
-     */
     public function toggle(): self
     {
         $this->currentState = ! $this->currentState;
