@@ -4,6 +4,9 @@ namespace Laravel\Surveyor\NodeResolvers\Expr;
 
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Types\Contracts\MultiType;
+use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
+use Laravel\Surveyor\Types\FloatType;
+use Laravel\Surveyor\Types\IntType;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
 
@@ -14,15 +17,27 @@ class UnaryMinus extends AbstractResolver
         $result = $this->from($node->expr);
 
         if ($result instanceof MultiType) {
-            return Type::union(...array_map(fn ($type) => $type->value * -1, $result->types));
+            return Type::union(...array_map(
+                fn ($type) => $this->negate($type),
+                $result->types,
+            ));
         }
 
-        if (! property_exists($result, 'value') || $result->value === null) {
-            return $result;
+        return $this->negate($result);
+    }
+
+    protected function negate(?TypeContract $type): ?TypeContract
+    {
+        if (! $type instanceof IntType && ! $type instanceof FloatType) {
+            return $type;
         }
 
-        $type = get_class($result);
+        if ($type->value === null) {
+            return $type;
+        }
 
-        return new $type($result->value * -1);
+        $class = $type::class;
+
+        return new $class($type->value * -1);
     }
 }
