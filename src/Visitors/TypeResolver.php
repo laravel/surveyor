@@ -39,11 +39,15 @@ class TypeResolver extends NodeVisitorAbstract
         [$_, $scope] = $this->resolver->fromWithScope($node, $this->scope);
 
         $this->scope = $scope;
+
+        return null;
     }
 
     public function leaveNode(Node $node)
     {
         $this->scope = $this->resolver->exitNode($node, $this->scope);
         Debug::decreaseDepth();
+
+        return null;
     }
 }
