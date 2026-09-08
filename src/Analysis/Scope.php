@@ -58,7 +58,7 @@ class Scope
     protected array $macros = [];
 
     /**
-     * @var PHPStan\PhpDocParser\Ast\PhpDoc\TemplateTagValueNode[]
+     * @var TemplateTagType[]
      */
     protected array $templateTags = [];
 

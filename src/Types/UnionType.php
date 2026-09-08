@@ -12,6 +12,14 @@ class UnionType extends AbstractType implements Contracts\CollapsibleType, Contr
         //
     }
 
+    /**
+     * @return Contracts\Type[]
+     */
+    public function getTypes(): array
+    {
+        return $this->types;
+    }
+
     public function collapse(): Contracts\Type
     {
         $groups = [];
