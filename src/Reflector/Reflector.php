@@ -455,11 +455,9 @@ class Reflector
                 if ($analyzedMethod !== null) {
                     $inferred = $analyzedMethod->returnType();
 
-                    foreach ($inferred instanceof UnionType ? $inferred->types : [$inferred] as $candidate) {
-                        if ($this->containsResourceType($candidate)) {
-                            $returnTypes[] = $candidate;
-                            $returnTypes = [Type::collapse(Type::union(...$returnTypes))];
-                        }
+                    if ($this->containsResourceType($inferred)) {
+                        $returnTypes[] = $inferred;
+                        $returnTypes = [Type::collapse(Type::union(...$returnTypes))];
                     }
                 }
             }

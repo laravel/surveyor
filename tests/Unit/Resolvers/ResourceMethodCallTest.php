@@ -35,3 +35,13 @@ it('preserves a nullable resource collection returned by a method', function () 
         ->and($type->isNullable())->toBeTrue()
         ->and($type->data->keys())->toBe(['id', 'label']);
 });
+
+it('preserves return branches without a resource alongside resource payloads', function () {
+    $type = app(Analyzer::class)->analyzeClass(ResourceMethodCalls::class)->result()->getMethod('conditionalGroupsCall')->returnType();
+
+    expect($type->keys())->toBe(['items', 'error']);
+    expect($type->value['items'])->toBeInstanceOf(ResourceResponse::class)
+        ->and($type->value['items']->isOptional())->toBeTrue();
+    expect($type->value['error']->value)->toBe('unavailable')
+        ->and($type->value['error']->isOptional())->toBeTrue();
+});

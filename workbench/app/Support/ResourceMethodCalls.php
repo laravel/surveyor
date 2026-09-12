@@ -74,4 +74,18 @@ class ResourceMethodCalls
     {
         return $provider->groups();
     }
+
+    public function conditionalGroups(bool $available): array
+    {
+        if ($available) {
+            return ['items' => MethodCallResource::collection([])];
+        }
+
+        return ['error' => 'unavailable'];
+    }
+
+    public function conditionalGroupsCall()
+    {
+        return $this->conditionalGroups(false);
+    }
 }
