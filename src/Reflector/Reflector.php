@@ -439,8 +439,7 @@ class Reflector
 
                 if ($analyzedMethod === null && $this->containsResourceType(Type::union(...$returnTypes))
                     && ! isset($this->resolvingMethods[$key])
-                    && $methodReflection->getDeclaringClass()->getName() === $reflection->getName()
-                    && $methodReflection->getFileName() !== false) {
+                    && $methodReflection->getDeclaringClass()->getName() === $reflection->getName()) {
                     $this->resolvingMethods[$key] = true;
                     $currentScope = $this->scope;
 
@@ -452,13 +451,11 @@ class Reflector
                     }
                 }
 
-                if ($analyzedMethod !== null) {
-                    $inferred = $analyzedMethod->returnType();
+                $inferred = $analyzedMethod?->returnType();
 
-                    if ($this->containsResourceType($inferred)) {
-                        $returnTypes[] = $inferred;
-                        $returnTypes = [Type::collapse(Type::union(...$returnTypes))];
-                    }
+                if ($inferred !== null && $this->containsResourceType($inferred)) {
+                    $returnTypes[] = $inferred;
+                    $returnTypes = [Type::collapse(Type::union(...$returnTypes))];
                 }
             }
 
