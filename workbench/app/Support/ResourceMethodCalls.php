@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Http\Resources\CustomPayloadCollection;
 use App\Http\Resources\MethodCallResource;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -40,6 +41,26 @@ class ResourceMethodCalls
     public function collection(): AnonymousResourceCollection
     {
         return MethodCallResource::collection([]);
+    }
+
+    public function collectedNamed(): AnonymousResourceCollection
+    {
+        return CustomPayloadCollection::collection([[null]]);
+    }
+
+    public function collectedNamedCall()
+    {
+        return $this->collectedNamed();
+    }
+
+    public function collectedNamedFluent()
+    {
+        return $this->collectedNamed()->additional(['source' => 'test']);
+    }
+
+    public function collectedNamedResolved()
+    {
+        return $this->collectedNamed()->additional(['source' => 'test'])->resolve();
     }
 
     public function recursive(bool $repeat): AnonymousResourceCollection

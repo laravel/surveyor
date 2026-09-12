@@ -3,6 +3,7 @@
 namespace Laravel\Surveyor\Analyzer;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use Illuminate\Http\Resources\JsonApi\JsonApiResource;
@@ -157,6 +158,7 @@ class ResourceAnalyzer
             isCollection: true,
             wrap: $response->wrap,
             additional: $response->additional,
+            responseClass: AnonymousResourceCollection::class,
         ) : $response;
     }
 

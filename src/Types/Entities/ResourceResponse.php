@@ -2,8 +2,6 @@
 
 namespace Laravel\Surveyor\Types\Entities;
 
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Http\Resources\Json\ResourceCollection;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Type;
@@ -19,8 +17,9 @@ class ResourceResponse extends ClassType
         public readonly bool $isCollection = false,
         public readonly ?string $wrap = 'data',
         public readonly ?TypeContract $additional = null,
+        ?string $responseClass = null,
     ) {
-        parent::__construct($resourceClass);
+        parent::__construct($responseClass ?? $resourceClass);
     }
 
     /**
@@ -43,7 +42,6 @@ class ResourceResponse extends ClassType
     public function isMoreSpecificThan(TypeContract $type): bool
     {
         return $type::class === ClassType::class
-            && ($this->resolved() === $type->resolved()
-                || ($this->isCollection && ! is_a($this->resolved(), ResourceCollection::class, true) && $type->resolved() === AnonymousResourceCollection::class));
+            && $this->resolved() === $type->resolved();
     }
 }
