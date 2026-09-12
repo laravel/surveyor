@@ -3,10 +3,7 @@
 namespace Laravel\Surveyor\NodeResolvers\Shared;
 
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Http\Resources\Json\ResourceCollection;
 use Illuminate\Support\Facades\Request as RequestFacade;
-use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
 use Laravel\Surveyor\Concerns\LazilyLoadsDependencies;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
@@ -66,17 +63,7 @@ trait ResolvesMethodCalls
         }
 
         if ($var instanceof ResourceResponse && $methodName->value === 'resolve') {
-            $resourceClass = $var->isCollection && ! is_subclass_of($var->resolved(), ResourceCollection::class)
-                ? AnonymousResourceCollection::class
-                : $var->resolved();
-
-            $method = app(ResourceAnalyzer::class)->resolveDataMethod($resourceClass);
-
-            if ($method !== null && $method->getName() !== 'resolve') {
-                return $method->getDeclaringClass()->getName() === ResourceCollection::class
-                    ? Type::arrayShape(Type::union(Type::int(), Type::string()), $var->data)
-                    : clone $var->data;
-            }
+            return $var->payload();
         }
 
         $returned = Type::union(

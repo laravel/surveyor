@@ -7,6 +7,8 @@ use App\Http\Resources\CustomAttributesCollection;
 use App\Http\Resources\CustomPayloadCollection;
 use App\Http\Resources\CustomResolveResource;
 use App\Http\Resources\CustomWrapResource;
+use App\Http\Resources\MappedResourceCollection;
+use App\Http\Resources\MethodCallCollection;
 use App\Http\Resources\PlainLabelResource;
 use App\Http\Resources\PostResource;
 use App\Http\Resources\UnwrappedResource;
@@ -19,9 +21,11 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
 use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
+use Laravel\Surveyor\Types\ArrayShapeType;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Entities\ResourceResponse;
+use Laravel\Surveyor\Types\MixedType;
 use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
 
@@ -85,6 +89,7 @@ namespace App\\Test;
 use App\\Http\\Resources\\CustomAttributesCollection;
 use App\\Http\\Resources\\CustomPayloadCollection;
 use App\\Http\\Resources\\CustomResolveResource;
+use App\\Http\\Resources\\MethodCallCollection;
 
 class ResourceController
 {
@@ -106,7 +111,7 @@ class ResourceController
     })->with([
         'overridden resolve' => [
             '(new CustomResolveResource(null))->resolve()',
-            fn () => Type::array(['custom' => Type::int()]),
+            fn () => Type::array(['custom' => Type::int(42)]),
             fn () => (new CustomResolveResource(null))->resolve(),
             ['custom' => 42],
         ],
@@ -121,6 +126,24 @@ class ResourceController
             fn () => Type::array(['attributes' => Type::int(42)]),
             fn () => (new CustomAttributesCollection([null]))->resolve(Request::create('/')),
             ['attributes' => 42],
+        ],
+        'native named collection' => [
+            '(new MethodCallCollection([null]))->resolve()',
+            fn () => Type::arrayShape(Type::union(Type::int(), Type::string()), Type::array(['id' => Type::int(1), 'label' => Type::string('Example')])),
+            fn () => (new MethodCallCollection([null]))->resolve(Request::create('/')),
+            [['id' => 1, 'label' => 'Example']],
+        ],
+        'collected native collection' => [
+            'MethodCallCollection::collection([[null]])->resolve()',
+            fn () => Type::arrayShape(Type::union(Type::int(), Type::string()), Type::arrayShape(Type::union(Type::int(), Type::string()), Type::array(['id' => Type::int(1), 'label' => Type::string('Example')]))),
+            fn () => MethodCallCollection::collection([[null]])->resolve(Request::create('/')),
+            [[['id' => 1, 'label' => 'Example']]],
+        ],
+        'collected custom collection' => [
+            'CustomPayloadCollection::collection([[null]])->resolve()',
+            fn () => Type::arrayShape(Type::union(Type::int(), Type::string()), Type::array(['count' => Type::int(42)])),
+            fn () => CustomPayloadCollection::collection([[null]])->resolve(Request::create('/')),
+            [['count' => 42]],
         ],
         'collected resource override' => [
             'CustomResolveResource::collection([null])->resolve()',
@@ -192,6 +215,31 @@ class ResourceController
             false,
         ],
         'inherited resolve override' => [CustomResolveResource::class, '', false],
+    ]);
+
+    it('preserves a mapped collection as its complete generic array payload', function () {
+        $resource = new MappedResourceCollection([null]);
+
+        expect(json_decode(json_encode($resource->resolve(Request::create('/'))), true))->toBe([
+            ['id' => 1, 'label' => 'Example'],
+        ]);
+
+        $response = app(ResourceAnalyzer::class)->buildResourceResponse(MappedResourceCollection::class);
+
+        expect($response)->toBeInstanceOf(ResourceResponse::class)
+            ->and($response->isCollection)->toBeFalse()
+            ->and($response->data)->toBeInstanceOf(ArrayShapeType::class)
+            ->and($response->data->valueType)->toBeInstanceOf(MixedType::class);
+    });
+
+    it('only adds collection wrapping to native collection payloads', function (string $resource, bool $needsWrapping) {
+        $response = app(ResourceAnalyzer::class)->buildResourceResponse($resource);
+
+        expect($response->isCollection)->toBe($needsWrapping);
+    })->with([
+        'native collection' => [MethodCallCollection::class, true],
+        'custom toArray' => [CustomPayloadCollection::class, false],
+        'custom toAttributes' => [CustomAttributesCollection::class, false],
     ]);
 
     it('preserves every toArray return shape for resources and collections', function (bool $isCollection) {
@@ -285,13 +333,13 @@ class ResourceController
         expect($resourceResponse->wrap)->toBe('results');
     });
 
-    it('detects ResourceCollection as collection', function () {
+    it('keeps a custom collection payload without an extra collection wrapper', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(UserCollection::class)->result();
 
         $resourceResponse = app(ResourceAnalyzer::class)->buildResourceResponse($result->name());
         expect($resourceResponse)->not->toBeNull();
-        expect($resourceResponse->isCollection)->toBeTrue();
+        expect($resourceResponse->isCollection)->toBeFalse();
     });
 
     it('builds ResourceResponse for external use', function () {

@@ -100,7 +100,7 @@ class ResourceAnalyzer
         $this->responses[$resource] = new ResourceResponse(
             resourceClass: $resource,
             data: $data,
-            isCollection: $this->isResourceCollection($resource),
+            isCollection: $this->needsCollectionWrapping($resource),
             wrap: $wrap,
             additional: $additional,
         );
@@ -132,38 +132,35 @@ class ResourceAnalyzer
             return null;
         }
 
-        // Reuse the response cached during Phase B if analysis already produced one
-        if ($existing = $this->responses[$resourceClass] ?? null) {
-            if ($isCollection && ! $existing->isCollection) {
-                return new ResourceResponse(
-                    resourceClass: $existing->resourceClass,
-                    data: $existing->data,
-                    isCollection: true,
-                    wrap: $existing->wrap,
-                    additional: $existing->additional,
-                );
+        // Reuse the response cached during Phase B if analysis already produced one.
+        $response = $this->responses[$resourceClass] ?? null;
+
+        if ($response === null) {
+            $data = $this->extractDataShape($resourceClass, $result);
+
+            if ($data === null) {
+                return null;
             }
 
-            return $existing;
+            $response = new ResourceResponse(
+                resourceClass: $resourceClass,
+                data: $data,
+                isCollection: $this->needsCollectionWrapping($resourceClass),
+                wrap: $this->resolveWrapKey($resourceClass),
+                additional: $this->resolveWithMethod($result),
+            );
         }
 
-        // Fallback: try to extract the resource shape directly
-        $data = $this->extractDataShape($resourceClass, $result);
-
-        if (! $data) {
-            return null;
-        }
-
-        return new ResourceResponse(
-            resourceClass: $resourceClass,
-            data: $data,
-            isCollection: $isCollection || $this->isResourceCollection($resourceClass),
-            wrap: $this->resolveWrapKey($resourceClass),
-            additional: $this->resolveWithMethod($result),
-        );
+        return $isCollection ? new ResourceResponse(
+            resourceClass: $response->resourceClass,
+            data: $response->payload(),
+            isCollection: true,
+            wrap: $response->wrap,
+            additional: $response->additional,
+        ) : $response;
     }
 
-    public function resolveDataMethod(string $resource): ?ReflectionMethod
+    protected function resolveDataMethod(string $resource): ?ReflectionMethod
     {
         $reflection = new ReflectionClass($resource);
 
@@ -190,32 +187,18 @@ class ResourceAnalyzer
             return null;
         }
 
-        if ($result->hasMethod($method->getName())) {
-            $returnType = $result->getMethod($method->getName())->returnType();
-
-            return $returnType instanceof ArrayType || ($returnType instanceof UnionType && collect($returnType->types)->every(fn ($type) => $type instanceof ArrayType))
-                ? $returnType
-                : null;
-        }
-
-        if ($method->getDeclaringClass()->getName() !== ResourceCollection::class) {
-            return null;
-        }
-
-        // For ResourceCollection without toArray, the shape is an array of the collected resource
-        if ($this->isResourceCollection($resource)) {
+        if ($method->getDeclaringClass()->getName() === ResourceCollection::class) {
             $collectedResource = $this->resolveCollectedResource($resource);
 
-            if ($collectedResource) {
-                $innerResponse = $this->buildResourceResponse($collectedResource);
-
-                if ($innerResponse) {
-                    return $innerResponse->data;
-                }
-            }
+            return $collectedResource ? $this->buildResourceResponse($collectedResource)?->payload() : null;
         }
 
-        return null;
+        $returnType = $result->getMethod($method->getName())?->returnType();
+        $types = $returnType instanceof UnionType ? $returnType->types : [$returnType];
+
+        return collect($types)->every(fn ($type) => $type !== null && Type::is($type, ArrayType::class, ArrayShapeType::class))
+            ? $returnType
+            : null;
     }
 
     protected function resolveModelClass(string $resource, ClassLikeResult $result, Scope $scope): ?string
@@ -344,9 +327,9 @@ class ResourceAnalyzer
         return null;
     }
 
-    protected function isResourceCollection(string $resource): bool
+    protected function needsCollectionWrapping(string $resource): bool
     {
-        return is_subclass_of($resource, ResourceCollection::class);
+        return $this->resolveDataMethod($resource)?->getDeclaringClass()->getName() === ResourceCollection::class;
     }
 
     protected function resolveCollectedResource(string $collectionClass): ?string
