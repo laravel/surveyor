@@ -128,9 +128,7 @@ class Reflector
 
         foreach ($key instanceof UnionType ? $key->types : [$key] as $type) {
             if ($type instanceof MixedType || $type instanceof NullType || $type->isNullable()) {
-                $types[] = new ClassType(Translator::class);
-
-                break;
+                return [...$types, new ClassType(Translator::class)];
             }
         }
 
