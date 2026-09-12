@@ -6,8 +6,10 @@ use Laravel\Surveyor\Analyzer\Analyzer;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Entities\InertiaRender;
+use Laravel\Surveyor\Types\Entities\ResourceResponse;
 use Laravel\Surveyor\Types\IntType;
 use Laravel\Surveyor\Types\StringType;
+use Laravel\Surveyor\Types\Type;
 use Laravel\Surveyor\Types\UnionType;
 
 uses()->group('integration');
@@ -38,6 +40,46 @@ function findInertiaRender(TypeContract $type): ?InertiaRender
 }
 
 describe('Inertia special prop types', function () {
+    it('preserves the resource collection payload of Inertia::scroll()', function (string $value) {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use Inertia\\Inertia;
+use App\\Models\\Post;
+use App\\Http\\Resources\\ConditionalShapeResource;
+
+class DashboardController
+{
+    public function index()
+    {
+        return Inertia::render(\'Dashboard\', [
+            \'posts\' => Inertia::scroll('.$value.'),
+        ]);
+    }
+}');
+
+        try {
+            $result = app(Analyzer::class)->analyze($fixture)->result();
+            $render = findInertiaRender($result->getMethod('index')->returnType());
+            $posts = $render->data->value['posts'];
+
+            expect($posts)->toBeInstanceOf(ResourceResponse::class);
+            expect($posts->isCollection)->toBeTrue();
+            expect($posts->wrap)->toBe('data');
+            expect($posts->isOptional())->toBeFalse();
+            expect($posts->data)->toEqual(Type::union(
+                Type::array(['id' => Type::int(1), 'name' => Type::string('Ada')]),
+                Type::array(['id' => Type::int(1)]),
+            ));
+        } finally {
+            unlink($fixture);
+        }
+    })->with([
+        'arrow function' => ['fn () => ConditionalShapeResource::collection(Post::simplePaginate(15))'],
+        'closure' => ['function () { return ConditionalShapeResource::collection(Post::simplePaginate(15)); }'],
+        'direct value' => ['ConditionalShapeResource::collection(Post::simplePaginate(15))'],
+    ]);
+
     it('resolves Inertia::defer() to the callback return type', function () {
         $fixture = createPhpFixture('
 namespace App\\Test;

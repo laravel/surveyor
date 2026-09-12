@@ -3,14 +3,19 @@
 namespace Laravel\Surveyor\NodeResolvers\Shared;
 
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Http\Resources\Json\ResourceCollection;
 use Illuminate\Support\Facades\Request as RequestFacade;
 use Laravel\Surveyor\Concerns\LazilyLoadsDependencies;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
+use Laravel\Surveyor\Types\Entities\ResourceResponse;
 use Laravel\Surveyor\Types\MixedType;
 use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
+use ReflectionMethod;
 
 trait ResolvesMethodCalls
 {
@@ -59,6 +64,18 @@ trait ResolvesMethodCalls
 
         if (in_array($methodName->value, static::$conditionalMethods) && $this->isJsonResource($var)) {
             return $this->resolveResourceConditional($var, $methodName->value, $node);
+        }
+
+        if ($var instanceof ResourceResponse && $methodName->value === 'resolve') {
+            $resourceClass = $var->isCollection && ! is_subclass_of($var->resolved(), ResourceCollection::class)
+                ? AnonymousResourceCollection::class
+                : $var->resolved();
+
+            if ((new ReflectionMethod($resourceClass, 'resolve'))->getDeclaringClass()->getName() === JsonResource::class) {
+                return (new ReflectionMethod($resourceClass, 'toArray'))->getDeclaringClass()->getName() === ResourceCollection::class
+                    ? Type::arrayShape(Type::union(Type::int(), Type::string()), $var->data)
+                    : clone $var->data;
+            }
         }
 
         $returned = Type::union(

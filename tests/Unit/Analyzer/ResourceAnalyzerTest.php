@@ -2,6 +2,7 @@
 
 use App\Http\Resources\ChildApiResource;
 use App\Http\Resources\ConditionalLabelResource;
+use App\Http\Resources\ConditionalShapeResource;
 use App\Http\Resources\CustomWrapResource;
 use App\Http\Resources\PlainLabelResource;
 use App\Http\Resources\PostResource;
@@ -10,12 +11,14 @@ use App\Http\Resources\UserCollection;
 use App\Http\Resources\UserResource;
 use App\Http\Resources\WhenLookupResource;
 use App\Models\Tag;
+use Illuminate\Http\Request;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
 use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\Entities\ResourceResponse;
 use Laravel\Surveyor\Types\StringType;
+use Laravel\Surveyor\Types\Type;
 
 uses()->group('integration');
 
@@ -28,6 +31,112 @@ afterEach(function () {
 });
 
 describe('ResourceAnalyzer', function () {
+    it('preserves resolved resource payloads without their response wrapping', function (string $expression, bool $isCollection) {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use Illuminate\\Http\\Request;
+use App\\Http\\Resources\\ConditionalShapeResource;
+
+class ResourceController
+{
+    public function index(Request $request)
+    {
+        return '.$expression.';
+    }
+}');
+
+        try {
+            $result = app(Analyzer::class)->analyze($fixture)->result();
+            $data = Type::union(
+                Type::array(['id' => Type::int(1), 'name' => Type::string('Ada')]),
+                Type::array(['id' => Type::int(1)]),
+            );
+
+            expect($result->getMethod('index')->returnType())->toEqual($isCollection
+                ? Type::arrayShape(Type::union(Type::int(), Type::string()), $data)
+                : Type::array(['id' => Type::int(1), 'name' => Type::string('Ada')->optional()]));
+
+            expect(app(ResourceAnalyzer::class)->buildResourceResponse(ConditionalShapeResource::class)->data)->toEqual($data);
+
+            $request = Request::create('/');
+            $resolved = $isCollection
+                ? ConditionalShapeResource::collection(['featured' => null])->resolve($request)
+                : (new ConditionalShapeResource(null))->resolve($request);
+
+            expect($resolved)->toBe($isCollection ? ['featured' => ['id' => 1]] : ['id' => 1]);
+        } finally {
+            unlink($fixture);
+        }
+    })->with([
+        'resource with null data' => ['(new ConditionalShapeResource(null))->resolve($request)', false],
+        'resource collection' => ['ConditionalShapeResource::collection([])->resolve($request)', true],
+    ]);
+
+    it('respects a resource that overrides resolve instead of returning its toArray shape', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use App\\Http\\Resources\\CustomResolveResource;
+
+class ResourceController
+{
+    public function index()
+    {
+        return (new CustomResolveResource(null))->resolve();
+    }
+}');
+
+        try {
+            $result = app(Analyzer::class)->analyze($fixture)->result();
+
+            expect($result->getMethod('index')->returnType())->toEqual(Type::array(['custom' => Type::int()]));
+        } finally {
+            unlink($fixture);
+        }
+    });
+
+    it('resolves the collection implementation rather than the collected resource override', function (bool $customPayload) {
+        $expression = $customPayload
+            ? '(new CustomPayloadCollection([]))->resolve()'
+            : 'CustomResolveResource::collection([])->resolve()';
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use App\\Http\\Resources\\CustomPayloadCollection;
+use App\\Http\\Resources\\CustomResolveResource;
+
+class ResourceController
+{
+    public function index()
+    {
+        return '.$expression.';
+    }
+}');
+
+        try {
+            $result = app(Analyzer::class)->analyze($fixture)->result();
+
+            expect($result->getMethod('index')->returnType())->toEqual($customPayload
+                ? Type::array(['count' => Type::int(42)])
+                : Type::arrayShape(Type::union(Type::int(), Type::string()), Type::array(['name' => Type::string('Ada')])));
+        } finally {
+            unlink($fixture);
+        }
+    })->with([true, false]);
+
+    it('preserves every toArray return shape for resources and collections', function (bool $isCollection) {
+        $response = app(ResourceAnalyzer::class)->buildResourceResponse(ConditionalShapeResource::class, $isCollection);
+
+        expect($response)->toBeInstanceOf(ResourceResponse::class);
+        expect($response->isCollection)->toBe($isCollection);
+        expect($response->wrap)->toBe('data');
+        expect($response->data)->toEqual(Type::union(
+            Type::array(['id' => Type::int(1), 'name' => Type::string('Ada')]),
+            Type::array(['id' => Type::int(1)]),
+        ));
+    })->with([false, true]);
+
     it('detects resource class and extracts toArray shape', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(PostResource::class)->result();

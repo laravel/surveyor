@@ -18,6 +18,7 @@ use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Entities\JsonApiResourceResponse;
 use Laravel\Surveyor\Types\Entities\ResourceResponse;
 use Laravel\Surveyor\Types\Type;
+use Laravel\Surveyor\Types\UnionType;
 use ReflectionClass;
 use ReflectionNamedType;
 use Throwable;
@@ -166,7 +167,7 @@ class ResourceAnalyzer
         if ($result->hasMethod('toArray')) {
             $returnType = $result->getMethod('toArray')->returnType();
 
-            if ($returnType instanceof ArrayType) {
+            if ($returnType instanceof ArrayType || ($returnType instanceof UnionType && collect($returnType->types)->every(fn ($type) => $type instanceof ArrayType))) {
                 return $returnType;
             }
         }

@@ -68,5 +68,6 @@ describe('UnionType', function () {
         expect($collapsed)->toBeInstanceOf(ArrayType::class);
         expect($collapsed->value['name']->isOptional())->toBeFalse();
         expect($collapsed->value['age']->isOptional())->toBeTrue();
+        expect($array2->value['age']->isOptional())->toBeFalse();
     });
 });
