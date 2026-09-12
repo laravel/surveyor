@@ -3,6 +3,9 @@
 use App\Http\Resources\ChildApiResource;
 use App\Http\Resources\ConditionalLabelResource;
 use App\Http\Resources\ConditionalShapeResource;
+use App\Http\Resources\CustomAttributesCollection;
+use App\Http\Resources\CustomPayloadCollection;
+use App\Http\Resources\CustomResolveResource;
 use App\Http\Resources\CustomWrapResource;
 use App\Http\Resources\PlainLabelResource;
 use App\Http\Resources\PostResource;
@@ -12,10 +15,12 @@ use App\Http\Resources\UserResource;
 use App\Http\Resources\WhenLookupResource;
 use App\Models\Tag;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
 use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
 use Laravel\Surveyor\Types\ArrayType;
+use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Entities\ResourceResponse;
 use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
@@ -73,36 +78,11 @@ class ResourceController
         'resource collection' => ['ConditionalShapeResource::collection([])->resolve($request)', true],
     ]);
 
-    it('respects a resource that overrides resolve instead of returning its toArray shape', function () {
+    it('respects custom resource and collection resolution', function (string $expression, TypeContract $expected, Closure $resolve, array $expectedData) {
         $fixture = createPhpFixture('
 namespace App\\Test;
 
-use App\\Http\\Resources\\CustomResolveResource;
-
-class ResourceController
-{
-    public function index()
-    {
-        return (new CustomResolveResource(null))->resolve();
-    }
-}');
-
-        try {
-            $result = app(Analyzer::class)->analyze($fixture)->result();
-
-            expect($result->getMethod('index')->returnType())->toEqual(Type::array(['custom' => Type::int()]));
-        } finally {
-            unlink($fixture);
-        }
-    });
-
-    it('resolves the collection implementation rather than the collected resource override', function (bool $customPayload) {
-        $expression = $customPayload
-            ? '(new CustomPayloadCollection([]))->resolve()'
-            : 'CustomResolveResource::collection([])->resolve()';
-        $fixture = createPhpFixture('
-namespace App\\Test;
-
+use App\\Http\\Resources\\CustomAttributesCollection;
 use App\\Http\\Resources\\CustomPayloadCollection;
 use App\\Http\\Resources\\CustomResolveResource;
 
@@ -115,15 +95,104 @@ class ResourceController
 }');
 
         try {
+            expect($resolve())->toBe($expectedData);
+
             $result = app(Analyzer::class)->analyze($fixture)->result();
 
-            expect($result->getMethod('index')->returnType())->toEqual($customPayload
-                ? Type::array(['count' => Type::int(42)])
-                : Type::arrayShape(Type::union(Type::int(), Type::string()), Type::array(['name' => Type::string('Ada')])));
+            expect($result->getMethod('index')->returnType())->toEqual($expected);
         } finally {
             unlink($fixture);
         }
-    })->with([true, false]);
+    })->with([
+        'overridden resolve' => [
+            '(new CustomResolveResource(null))->resolve()',
+            fn () => Type::array(['custom' => Type::int()]),
+            fn () => (new CustomResolveResource(null))->resolve(),
+            ['custom' => 42],
+        ],
+        'custom collection payload' => [
+            '(new CustomPayloadCollection([null]))->resolve()',
+            fn () => Type::array(['count' => Type::int(42)]),
+            fn () => (new CustomPayloadCollection([null]))->resolve(Request::create('/')),
+            ['count' => 42],
+        ],
+        'custom collection attributes' => [
+            '(new CustomAttributesCollection([null]))->resolve()',
+            fn () => Type::array(['attributes' => Type::int(42)]),
+            fn () => (new CustomAttributesCollection([null]))->resolve(Request::create('/')),
+            ['attributes' => 42],
+        ],
+        'collected resource override' => [
+            'CustomResolveResource::collection([null])->resolve()',
+            fn () => Type::arrayShape(Type::union(Type::int(), Type::string()), Type::array(['custom' => Type::int(42)])),
+            fn () => CustomResolveResource::collection([null])->resolve(Request::create('/')),
+            [['custom' => 42]],
+        ],
+    ]);
+
+    it('uses the effective resolution method without guessing inherited or property-backed data', function (string $parent, string $override, bool $analyzed) {
+        $class = 'ResolutionResource'.md5($parent.$override);
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use Illuminate\\Http\\Request;
+
+class '.$class.' extends \\'.$parent.'
+{
+    public function toArray(Request $request): array
+    {
+        return ["legacy" => 1];
+    }
+
+    '.$override.'
+}');
+
+        $resource = 'App\\Test\\'.$class;
+        $caller = createPhpFixture('
+class ResourceController
+{
+    public function index()
+    {
+        return \\'.$resource.'::collection([null])->resolve();
+    }
+}');
+
+        try {
+            require $fixture;
+
+            expect($resource::collection([null])->resolve(Request::create('/')))->toBe([['custom' => 42]]);
+
+            $response = app(ResourceAnalyzer::class)->buildResourceResponse($resource);
+
+            expect($response?->data)->toEqual($analyzed ? Type::array(['custom' => Type::int(42)]) : null);
+
+            $result = app(Analyzer::class)->analyze($caller)->result();
+
+            expect($result->getMethod('index')->returnType())->toEqual($analyzed
+                ? Type::arrayShape(Type::union(Type::int(), Type::string()), Type::array(['custom' => Type::int(42)]))
+                : Type::array([]));
+        } finally {
+            unlink($caller);
+            unlink($fixture);
+        }
+    })->with([
+        'resolveResourceData override' => [
+            JsonResource::class,
+            'public function resolveResourceData(Request $request): array { return ["custom" => 42]; }',
+            true,
+        ],
+        'toAttributes override' => [
+            JsonResource::class,
+            'public function toAttributes(Request $request): array { return ["custom" => 42]; }',
+            true,
+        ],
+        'attributes property' => [
+            JsonResource::class,
+            'public array $attributes = ["custom" => 42];',
+            false,
+        ],
+        'inherited resolve override' => [CustomResolveResource::class, '', false],
+    ]);
 
     it('preserves every toArray return shape for resources and collections', function (bool $isCollection) {
         $response = app(ResourceAnalyzer::class)->buildResourceResponse(ConditionalShapeResource::class, $isCollection);

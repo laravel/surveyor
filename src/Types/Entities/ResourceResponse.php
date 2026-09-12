@@ -3,6 +3,7 @@
 namespace Laravel\Surveyor\Types\Entities;
 
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Resources\Json\ResourceCollection;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 
@@ -29,6 +30,6 @@ class ResourceResponse extends ClassType
     {
         return $type::class === ClassType::class
             && ($this->resolved() === $type->resolved()
-                || ($this->isCollection && $type->resolved() === AnonymousResourceCollection::class));
+                || ($this->isCollection && ! is_a($this->resolved(), ResourceCollection::class, true) && $type->resolved() === AnonymousResourceCollection::class));
     }
 }

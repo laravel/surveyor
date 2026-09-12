@@ -20,6 +20,7 @@ use Laravel\Surveyor\Types\Entities\ResourceResponse;
 use Laravel\Surveyor\Types\Type;
 use Laravel\Surveyor\Types\UnionType;
 use ReflectionClass;
+use ReflectionMethod;
 use ReflectionNamedType;
 use Throwable;
 
@@ -72,7 +73,7 @@ class ResourceAnalyzer
     }
 
     /**
-     * Phase B: After toArray() has been walked, extract the resolved data shape
+     * Phase B: After resource methods have been walked, extract the resolved data shape
      * and store resource metadata on the ClassLikeResult.
      *
      * Called on class EXIT (after method bodies have been walked).
@@ -87,7 +88,7 @@ class ResourceAnalyzer
             return;
         }
 
-        $data = $this->extractToArrayShape($resource, $result);
+        $data = $this->extractDataShape($resource, $result);
 
         if (! $data) {
             return;
@@ -146,8 +147,8 @@ class ResourceAnalyzer
             return $existing;
         }
 
-        // Fallback: try to extract toArray shape directly
-        $data = $this->extractToArrayShape($resourceClass, $result);
+        // Fallback: try to extract the resource shape directly
+        $data = $this->extractDataShape($resourceClass, $result);
 
         if (! $data) {
             return null;
@@ -162,14 +163,43 @@ class ResourceAnalyzer
         );
     }
 
-    protected function extractToArrayShape(string $resource, ClassLikeResult $result): ?TypeContract
+    public function resolveDataMethod(string $resource): ?ReflectionMethod
     {
-        if ($result->hasMethod('toArray')) {
-            $returnType = $result->getMethod('toArray')->returnType();
+        $reflection = new ReflectionClass($resource);
 
-            if ($returnType instanceof ArrayType || ($returnType instanceof UnionType && collect($returnType->types)->every(fn ($type) => $type instanceof ArrayType))) {
-                return $returnType;
+        foreach (['resolve', 'resolveResourceData', 'toAttributes', 'toArray'] as $method) {
+            $reflected = $reflection->getMethod($method);
+
+            if ($reflected->getDeclaringClass()->getName() !== JsonResource::class) {
+                return $reflected;
             }
+
+            if ($method === 'toAttributes' && $reflection->hasProperty('attributes')) {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    protected function extractDataShape(string $resource, ClassLikeResult $result): ?TypeContract
+    {
+        $method = $this->resolveDataMethod($resource);
+
+        if ($method === null) {
+            return null;
+        }
+
+        if ($result->hasMethod($method->getName())) {
+            $returnType = $result->getMethod($method->getName())->returnType();
+
+            return $returnType instanceof ArrayType || ($returnType instanceof UnionType && collect($returnType->types)->every(fn ($type) => $type instanceof ArrayType))
+                ? $returnType
+                : null;
+        }
+
+        if ($method->getDeclaringClass()->getName() !== ResourceCollection::class) {
+            return null;
         }
 
         // For ResourceCollection without toArray, the shape is an array of the collected resource
