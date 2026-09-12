@@ -1,6 +1,10 @@
 <?php
 
+use App\Http\Resources\CustomPayloadCollection;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Laravel\Surveyor\Types\ArrayType;
+use Laravel\Surveyor\Types\ClassType;
+use Laravel\Surveyor\Types\Entities\ResourceResponse;
 use Laravel\Surveyor\Types\IntType;
 use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
@@ -15,6 +19,13 @@ describe('UnionType', function () {
         expect($union->types)->toHaveCount(2);
         expect($union->types[0])->toBeInstanceOf(StringType::class);
         expect($union->types[1])->toBeInstanceOf(IntType::class);
+    });
+
+    it('preserves anonymous collections alongside named resource collections', function () {
+        $named = new ResourceResponse(CustomPayloadCollection::class, Type::array(['count' => Type::int(42)]), isCollection: true);
+        $anonymous = new ClassType(AnonymousResourceCollection::class);
+
+        expect(Type::union($named, $anonymous))->toEqual(new UnionType([$named, $anonymous]));
     });
 
     it('provides unique id based on types', function () {
@@ -68,5 +79,6 @@ describe('UnionType', function () {
         expect($collapsed)->toBeInstanceOf(ArrayType::class);
         expect($collapsed->value['name']->isOptional())->toBeFalse();
         expect($collapsed->value['age']->isOptional())->toBeTrue();
+        expect($array2->value['age']->isOptional())->toBeFalse();
     });
 });

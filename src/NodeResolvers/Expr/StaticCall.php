@@ -125,7 +125,7 @@ class StaticCall extends AbstractResolver
 
         if (
             $class->value === 'Inertia\Inertia'
-            && in_array($method, ['defer', 'optional', 'lazy', 'always', 'merge'], true)
+            && in_array($method, ['defer', 'optional', 'lazy', 'always', 'merge', 'scroll'], true)
         ) {
             return true;
         }
@@ -175,14 +175,15 @@ class StaticCall extends AbstractResolver
             ];
         }
 
-        if (in_array($method, ['defer', 'optional', 'lazy', 'always', 'merge'], true)) {
+        if (in_array($method, ['defer', 'optional', 'lazy', 'always', 'merge', 'scroll'], true)) {
             $args = $node->getArgs();
 
             if (empty($args)) {
                 return [Type::mixed()];
             }
 
-            $type = $this->resolveClosureReturnType($args[0]->value) ?? Type::mixed();
+            $type = $this->resolveClosureReturnType($args[0]->value)
+                ?? ($method === 'scroll' ? $this->from($args[0]->value) : Type::mixed());
 
             if (in_array($method, ['defer', 'optional', 'lazy'], true)) {
                 $type->optional();

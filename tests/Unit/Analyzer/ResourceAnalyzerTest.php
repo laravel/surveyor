@@ -2,7 +2,13 @@
 
 use App\Http\Resources\ChildApiResource;
 use App\Http\Resources\ConditionalLabelResource;
+use App\Http\Resources\ConditionalShapeResource;
+use App\Http\Resources\CustomAttributesCollection;
+use App\Http\Resources\CustomPayloadCollection;
+use App\Http\Resources\CustomResolveResource;
 use App\Http\Resources\CustomWrapResource;
+use App\Http\Resources\MappedResourceCollection;
+use App\Http\Resources\MethodCallCollection;
 use App\Http\Resources\PlainLabelResource;
 use App\Http\Resources\PostResource;
 use App\Http\Resources\UnwrappedResource;
@@ -10,12 +16,18 @@ use App\Http\Resources\UserCollection;
 use App\Http\Resources\UserResource;
 use App\Http\Resources\WhenLookupResource;
 use App\Models\Tag;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
 use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
+use Laravel\Surveyor\Types\ArrayShapeType;
 use Laravel\Surveyor\Types\ArrayType;
+use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Entities\ResourceResponse;
+use Laravel\Surveyor\Types\MixedType;
 use Laravel\Surveyor\Types\StringType;
+use Laravel\Surveyor\Types\Type;
 
 uses()->group('integration');
 
@@ -28,6 +40,220 @@ afterEach(function () {
 });
 
 describe('ResourceAnalyzer', function () {
+    it('preserves resolved resource payloads without their response wrapping', function (string $expression, bool $isCollection) {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use Illuminate\\Http\\Request;
+use App\\Http\\Resources\\ConditionalShapeResource;
+
+class ResourceController
+{
+    public function index(Request $request)
+    {
+        return '.$expression.';
+    }
+}');
+
+        try {
+            $result = app(Analyzer::class)->analyze($fixture)->result();
+            $data = Type::union(
+                Type::array(['id' => Type::int(1), 'name' => Type::string('Ada')]),
+                Type::array(['id' => Type::int(1)]),
+            );
+
+            expect($result->getMethod('index')->returnType())->toEqual($isCollection
+                ? Type::arrayShape(Type::union(Type::int(), Type::string()), $data)
+                : Type::array(['id' => Type::int(1), 'name' => Type::string('Ada')->optional()]));
+
+            expect(app(ResourceAnalyzer::class)->buildResourceResponse(ConditionalShapeResource::class)->data)->toEqual($data);
+
+            $request = Request::create('/');
+            $resolved = $isCollection
+                ? ConditionalShapeResource::collection(['featured' => null])->resolve($request)
+                : (new ConditionalShapeResource(null))->resolve($request);
+
+            expect($resolved)->toBe($isCollection ? ['featured' => ['id' => 1]] : ['id' => 1]);
+        } finally {
+            unlink($fixture);
+        }
+    })->with([
+        'resource with null data' => ['(new ConditionalShapeResource(null))->resolve($request)', false],
+        'resource collection' => ['ConditionalShapeResource::collection([])->resolve($request)', true],
+    ]);
+
+    it('respects custom resource and collection resolution', function (string $expression, TypeContract $expected, Closure $resolve, array $expectedData) {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use App\\Http\\Resources\\CustomAttributesCollection;
+use App\\Http\\Resources\\CustomPayloadCollection;
+use App\\Http\\Resources\\CustomResolveResource;
+use App\\Http\\Resources\\MethodCallCollection;
+
+class ResourceController
+{
+    public function index()
+    {
+        return '.$expression.';
+    }
+}');
+
+        try {
+            expect($resolve())->toBe($expectedData);
+
+            $result = app(Analyzer::class)->analyze($fixture)->result();
+
+            expect($result->getMethod('index')->returnType())->toEqual($expected);
+        } finally {
+            unlink($fixture);
+        }
+    })->with([
+        'overridden resolve' => [
+            '(new CustomResolveResource(null))->resolve()',
+            fn () => Type::array(['custom' => Type::int(42)]),
+            fn () => (new CustomResolveResource(null))->resolve(),
+            ['custom' => 42],
+        ],
+        'custom collection payload' => [
+            '(new CustomPayloadCollection([null]))->resolve()',
+            fn () => Type::array(['count' => Type::int(42)]),
+            fn () => (new CustomPayloadCollection([null]))->resolve(Request::create('/')),
+            ['count' => 42],
+        ],
+        'custom collection attributes' => [
+            '(new CustomAttributesCollection([null]))->resolve()',
+            fn () => Type::array(['attributes' => Type::int(42)]),
+            fn () => (new CustomAttributesCollection([null]))->resolve(Request::create('/')),
+            ['attributes' => 42],
+        ],
+        'native named collection' => [
+            '(new MethodCallCollection([null]))->resolve()',
+            fn () => Type::arrayShape(Type::union(Type::int(), Type::string()), Type::array(['id' => Type::int(1), 'label' => Type::string('Example')])),
+            fn () => (new MethodCallCollection([null]))->resolve(Request::create('/')),
+            [['id' => 1, 'label' => 'Example']],
+        ],
+        'collected native collection' => [
+            'MethodCallCollection::collection([[null]])->resolve()',
+            fn () => Type::arrayShape(Type::union(Type::int(), Type::string()), Type::arrayShape(Type::union(Type::int(), Type::string()), Type::array(['id' => Type::int(1), 'label' => Type::string('Example')]))),
+            fn () => MethodCallCollection::collection([[null]])->resolve(Request::create('/')),
+            [[['id' => 1, 'label' => 'Example']]],
+        ],
+        'collected custom collection' => [
+            'CustomPayloadCollection::collection([[null]])->resolve()',
+            fn () => Type::arrayShape(Type::union(Type::int(), Type::string()), Type::array(['count' => Type::int(42)])),
+            fn () => CustomPayloadCollection::collection([[null]])->resolve(Request::create('/')),
+            [['count' => 42]],
+        ],
+        'collected resource override' => [
+            'CustomResolveResource::collection([null])->resolve()',
+            fn () => Type::arrayShape(Type::union(Type::int(), Type::string()), Type::array(['custom' => Type::int(42)])),
+            fn () => CustomResolveResource::collection([null])->resolve(Request::create('/')),
+            [['custom' => 42]],
+        ],
+    ]);
+
+    it('uses the effective resolution method without guessing inherited or property-backed data', function (string $parent, string $override, bool $analyzed) {
+        $class = 'ResolutionResource'.md5($parent.$override);
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use Illuminate\\Http\\Request;
+
+class '.$class.' extends \\'.$parent.'
+{
+    public function toArray(Request $request): array
+    {
+        return ["legacy" => 1];
+    }
+
+    '.$override.'
+}');
+
+        $resource = 'App\\Test\\'.$class;
+        $caller = createPhpFixture('
+class ResourceController
+{
+    public function index()
+    {
+        return \\'.$resource.'::collection([null])->resolve();
+    }
+}');
+
+        try {
+            require $fixture;
+
+            expect($resource::collection([null])->resolve(Request::create('/')))->toBe([['custom' => 42]]);
+
+            $response = app(ResourceAnalyzer::class)->buildResourceResponse($resource);
+
+            expect($response?->data)->toEqual($analyzed ? Type::array(['custom' => Type::int(42)]) : null);
+
+            $result = app(Analyzer::class)->analyze($caller)->result();
+
+            expect($result->getMethod('index')->returnType())->toEqual($analyzed
+                ? Type::arrayShape(Type::union(Type::int(), Type::string()), Type::array(['custom' => Type::int(42)]))
+                : Type::array([]));
+        } finally {
+            unlink($caller);
+            unlink($fixture);
+        }
+    })->with([
+        'resolveResourceData override' => [
+            JsonResource::class,
+            'public function resolveResourceData(Request $request): array { return ["custom" => 42]; }',
+            true,
+        ],
+        'toAttributes override' => [
+            JsonResource::class,
+            'public function toAttributes(Request $request): array { return ["custom" => 42]; }',
+            true,
+        ],
+        'attributes property' => [
+            JsonResource::class,
+            'public array $attributes = ["custom" => 42];',
+            false,
+        ],
+        'inherited resolve override' => [CustomResolveResource::class, '', false],
+    ]);
+
+    it('preserves a mapped collection as its complete generic array payload', function () {
+        $resource = new MappedResourceCollection([null]);
+
+        expect(json_decode(json_encode($resource->resolve(Request::create('/'))), true))->toBe([
+            ['id' => 1, 'label' => 'Example'],
+        ]);
+
+        $response = app(ResourceAnalyzer::class)->buildResourceResponse(MappedResourceCollection::class);
+
+        expect($response)->toBeInstanceOf(ResourceResponse::class)
+            ->and($response->isCollection)->toBeFalse()
+            ->and($response->data)->toBeInstanceOf(ArrayShapeType::class)
+            ->and($response->data->valueType)->toBeInstanceOf(MixedType::class);
+    });
+
+    it('only adds collection wrapping to native collection payloads', function (string $resource, bool $needsWrapping) {
+        $response = app(ResourceAnalyzer::class)->buildResourceResponse($resource);
+
+        expect($response->isCollection)->toBe($needsWrapping);
+    })->with([
+        'native collection' => [MethodCallCollection::class, true],
+        'custom toArray' => [CustomPayloadCollection::class, false],
+        'custom toAttributes' => [CustomAttributesCollection::class, false],
+    ]);
+
+    it('preserves every toArray return shape for resources and collections', function (bool $isCollection) {
+        $response = app(ResourceAnalyzer::class)->buildResourceResponse(ConditionalShapeResource::class, $isCollection);
+
+        expect($response)->toBeInstanceOf(ResourceResponse::class);
+        expect($response->isCollection)->toBe($isCollection);
+        expect($response->wrap)->toBe('data');
+        expect($response->data)->toEqual(Type::union(
+            Type::array(['id' => Type::int(1), 'name' => Type::string('Ada')]),
+            Type::array(['id' => Type::int(1)]),
+        ));
+    })->with([false, true]);
+
     it('detects resource class and extracts toArray shape', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(PostResource::class)->result();
@@ -107,13 +333,13 @@ describe('ResourceAnalyzer', function () {
         expect($resourceResponse->wrap)->toBe('results');
     });
 
-    it('detects ResourceCollection as collection', function () {
+    it('keeps a custom collection payload without an extra collection wrapper', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(UserCollection::class)->result();
 
         $resourceResponse = app(ResourceAnalyzer::class)->buildResourceResponse($result->name());
         expect($resourceResponse)->not->toBeNull();
-        expect($resourceResponse->isCollection)->toBeTrue();
+        expect($resourceResponse->isCollection)->toBeFalse();
     });
 
     it('builds ResourceResponse for external use', function () {
