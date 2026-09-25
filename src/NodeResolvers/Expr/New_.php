@@ -42,9 +42,16 @@ class New_ extends AbstractResolver
 
         if (class_exists($resolved) && is_subclass_of($resolved, JsonResource::class)) {
             try {
-                $resourceResponse = app(ResourceAnalyzer::class)->buildResourceResponse($resolved);
+                $resource = isset($node->args[0]) ? $this->from($node->args[0]->value) : null;
+                $resourceResponse = app(ResourceAnalyzer::class)->buildResourceResponse($resolved, resource: $resource);
 
                 if ($resourceResponse) {
+                    // A nested resource wrapping null is serialized as null. The response
+                    // may be the cached JSON:API one, so it is copied before being marked.
+                    if ($resource?->isNullable() && is_a($this->scope->entityName(), JsonResource::class, true)) {
+                        $resourceResponse = (clone $resourceResponse)->nullable();
+                    }
+
                     return $resourceResponse;
                 }
             } catch (Throwable $e) {
