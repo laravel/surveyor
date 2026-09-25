@@ -30,6 +30,19 @@ afterEach(function () {
 });
 
 describe('JSON:API ResourceAnalyzer', function () {
+    it('rebuilds response metadata from a cached resource analysis', function () {
+        $original = app(ResourceAnalyzer::class)->buildResourceResponse(PostApiResource::class);
+
+        app()->forgetInstance(ResourceAnalyzer::class);
+
+        $cached = app(ResourceAnalyzer::class)->buildResourceResponse(PostApiResource::class, true);
+
+        expect($cached)->toBeInstanceOf(JsonApiResourceResponse::class)
+            ->and($cached->isCollection)->toBeTrue()
+            ->and($cached->attributes->keys())->toBe($original->attributes->keys())
+            ->and($cached->relationships->keys())->toBe($original->relationships->keys());
+    });
+
     it('detects JSON:API resource with $attributes property', function () {
         $analyzer = app(Analyzer::class);
         $result = $analyzer->analyzeClass(PostApiResource::class)->result();

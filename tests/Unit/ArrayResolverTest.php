@@ -20,6 +20,33 @@ afterEach(function () {
 });
 
 describe('basic array literals', function () {
+    it('preserves known fields around computed array keys', function () {
+        $fixture = createPhpFixture('
+namespace App;
+
+class ComputedArrayKeys
+{
+    public function test(string $unknown): array
+    {
+        $key = "resolved";
+
+        return ["before" => true, $unknown => 1, $key => 2, \\DateTime::ATOM => 3, "after" => false];
+    }
+}');
+
+        try {
+            $type = app(Analyzer::class)->analyze($fixture)->result()->getMethod('test')->returnType();
+
+            expect($type)->toBeInstanceOf(ArrayType::class)
+                ->and($type->value['before']->value)->toBeTrue()
+                ->and($type->value['resolved']->value)->toBe(2)
+                ->and($type->value[DateTime::ATOM]->value)->toBe(3)
+                ->and($type->value['after']->value)->toBeFalse();
+        } finally {
+            unlink($fixture);
+        }
+    });
+
     it('resolves simple list array', function () {
         $fixture = createPhpFixture('
 namespace App;

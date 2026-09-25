@@ -111,7 +111,7 @@ class StaticCall extends AbstractResolver
     protected function handleEntitiesFallback(ClassType $class, string $method, Node\Expr\StaticCall $node): array
     {
         if (in_array($method, ['collection', 'make'])) {
-            return $this->handlePossibleResourceStaticCall($class, isCollection: $method === 'collection');
+            return $this->handlePossibleResourceStaticCall($class, $node, isCollection: $method === 'collection');
         }
 
         return [];
@@ -141,7 +141,7 @@ class StaticCall extends AbstractResolver
         return class_exists($resolved) && is_subclass_of($resolved, JsonResource::class);
     }
 
-    protected function handlePossibleResourceStaticCall(ClassType $class, bool $isCollection): array
+    protected function handlePossibleResourceStaticCall(ClassType $class, Node\Expr\StaticCall $node, bool $isCollection): array
     {
         $resolved = $class->resolved();
 
@@ -150,9 +150,16 @@ class StaticCall extends AbstractResolver
         }
 
         try {
-            $resourceResponse = app(ResourceAnalyzer::class)->buildResourceResponse($resolved, isCollection: $isCollection);
+            $resource = isset($node->args[0]) ? $this->from($node->args[0]->value) : null;
+            $resourceResponse = app(ResourceAnalyzer::class)->buildResourceResponse($resolved, isCollection: $isCollection, resource: $resource);
 
             if ($resourceResponse) {
+                // A nested resource wrapping null is serialized as null. The response
+                // may be the cached JSON:API one, so it is copied before being marked.
+                if ($resource?->isNullable() && is_a($this->scope->entityName(), JsonResource::class, true)) {
+                    $resourceResponse = (clone $resourceResponse)->nullable();
+                }
+
                 return [$resourceResponse];
             }
         } catch (Throwable $e) {

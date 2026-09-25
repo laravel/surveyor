@@ -9,6 +9,7 @@ use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Application;
+use Illuminate\Http\Resources\Json\ResourceCollection;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Concerns\LazilyLoadsDependencies;
 use Laravel\Surveyor\Debug\Debug;
@@ -194,6 +195,14 @@ class Reflector
     public function propertyType(string $name, ClassType|string $class, ?Node $node = null): ?TypeContract
     {
         $reflection = $this->reflectClass($class);
+
+        if ($name === 'collection'
+            && $reflection->isSubclassOf(ResourceCollection::class)
+            && $this->scope->entityName() === $reflection->getName()
+            && ($collection = $this->scope->state()->properties()->get($name))
+        ) {
+            return $collection;
+        }
 
         if ($reflection->getName() === DateInterval::class) {
             return match ($name) {

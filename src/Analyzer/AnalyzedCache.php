@@ -15,7 +15,7 @@ class AnalyzedCache
      * class changes, so an upgrade reads its own entries and not ones left by
      * a version whose objects no longer unserialize cleanly.
      */
-    public const SCHEMA = 5;
+    public const SCHEMA = 6;
 
     protected static array $cached = [];
 

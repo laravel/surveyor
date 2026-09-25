@@ -2,9 +2,23 @@
 
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Entities\InertiaRender;
+use Laravel\Surveyor\Types\Entities\JsonEncoded;
 use Laravel\Surveyor\Types\Entities\View;
 use Laravel\Surveyor\Types\Type;
 use Laravel\Surveyor\Types\UnionType;
+
+describe('JsonEncoded', function () {
+    it('retains encoded payloads alongside literal strings in either order', function (bool $encodedFirst) {
+        $encoded = new JsonEncoded(Type::array(['name' => Type::string()]));
+        $literal = Type::string('{"count":1}');
+        $types = $encodedFirst ? [$encoded, $literal] : [$literal, $encoded];
+
+        $union = Type::union(Type::string(), ...$types);
+
+        expect($union)->toBeInstanceOf(UnionType::class)
+            ->and($union->types)->toBe($types);
+    })->with([true, false]);
+});
 
 describe('View', function () {
     it('properly initializes parent ClassType value', function () {
