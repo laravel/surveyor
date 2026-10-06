@@ -2,6 +2,7 @@
 
 namespace Laravel\Surveyor\Analyzer;
 
+use Closure;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Parser\Parser;
@@ -9,11 +10,35 @@ use ReflectionClass;
 
 class Analyzer
 {
+    /**
+     * How many times one file is gone over at most. Each pass can only settle
+     * what the pass before it left open, so a chain of methods that each ask
+     * for the one below takes a pass per link, and methods that feed each
+     * other a growing list would otherwise never settle at all.
+     */
+    protected const MAX_PASSES = 3;
+
     protected Scope $analyzed;
 
     protected int $analyzing = 0;
 
     protected bool $settling = false;
+
+    /**
+     * What the pass before made of each file that is being gone over again.
+     *
+     * @var array<string, Scope>
+     */
+    protected array $earlierPasses = [];
+
+    /**
+     * Questions asked of a file before its analysis got far enough to answer
+     * them. Each is shown the finished pass and says whether its answer would
+     * now be a different one.
+     *
+     * @var array<string, list<Closure(Scope): bool>>
+     */
+    protected array $openQuestions = [];
 
     public function __construct(
         protected Parser $parser,
@@ -79,7 +104,7 @@ class Analyzer
         AnalyzedCache::beginAnalysis($path);
 
         try {
-            $analyzed = $this->parser->parse(file_get_contents($path), $path);
+            $analyzed = $this->parse($path);
 
             foreach ($analyzed as $result) {
                 if ($result->fullPath() === $path) {
@@ -99,6 +124,90 @@ class Analyzer
         $this->analyzing--;
 
         return $this;
+    }
+
+    /**
+     * Parse a file, and again for as long as that changes an answer.
+     *
+     * A file is read top to bottom, so a method that calls one written below
+     * it asks before there is anything to tell. Going over the file again with
+     * the last pass to hand lets the question be answered, and stopping once
+     * no answer moves keeps a file that never asked from being read twice.
+     *
+     * @return Scope[]
+     */
+    protected function parse(string $path): array
+    {
+        $code = file_get_contents($path);
+        $analyzed = $this->parser->parse($code, $path);
+
+        try {
+            for ($pass = 1; $pass < self::MAX_PASSES; $pass++) {
+                $scope = $this->scopeFor($path, $analyzed);
+
+                if ($scope === null || ! $this->answersMoved($path, $scope)) {
+                    break;
+                }
+
+                $this->earlierPasses[$path] = $scope;
+
+                Debug::log(static fn () => '🔁 Going over again for methods further down: '.self::shortPath($path));
+
+                $analyzed = $this->parser->parse($code, $path);
+            }
+        } finally {
+            unset($this->earlierPasses[$path], $this->openQuestions[$path]);
+        }
+
+        return $analyzed;
+    }
+
+    /**
+     * @param  Scope[]  $analyzed
+     */
+    protected function scopeFor(string $path, array $analyzed): ?Scope
+    {
+        foreach ($analyzed as $scope) {
+            if ($scope->fullPath() === $path) {
+                return $scope;
+            }
+        }
+
+        return null;
+    }
+
+    protected function answersMoved(string $path, Scope $scope): bool
+    {
+        $questions = $this->openQuestions[$path] ?? [];
+
+        unset($this->openQuestions[$path]);
+
+        foreach ($questions as $answerMoved) {
+            if ($answerMoved($scope)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The pass before this one over a file that is still being analyzed.
+     */
+    public function earlierPass(string $path): ?Scope
+    {
+        return $this->earlierPasses[$path] ?? null;
+    }
+
+    /**
+     * Note a question the analysis of a file could not answer yet, to be put
+     * again once the pass in progress is over.
+     *
+     * @param  Closure(Scope): bool  $answerMoved
+     */
+    public function askAgain(string $path, Closure $answerMoved): void
+    {
+        $this->openQuestions[$path][] = $answerMoved;
     }
 
     /**
