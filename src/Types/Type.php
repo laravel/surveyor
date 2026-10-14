@@ -150,7 +150,10 @@ class Type
         }
 
         if (is_array($value)) {
-            return self::array($value);
+            return self::array(array_map(
+                fn ($item) => $item instanceof VariableState ? $item : self::from($item),
+                $value,
+            ));
         }
 
         if (is_string($value)) {

@@ -142,6 +142,17 @@ describe('Type::from() conversion', function () {
         expect($result)->toBeInstanceOf(ArrayType::class);
     });
 
+    it('converts each array item to a type', function () {
+        $result = Type::from(['types' => ['jpeg', 'png'], 'max' => 5120]);
+
+        expect($result)->toBeInstanceOf(ArrayType::class);
+        expect($result->value['types'])->toBeInstanceOf(ArrayType::class);
+        expect($result->value['types']->value[0])->toBeInstanceOf(StringType::class);
+        expect($result->value['types']->value[0]->value)->toBe('jpeg');
+        expect($result->value['max'])->toBeInstanceOf(IntType::class);
+        expect($result->value['max']->value)->toBe(5120);
+    });
+
     it('converts string type names to types', function () {
         expect(Type::from('array'))->toBeInstanceOf(ArrayType::class);
         expect(Type::from('void'))->toBeInstanceOf(VoidType::class);
