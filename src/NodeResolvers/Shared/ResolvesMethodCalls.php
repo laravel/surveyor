@@ -20,6 +20,12 @@ trait ResolvesMethodCalls
     {
         $var = $this->from($node->var);
 
+        if ($this->isInertiaProp($node->var)) {
+            return $node->name instanceof Node\Identifier && $node->name->name === 'defer'
+                ? $var->optional()
+                : $var;
+        }
+
         if ($var instanceof MixedType || ! $var instanceof ClassType) {
             return Type::mixed();
         }
@@ -70,6 +76,23 @@ trait ResolvesMethodCalls
         );
 
         return $this->keepReceiver($var, $returned);
+    }
+
+    protected function isInertiaProp(Node\Expr $expr): bool
+    {
+        while ($expr instanceof Node\Expr\MethodCall || $expr instanceof Node\Expr\NullsafeMethodCall) {
+            $expr = $expr->var;
+        }
+
+        if (! $expr instanceof Node\Expr\StaticCall || ! $expr->name instanceof Node\Identifier) {
+            return false;
+        }
+
+        $class = $this->from($expr->class);
+
+        return $class instanceof ClassType
+            && $class->value === 'Inertia\Inertia'
+            && in_array($expr->name->name, ['defer', 'optional', 'lazy', 'always', 'merge', 'scroll'], true);
     }
 
     /**

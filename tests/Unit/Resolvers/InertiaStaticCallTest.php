@@ -3,6 +3,7 @@
 use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
+use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Entities\InertiaRender;
@@ -167,6 +168,127 @@ class DashboardController
     {
         return Inertia::render(\'Dashboard\', [
             \'users\' => Inertia::merge(fn () => User::all()),
+        ]);
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        $render = findInertiaRender($result->getMethod('index')->returnType());
+
+        expect($render)->not->toBeNull();
+        expect($render->data->value['users'])->toBeInstanceOf(ClassType::class);
+        expect($render->data->value['users']->value)->toBe('Illuminate\\Database\\Eloquent\\Collection');
+        expect($render->data->value['users']->isOptional())->toBeFalse();
+
+        unlink($fixture);
+    });
+
+    it('resolves Inertia::scroll() to the callback return type', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use Inertia\\Inertia;
+use App\\Models\\User;
+
+class DashboardController
+{
+    public function index()
+    {
+        return Inertia::render(\'Dashboard\', [
+            \'users\' => Inertia::scroll(fn () => User::all()),
+        ]);
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        $render = findInertiaRender($result->getMethod('index')->returnType());
+
+        expect($render)->not->toBeNull();
+        expect($render->data->value['users'])->toBeInstanceOf(ClassType::class);
+        expect($render->data->value['users']->value)->toBe('Illuminate\\Database\\Eloquent\\Collection');
+        expect($render->data->value['users']->isOptional())->toBeFalse();
+
+        unlink($fixture);
+    });
+
+    it('keeps the Inertia::scroll() type through a chained defer() and marks it optional', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use Inertia\\Inertia;
+use App\\Models\\User;
+
+class DashboardController
+{
+    public function index()
+    {
+        return Inertia::render(\'Dashboard\', [
+            \'users\' => Inertia::scroll(fn () => User::all())->defer(),
+        ]);
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        $render = findInertiaRender($result->getMethod('index')->returnType());
+
+        expect($render)->not->toBeNull();
+        expect($render->data->value['users'])->toBeInstanceOf(ClassType::class);
+        expect($render->data->value['users']->value)->toBe('Illuminate\\Database\\Eloquent\\Collection');
+        expect($render->data->value['users']->isOptional())->toBeTrue();
+
+        unlink($fixture);
+    });
+
+    it('keeps an array shape through a chained defer()', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use Inertia\\Inertia;
+use App\\Models\\User;
+
+class DashboardController
+{
+    public function index()
+    {
+        return Inertia::render(\'Dashboard\', [
+            \'users\' => Inertia::scroll(fn () => [\'data\' => User::all(), \'total\' => 10])->defer(),
+        ]);
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        $render = findInertiaRender($result->getMethod('index')->returnType());
+
+        expect($render)->not->toBeNull();
+        expect($render->data->value['users'])->toBeInstanceOf(ArrayType::class);
+        expect($render->data->value['users']->value['data']->value)->toBe('Illuminate\\Database\\Eloquent\\Collection');
+        expect($render->data->value['users']->value['total'])->toBeInstanceOf(IntType::class);
+        expect($render->data->value['users']->isOptional())->toBeTrue();
+
+        unlink($fixture);
+    });
+
+    it('keeps the type through other chained prop methods without marking it optional', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use Inertia\\Inertia;
+use App\\Models\\User;
+
+class DashboardController
+{
+    public function index()
+    {
+        return Inertia::render(\'Dashboard\', [
+            \'users\' => Inertia::merge(fn () => User::all())->deepMerge(),
         ]);
     }
 }');
