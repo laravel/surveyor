@@ -10,6 +10,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Application;
 use Laravel\Surveyor\Analysis\Scope;
+use Laravel\Surveyor\Analyzed\ClassLikeResult;
+use Laravel\Surveyor\Analyzed\MethodResult;
+use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Concerns\LazilyLoadsDependencies;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Support\Util;
@@ -25,6 +28,7 @@ use PhpParser\Node\Stmt\TraitUse;
 use ReflectionClass;
 use ReflectionFunction;
 use ReflectionIntersectionType;
+use ReflectionMethod;
 use ReflectionNamedType;
 use ReflectionProperty;
 use ReflectionUnionType;
@@ -101,7 +105,10 @@ class Reflector
     protected function handleFunctionArrayMerge(?CallLike $node): ?array
     {
         $args = collect($node->getArgs())
-            ->map(fn ($arg) => $this->getNodeResolver()->from($arg->value, $this->scope))
+            ->map(fn ($arg) => $this->preferReturnedLiteral(
+                $arg->value,
+                $this->getNodeResolver()->from($arg->value, $this->scope),
+            ))
             ->filter(fn ($arg) => Type::is($arg, ArrayType::class, UnionType::class));
 
         if ($args->every(fn ($arg) => $arg instanceof ArrayType)) {
@@ -433,6 +440,145 @@ class Reflector
                 $this->setScope($scopeToRestore);
             }
         }
+    }
+
+    /**
+     * Trade a type that names no keys for the array literal the call behind it
+     * returns, where there is one to find.
+     *
+     * A return type of `array` says nothing about what is inside, and neither
+     * does `array<string, mixed>`, while the body often spells the keys out.
+     * Going by the declaration alone, spreading such a call into another array
+     * or merging it with one contributes nothing.
+     */
+    public function preferReturnedLiteral(Node $expr, mixed $resolved): mixed
+    {
+        if ($resolved instanceof ArrayType && $resolved->value !== []) {
+            return $resolved;
+        }
+
+        return $this->returnedArrayLiteral($expr) ?? $resolved;
+    }
+
+    /**
+     * Only asked of a call a class makes on itself, which keeps it to the
+     * class's own methods and the traits it uses.
+     */
+    protected function returnedArrayLiteral(Node $call): ?ArrayType
+    {
+        if (! $this->isCalledOnThis($call) || ! $call->name instanceof Node\Identifier) {
+            return null;
+        }
+
+        // A method that calls itself has no answer of its own to build on, and
+        // taking the one from the pass before would grow it on every pass.
+        if ($call->name->name === $this->scope->methodName()) {
+            return null;
+        }
+
+        try {
+            $reflection = $this->reflectClass($this->scope->entityName() ?? '');
+        } catch (Throwable $e) {
+            return null;
+        }
+
+        if (! $reflection->hasMethod($call->name->name)) {
+            return null;
+        }
+
+        return $this->arrayLiteral($this->analyzedMethod($reflection->getMethod($call->name->name)));
+    }
+
+    protected function arrayLiteral(?MethodResult $method): ?ArrayType
+    {
+        $returned = $method?->returnType();
+
+        return $returned instanceof ArrayType && $returned->value !== [] ? $returned : null;
+    }
+
+    /**
+     * @phpstan-assert-if-true Node\Expr\MethodCall $node
+     */
+    protected function isCalledOnThis(Node $node): bool
+    {
+        return $node instanceof Node\Expr\MethodCall
+            && $node->var instanceof Node\Expr\Variable
+            && $node->var->name === 'this';
+    }
+
+    /**
+     * What analysis made of a method, read from the file it is written in,
+     * which for a method that comes from a trait is the trait's own file.
+     */
+    protected function analyzedMethod(ReflectionMethod $method): ?MethodResult
+    {
+        $path = $method->getFileName();
+
+        if (! $path) {
+            return null;
+        }
+
+        // The file being analyzed has no finished result to ask yet, but the
+        // methods above the one in hand have already been through.
+        if (AnalyzedCache::isInProgress($path)) {
+            $result = $this->classLikeResult($this->scope);
+
+            if ($result?->filePath() !== $path) {
+                return null;
+            }
+
+            return $result->getMethod($method->getName())
+                ?? $this->methodFurtherDown($path, $result->name(), $method->getName());
+        }
+
+        $scope = $this->scope;
+
+        try {
+            $result = $this->getAnalyzer()->analyze($path)->result();
+        } finally {
+            $this->setScope($scope);
+        }
+
+        return $result instanceof ClassLikeResult ? $result->getMethod($method->getName()) : null;
+    }
+
+    /**
+     * A method the pass over its file has not reached, as the pass before left
+     * it. The first pass has no pass before it and so nothing to tell, and
+     * asking is what has the file gone over again.
+     */
+    protected function methodFurtherDown(string $path, string $class, string $method): ?MethodResult
+    {
+        $find = static function (?Scope $scope) use ($class, $method): ?MethodResult {
+            $result = $scope?->result();
+
+            return $result instanceof ClassLikeResult && $result->name() === $class
+                ? $result->getMethod($method)
+                : null;
+        };
+
+        $earlier = $find($this->getAnalyzer()->earlierPass($path));
+        $answered = $this->arrayLiteral($earlier)?->toString();
+
+        $this->getAnalyzer()->askAgain(
+            $path,
+            fn (Scope $finished) => $this->arrayLiteral($find($finished))?->toString() !== $answered,
+        );
+
+        return $earlier;
+    }
+
+    protected function classLikeResult(?Scope $scope): ?ClassLikeResult
+    {
+        while ($scope !== null) {
+            if (($result = $scope->result()) instanceof ClassLikeResult) {
+                return $result;
+            }
+
+            $scope = $scope->parent();
+        }
+
+        return null;
     }
 
     /**

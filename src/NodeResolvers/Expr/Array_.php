@@ -31,7 +31,7 @@ class Array_ extends AbstractResolver
             }
 
             if ($item->unpack) {
-                $spreadValue = $this->from($item->value);
+                $spreadValue = $this->reflector->preferReturnedLiteral($item->value, $this->from($item->value));
 
                 if ($spreadValue instanceof ArrayType && ! $spreadValue->isList()) {
                     return false;
@@ -59,7 +59,7 @@ class Array_ extends AbstractResolver
             }
 
             if ($item->unpack) {
-                $spreadValue = $this->from($item->value);
+                $spreadValue = $this->reflector->preferReturnedLiteral($item->value, $this->from($item->value));
 
                 if ($spreadValue instanceof ArrayType) {
                     foreach ($spreadValue->value as $value) {
@@ -87,7 +87,7 @@ class Array_ extends AbstractResolver
             }
 
             if ($item->unpack) {
-                $spreadValue = $this->from($item->value);
+                $spreadValue = $this->reflector->preferReturnedLiteral($item->value, $this->from($item->value));
 
                 if ($spreadValue instanceof ArrayType) {
                     foreach ($spreadValue->value as $key => $value) {
