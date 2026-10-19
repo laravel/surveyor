@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Resources\MetadataTagResource;
 use App\Http\Resources\UserResource;
 use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
+use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Entities\ResourceResponse;
@@ -38,6 +40,65 @@ function findResourceResponse(TypeContract $type): ?ResourceResponse
 }
 
 describe('StaticCall resolver', function () {
+    it('merges fluent additional metadata without mutating the resource shape', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use App\\Http\\Resources\\MetadataTagResource;
+use App\\Models\\Tag;
+
+class MetadataController
+{
+    public function show(Tag $tag)
+    {
+        return MetadataTagResource::make($tag)
+            ->additional(["removed" => true])
+            ->additional(["meta" => ["source" => "controller", "count" => 1]]);
+    }
+}');
+
+        try {
+            $response = app(Analyzer::class)->analyze($fixture)->result()->getMethod('show')->returnType();
+
+            expect($response)->toBeInstanceOf(ResourceResponse::class)
+                ->and($response->additional->value)->not->toHaveKey('removed')
+                ->and($response->additional->value['meta']->keys())->toBe(['version', 'source', 'count'])
+                ->and($response->additional->value['meta']->value['source']->value)->toHaveCount(2);
+
+            $plain = app(ResourceAnalyzer::class)->buildResourceResponse(MetadataTagResource::class);
+
+            expect($plain->additional->value['meta']->keys())->toBe(['version', 'source'])
+                ->and($response->id())->not->toBe($plain->id());
+        } finally {
+            unlink($fixture);
+        }
+    });
+
+    it('does not make a resource nullable because its input is nullable', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use App\\Http\\Resources\\PlainLabelResource;
+use App\\Models\\Tag;
+
+class NullableController
+{
+    public function show(?Tag $tag)
+    {
+        return PlainLabelResource::make($tag);
+    }
+}');
+
+        try {
+            $response = app(Analyzer::class)->analyze($fixture)->result()->getMethod('show')->returnType();
+
+            expect($response)->toBeInstanceOf(ResourceResponse::class)
+                ->and($response->isNullable())->toBeFalse();
+        } finally {
+            unlink($fixture);
+        }
+    });
+
     it('resolves Resource::make($model) to a ResourceResponse', function () {
         $fixture = createPhpFixture('
 namespace App\\Test;
@@ -126,6 +187,68 @@ class CollectionController
 
         unlink($fixture);
     });
+});
+
+describe('Resource response method calls', function () {
+    it('keeps the resource response through fluent collection and response methods', function (string $call) {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use App\\Http\\Resources\\PlainLabelResource;
+use App\\Models\\Tag;
+
+class FluentResourceController
+{
+    public function index()
+    {
+        return PlainLabelResource::collection(Tag::query()->paginate(10))'.$call.';
+    }
+}');
+
+        try {
+            $response = app(Analyzer::class)->analyze($fixture)->result()->getMethod('index')->returnType();
+
+            expect($response)->toBeInstanceOf(ResourceResponse::class)
+                ->and($response->isCollection)->toBeTrue()
+                ->and($response->pagination)->not->toBeNull();
+        } finally {
+            unlink($fixture);
+        }
+    })->with([
+        'preserveQuery()' => ['->preserveQuery()'],
+        'withQuery()' => ['->withQuery(["sort" => "label"])'],
+        'response()' => ['->response()'],
+        'response() with a status' => ['->response()->setStatusCode(201)'],
+        'response() with headers' => ['->response()->header("X-Total", "1")->withHeaders([])'],
+    ]);
+
+    it('records preserved keys set on the collection', function (string $call, bool $preserved) {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use App\\Http\\Resources\\KeyedPropertyLabelResource;
+
+class KeyedResourceController
+{
+    public function index()
+    {
+        return KeyedPropertyLabelResource::collection([])'.$call.';
+    }
+}');
+
+        try {
+            $response = app(Analyzer::class)->analyze($fixture)->result()->getMethod('index')->returnType();
+
+            expect($response)->toBeInstanceOf(ResourceResponse::class)
+                ->and($response->preservesKeys())->toBe($preserved);
+        } finally {
+            unlink($fixture);
+        }
+    })->with([
+        'resource default' => ['', true],
+        'turned off' => ['->preserveKeys(false)', false],
+        'turned back on' => ['->preserveKeys(false)->preserveKeys()', true],
+    ]);
 });
 
 describe('Eloquent builder chains', function () {

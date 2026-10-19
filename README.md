@@ -411,6 +411,10 @@ if ($method->isModelRelation()) {
 }
 ```
 
+## API Resources
+
+`new UserResource($user)`, `UserResource::make($user)`, and `UserResource::collection($users)` resolve to a `ResourceResponse` describing the data the resource serializes, along with its wrapping, additional data, and pagination. A `@mixin` annotation on a resource types the model properties it reads through `$this`.
+
 ## Scope Information
 
 When analyzing files, Surveyor provides detailed scope information including:

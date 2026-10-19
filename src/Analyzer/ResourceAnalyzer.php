@@ -3,13 +3,17 @@
 namespace Laravel\Surveyor\Analyzer;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Resources\Attributes\Collects;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use Illuminate\Http\Resources\JsonApi\JsonApiResource;
+use Illuminate\Support\Collection;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Parser\DocBlockParser;
+use Laravel\Surveyor\Parser\Parser;
 use Laravel\Surveyor\Reflector\Reflector;
 use Laravel\Surveyor\Types\ArrayShapeType;
 use Laravel\Surveyor\Types\ArrayType;
@@ -18,13 +22,16 @@ use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Entities\JsonApiResourceResponse;
 use Laravel\Surveyor\Types\Entities\ResourceResponse;
 use Laravel\Surveyor\Types\Type;
+use PhpParser\Node;
+use PhpParser\NodeFinder;
 use ReflectionClass;
+use ReflectionMethod;
 use ReflectionNamedType;
 use Throwable;
 
 class ResourceAnalyzer
 {
-    /** @var array<string, ResourceResponse|JsonApiResourceResponse> */
+    /** @var array<string, JsonApiResourceResponse> */
     protected array $responses = [];
 
     public function __construct(
@@ -44,6 +51,14 @@ class ResourceAnalyzer
     public function injectModelProperties(string $resource, ClassLikeResult $result, Scope $scope): void
     {
         $this->reflector->setScope($scope);
+
+        if ($this->isResourceCollection($resource) && ($collected = $this->resolveCollectedResource($resource))) {
+            if ($response = $this->buildResourceResponse($collected)) {
+                $scope->state()->properties()->addManually(
+                    'collection', (new ClassType(Collection::class))->setGenericTypes([Type::int(), $response]), 0, 0, 0, 0,
+                );
+            }
+        }
 
         $modelClass = $this->resolveModelClass($resource, $result, $scope);
 
@@ -71,8 +86,8 @@ class ResourceAnalyzer
     }
 
     /**
-     * Phase B: After toArray() has been walked, extract the resolved data shape
-     * and store resource metadata on the ClassLikeResult.
+     * Phase B: After the class has been walked, store JSON:API resource metadata.
+     * Other resources are described by buildResourceResponse() when they are used.
      *
      * Called on class EXIT (after method bodies have been walked).
      */
@@ -82,32 +97,13 @@ class ResourceAnalyzer
 
         if ($this->isJsonApiResource($resource)) {
             $this->resolveJsonApiDataShape($resource, $result, $scope);
-
-            return;
         }
-
-        $data = $this->extractToArrayShape($resource, $result);
-
-        if (! $data) {
-            return;
-        }
-
-        $wrap = $this->resolveWrapKey($resource);
-        $additional = $this->resolveWithMethod($result);
-
-        $this->responses[$resource] = new ResourceResponse(
-            resourceClass: $resource,
-            data: $data,
-            isCollection: $this->isResourceCollection($resource),
-            wrap: $wrap,
-            additional: $additional,
-        );
     }
 
     /**
      * Build a ResourceResponse for a resource class that has already been analyzed.
      */
-    public function buildResourceResponse(string $resourceClass, bool $isCollection = false): ResourceResponse|JsonApiResourceResponse|null
+    public function buildResourceResponse(string $resourceClass, bool $isCollection = false, ?TypeContract $resource = null): ResourceResponse|JsonApiResourceResponse|null
     {
         if (! class_exists($resourceClass)) {
             return null;
@@ -130,43 +126,96 @@ class ResourceAnalyzer
             return null;
         }
 
-        // Reuse the response cached during Phase B if analysis already produced one
-        if ($existing = $this->responses[$resourceClass] ?? null) {
-            if ($isCollection && ! $existing->isCollection) {
-                return new ResourceResponse(
-                    resourceClass: $existing->resourceClass,
-                    data: $existing->data,
-                    isCollection: true,
-                    wrap: $existing->wrap,
-                    additional: $existing->additional,
-                );
-            }
-
-            return $existing;
-        }
-
-        // Fallback: try to extract toArray shape directly
         $data = $this->extractToArrayShape($resourceClass, $result);
 
         if (! $data) {
             return null;
         }
 
-        return new ResourceResponse(
+        $collection = $isCollection ? AnonymousResourceCollection::class : $resourceClass;
+
+        $response = new ResourceResponse(
             resourceClass: $resourceClass,
             data: $data,
-            isCollection: $isCollection || $this->isResourceCollection($resourceClass),
-            wrap: $this->resolveWrapKey($resourceClass),
-            additional: $this->resolveWithMethod($result),
+            isCollection: $isCollection || $this->usesCollectedResourceShape($resourceClass),
+            additional: $isCollection ? null : $this->resolveWithMethod($result),
+            pagination: $this->isResourceCollection($collection) && $resource !== null
+                ? $this->resolvePagination($collection, $resource)
+                : null,
         );
+
+        return $resource === null ? $response : $response->required(! $resource->isOptional());
+    }
+
+    /**
+     * A collection can replace the default links and meta with its own
+     * paginationInformation(). One that builds on the $default it is given, as
+     * Laravel's documentation does, keeps the default shape. Otherwise its own
+     * shape is used when it has known keys, and no pagination is described
+     * rather than the default it replaced.
+     */
+    protected function resolvePagination(string $collection, TypeContract $resource): ?TypeContract
+    {
+        $pagination = app(ResourcePagination::class)->resolve($resource);
+
+        if ($pagination === null) {
+            return null;
+        }
+
+        if (method_exists($collection, 'paginationInformation')) {
+            $method = new ReflectionMethod($collection, 'paginationInformation');
+
+            if ($this->usesDefaultPagination($method)) {
+                return $pagination;
+            }
+
+            $result = $this->analyzer->analyzeClass($method->getDeclaringClass()->getName())->result();
+            $returnType = $result instanceof ClassLikeResult && $result->hasMethod('paginationInformation')
+                ? $result->getMethod('paginationInformation')->returnType()
+                : null;
+
+            return $returnType instanceof ArrayType && $returnType->value !== [] ? $returnType : null;
+        }
+
+        // A macro is a closure registered at runtime, so there is no shape to read.
+        return $collection::hasMacro('paginationInformation') ? null : $pagination;
+    }
+
+    protected function usesDefaultPagination(ReflectionMethod $method): bool
+    {
+        $default = $method->getParameters()[2] ?? null;
+
+        if ($default === null || ! $method->getFileName()) {
+            return false;
+        }
+
+        $finder = new NodeFinder;
+
+        $node = $finder->findFirst(
+            app(Parser::class)->parseFile($method->getFileName()),
+            fn (Node $node) => $node instanceof Node\Stmt\ClassMethod && $node->name->toString() === $method->getName(),
+        );
+
+        return $node instanceof Node\Stmt\ClassMethod && $finder->findFirst(
+            $node->stmts ?? [],
+            fn (Node $node) => $node instanceof Node\Expr\Variable && $node->name === $default->getName(),
+        ) !== null;
     }
 
     protected function extractToArrayShape(string $resource, ClassLikeResult $result): ?TypeContract
     {
-        if ($result->hasMethod('toArray')) {
+        if (! $result->hasMethod('toArray') && ! $this->usesCollectedResourceShape($resource)) {
+            $declaringClass = (new ReflectionClass($resource))->getMethod('toArray')->getDeclaringClass()->getName();
+
+            if ($declaringClass !== JsonResource::class && $declaringClass !== $resource) {
+                $result = $this->analyzer->analyzeClass($declaringClass)->result();
+            }
+        }
+
+        if (! $this->usesCollectedResourceShape($resource) && $result->hasMethod('toArray')) {
             $returnType = $result->getMethod('toArray')->returnType();
 
-            if ($returnType instanceof ArrayType) {
+            if ($returnType instanceof ArrayType || $returnType instanceof ArrayShapeType) {
                 return $returnType;
             }
         }
@@ -279,29 +328,21 @@ class ResourceAnalyzer
         return null;
     }
 
-    protected function resolveWrapKey(string $resource): ?string
-    {
-        try {
-            $reflection = new ReflectionClass($resource);
-
-            if ($reflection->hasProperty('wrap')) {
-                $property = $reflection->getProperty('wrap');
-
-                if ($property->isStatic()) {
-                    return $property->getValue();
-                }
-            }
-        } catch (Throwable $e) {
-            Debug::error($e, 'Reading $wrap property on resource');
-        }
-
-        return 'data';
-    }
-
     protected function resolveWithMethod(ClassLikeResult $result): ?TypeContract
     {
         if (! $result->hasMethod('with')) {
-            return null;
+            $class = $result->name();
+            $declaringClass = (new ReflectionClass($class))->getMethod('with')->getDeclaringClass()->getName();
+
+            if ($declaringClass === JsonResource::class || $declaringClass === $class) {
+                return null;
+            }
+
+            $result = $this->analyzer->analyzeClass($declaringClass)->result();
+
+            if (! $result instanceof ClassLikeResult || ! $result->hasMethod('with')) {
+                return null;
+            }
         }
 
         $returnType = $result->getMethod('with')->returnType();
@@ -318,10 +359,21 @@ class ResourceAnalyzer
         return is_subclass_of($resource, ResourceCollection::class);
     }
 
+    protected function usesCollectedResourceShape(string $resource): bool
+    {
+        return $this->isResourceCollection($resource)
+            && (new ReflectionClass($resource))->getMethod('toArray')->getDeclaringClass()->getName() === ResourceCollection::class;
+    }
+
     protected function resolveCollectedResource(string $collectionClass): ?string
     {
         try {
             $reflection = new ReflectionClass($collectionClass);
+
+            // Check #[Collects] attribute
+            if (class_exists(Collects::class) && ($attribute = $reflection->getAttributes(Collects::class)[0] ?? null)) {
+                return $attribute->newInstance()->class;
+            }
 
             // Check $collects property
             if ($reflection->hasProperty('collects')) {
@@ -333,11 +385,16 @@ class ResourceAnalyzer
                 }
             }
 
-            // Naming convention: UserCollection → UserResource
+            // Naming convention: UserCollection → User or UserResource
             $baseName = class_basename($collectionClass);
-            $resourceName = preg_replace('/Collection$/', 'Resource', $baseName);
 
-            if ($resourceName !== $baseName) {
+            foreach (['', 'Resource'] as $suffix) {
+                $resourceName = preg_replace('/Collection$/', $suffix, $baseName);
+
+                if ($resourceName === $baseName) {
+                    break;
+                }
+
                 $namespace = str($collectionClass)->beforeLast('\\')->toString();
                 $candidate = $namespace.'\\'.$resourceName;
 
@@ -534,6 +591,12 @@ class ResourceAnalyzer
         }
 
         $existing = $this->responses[$resourceClass] ?? null;
+
+        if (! $existing instanceof JsonApiResourceResponse) {
+            $scope = $analyzed->analyzed();
+            $this->resolveJsonApiDataShape($resourceClass, $result, $scope);
+            $existing = $this->responses[$resourceClass] ?? null;
+        }
 
         if ($existing instanceof JsonApiResourceResponse) {
             if ($isCollection && ! $existing->isCollection) {

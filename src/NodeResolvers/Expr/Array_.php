@@ -7,6 +7,7 @@ use Laravel\Surveyor\NodeResolvers\Shared\ResolvesIgnoreMarkers;
 use Laravel\Surveyor\Result\VariableState;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
+use Laravel\Surveyor\Types\Entities\ResourceMerge;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
 
@@ -73,7 +74,7 @@ class Array_ extends AbstractResolver
             $result[] = $this->resolveItemValue($item);
         }
 
-        return Type::array($result);
+        return Type::array($this->mergeResourceValues($result));
     }
 
     protected function resolveKeyedArray(Node\Expr\Array_ $node)
@@ -98,10 +99,57 @@ class Array_ extends AbstractResolver
                 continue;
             }
 
-            $result[$item->key->value ?? null] = $this->resolveItemValue($item);
+            $value = $this->resolveItemValue($item);
+
+            if ($item->key === null) {
+                $result[] = $value;
+            } else {
+                $key = $item->key->value ?? ($this->from($item->key)->value ?? null);
+
+                if (is_scalar($key)) {
+                    $result[$key] = $value;
+                }
+            }
         }
 
-        return Type::array($result);
+        return Type::array($this->mergeResourceValues($result));
+    }
+
+    /**
+     * Flatten the first resource merge at a numeric key into the array the way
+     * Laravel's resource filter() does: a list is spliced in, while keyed data
+     * gives way to earlier keys and takes precedence over later ones. A later
+     * key still fills in for a merged key that may be missing.
+     */
+    protected function mergeResourceValues(array $values): array
+    {
+        $index = 0;
+
+        foreach ($values as $key => $value) {
+            if (is_numeric($key) && $value instanceof ResourceMerge) {
+                $before = array_slice($values, 0, $index, true);
+                $after = $this->mergeResourceValues(array_slice($values, $index + 1, null, true));
+
+                if ($value->isList()) {
+                    return array_merge($before, $value->value, $after);
+                }
+
+                $merged = $value->value;
+
+                foreach ($merged as $mergedKey => $type) {
+                    if ($type->isOptional() && isset($after[$mergedKey])) {
+                        $fallback = $after[$mergedKey];
+                        $merged[$mergedKey] = (clone Type::union($type, $fallback))->required(! $fallback->isOptional());
+                    }
+                }
+
+                return $before + $merged + $after;
+            }
+
+            $index++;
+        }
+
+        return $values;
     }
 
     protected function resolveItemValue(Node\ArrayItem $item): TypeContract

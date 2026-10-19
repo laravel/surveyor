@@ -6,9 +6,11 @@ use Laravel\Surveyor\Analysis\Condition;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\Types;
 use Laravel\Surveyor\Types\Entities\InertiaRender;
+use Laravel\Surveyor\Types\Entities\JsonEncoded;
 use Laravel\Surveyor\Types\Entities\View;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
+use ReflectionMethod;
 
 class FuncCall extends AbstractResolver
 {
@@ -36,12 +38,105 @@ class FuncCall extends AbstractResolver
 
         $name = $node->name->toString();
 
+        if ($name === 'json_encode' && ! $node->isFirstClassCallable() && isset($node->args[0])) {
+            return $this->resolveJsonEncode($node);
+        }
+
         $returnTypes = array_merge(
             $this->reflector->functionReturnType($name, $node),
             $this->handleEntities($name, $node),
         );
 
         return Type::union(...$returnTypes);
+    }
+
+    /**
+     * Keep the encoded value's type so a toJson() built on json_encode() can be
+     * read back. Flags that change the structure are honored or, when they
+     * cannot be read, leave the payload unknown.
+     */
+    protected function resolveJsonEncode(Node\Expr\FuncCall $node): Types\Contracts\Type
+    {
+        $arguments = [];
+
+        foreach ($node->getArgs() as $index => $argument) {
+            $arguments[$argument->name?->name ?? ['value', 'flags', 'depth'][$index]] = $argument->value;
+        }
+
+        $data = isset($arguments['value']) ? $this->from($arguments['value']) : Type::mixed();
+        $flags = isset($arguments['flags']) ? $this->jsonFlags($arguments['flags']) : 0;
+
+        if ($flags === null || ($flags & JSON_NUMERIC_CHECK)) {
+            $data = Type::mixed();
+        } elseif ($flags & JSON_FORCE_OBJECT) {
+            $data = $this->forceJsonObject($data);
+        }
+
+        $encoded = new JsonEncoded($data);
+
+        return $flags !== null && ($flags & JSON_THROW_ON_ERROR)
+            ? $encoded
+            : Type::union($encoded, Type::bool(false));
+    }
+
+    /**
+     * The json_encode() flags an expression evaluates to, or null when unknown.
+     */
+    protected function jsonFlags(Node\Expr $expression): ?int
+    {
+        if ($expression instanceof Node\Expr\ConstFetch && str_starts_with($expression->name->toString(), 'JSON_')) {
+            $constant = $expression->name->toString();
+
+            return defined($constant) ? constant($constant) : null;
+        }
+
+        if ($expression instanceof Node\Expr\BinaryOp\BitwiseOr) {
+            $left = $this->jsonFlags($expression->left);
+            $right = $this->jsonFlags($expression->right);
+
+            return $left === null || $right === null ? null : $left | $right;
+        }
+
+        $type = $this->from($expression);
+
+        if ($type instanceof Types\IntType && $type->value !== null) {
+            return $type->value;
+        }
+
+        // Laravel serializes Jsonable values by calling toJson() without arguments.
+        if ($expression instanceof Node\Expr\Variable && $this->scope->methodName() === 'toJson') {
+            $method = new ReflectionMethod($this->scope->entityName(), 'toJson');
+
+            foreach ($method->getParameters() as $parameter) {
+                if ($parameter->getName() === $expression->name && $parameter->isDefaultValueAvailable()) {
+                    $default = $parameter->getDefaultValue();
+
+                    return is_int($default) ? $default : null;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * JSON_FORCE_OBJECT encodes every list as an object keyed by index.
+     */
+    protected function forceJsonObject(Types\Contracts\Type $data): Types\Contracts\Type
+    {
+        if ($data instanceof Types\ArrayType) {
+            $values = array_map(fn ($value) => $this->forceJsonObject($value), $data->value);
+
+            return $data->isList()
+                ? Type::arrayShape(Type::string(), Type::union(...$values))
+                : Type::array($values);
+        }
+
+        if ($data instanceof Types\ArrayShapeType) {
+            return Type::arrayShape(Type::string(), $this->forceJsonObject($data->valueType));
+        }
+
+        return $data;
     }
 
     protected function handleEntities(string $name, Node\Expr\FuncCall $node): array

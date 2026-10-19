@@ -16,10 +16,10 @@ class StringType extends AbstractType implements Contracts\Type
 
     public function isMoreSpecificThan(Contracts\Type $type): bool
     {
-        if (! $type instanceof StringType) {
+        if ($type::class !== self::class) {
             return false;
         }
 
-        return $type->value === null;
+        return $this->value !== null && $type->value === null;
     }
 }
