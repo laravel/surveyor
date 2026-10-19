@@ -3,6 +3,7 @@
 use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
+use Laravel\Surveyor\Types\BoolType;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Entities\InertiaRender;
@@ -153,6 +154,37 @@ class DashboardController
 
         unlink($fixture);
     });
+
+    it('does not make the original value optional', function (string $method) {
+        $fixture = createPhpFixture('
+namespace App\Test;
+
+use Inertia\Inertia;
+
+class DashboardController
+{
+    public function index()
+    {
+        $flag = true;
+
+        return Inertia::render("Dashboard", [
+            "plain" => $flag,
+            "wrapped" => Inertia::'.$method.'(fn () => $flag),
+        ]);
+    }
+}');
+
+        $result = app(Analyzer::class)->analyze($fixture)->result();
+        $render = findInertiaRender($result->getMethod('index')->returnType());
+
+        expect($render)->not->toBeNull();
+        expect($render->data->value['plain'])->toBeInstanceOf(BoolType::class);
+        expect($render->data->value['plain']->isOptional())->toBeFalse();
+        expect($render->data->value['wrapped'])->toBeInstanceOf(BoolType::class);
+        expect($render->data->value['wrapped']->isOptional())->toBeTrue();
+
+        unlink($fixture);
+    })->with(['defer', 'optional', 'lazy']);
 
     it('resolves Inertia::merge() to the callback return type', function () {
         $fixture = createPhpFixture('

@@ -185,7 +185,7 @@ class StaticCall extends AbstractResolver
             $type = $this->resolveClosureReturnType($args[0]->value) ?? Type::mixed();
 
             if (in_array($method, ['defer', 'optional', 'lazy'], true)) {
-                $type->optional();
+                $type = (clone $type)->optional();
             }
 
             return [$type];
