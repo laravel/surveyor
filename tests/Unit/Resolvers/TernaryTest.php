@@ -3,6 +3,7 @@
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
 use Laravel\Surveyor\Types\ArrayType;
+use Laravel\Surveyor\Types\BoolType;
 use Laravel\Surveyor\Types\IntType;
 use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\UnionType;
@@ -106,6 +107,46 @@ describe('Ternary resolver', function () {
 
         foreach ($types as $inner) {
             expect($inner)->toBeInstanceOf(StringType::class);
+        }
+    });
+
+    it('preserves the condition type', function () {
+        $type = ternaryReturnType('
+            $flag = true;
+            $label = $flag ? "yes" : "no";
+
+            return $flag;
+        ');
+
+        expect($type)->toBeInstanceOf(BoolType::class);
+        expect($type->isNullable())->toBeFalse();
+    });
+
+    it('preserves the condition type with narrowing callback', function () {
+        $type = ternaryReturnType('
+            /** @var bool|null $flag */
+            $flag = true;
+            $label = empty($flag) ? "yes" : "no";
+
+            return $flag;
+        ');
+
+        expect($type)->toBeInstanceOf(BoolType::class);
+        expect($type->isNullable())->toBeTrue();
+    });
+
+    it('does not make a false boolean branch nullable', function () {
+        $type = ternaryReturnType('
+            $flag = false;
+
+            return $flag ? true : $flag;
+        ');
+
+        $types = $type instanceof UnionType ? $type->types : [$type];
+
+        foreach ($types as $inner) {
+            expect($inner)->toBeInstanceOf(BoolType::class);
+            expect($inner->isNullable())->toBeFalse();
         }
     });
 });
