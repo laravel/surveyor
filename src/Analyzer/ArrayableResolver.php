@@ -5,9 +5,11 @@ namespace Laravel\Surveyor\Analyzer;
 use Illuminate\Contracts\Support\Arrayable;
 use JsonSerializable;
 use Laravel\Surveyor\Analyzed\ClassLikeResult;
+use Laravel\Surveyor\Types\ArrayShapeType;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
+use Laravel\Surveyor\Types\MixedType;
 use ReflectionClass;
 use Throwable;
 
@@ -68,7 +70,7 @@ class ArrayableResolver
         if ($isArrayable && $analyzed->hasMethod('toArray')) {
             $returnType = $analyzed->getMethod('toArray')->returnType();
 
-            if ($returnType instanceof ArrayType) {
+            if ($returnType instanceof ArrayType || $returnType instanceof ArrayShapeType) {
                 return $returnType;
             }
         }
@@ -76,7 +78,7 @@ class ArrayableResolver
         if ($isJsonSerializable && $analyzed->hasMethod('jsonSerialize')) {
             $returnType = $analyzed->getMethod('jsonSerialize')->returnType();
 
-            if ($returnType instanceof ArrayType) {
+            if (! $returnType instanceof MixedType) {
                 return $returnType;
             }
         }
