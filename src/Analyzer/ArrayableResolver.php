@@ -22,7 +22,7 @@ class ArrayableResolver
     }
 
     /**
-     * Resolve a ClassType to its array shape if it implements Arrayable or JsonSerializable.
+     * Resolve a ClassType to its serialized type if it implements Arrayable or JsonSerializable.
      * Uses runtime reflection (class_implements) to catch inherited interfaces.
      * Returns null if the class is not resolvable.
      */
