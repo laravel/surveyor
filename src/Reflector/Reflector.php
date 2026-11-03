@@ -565,9 +565,10 @@ class Reflector
 
     /**
      * What analysis made of a method, read from the file it is written in,
-     * which for a method that comes from a trait is the trait's own file.
+     * which for a method that comes from a trait or a parent class is that
+     * trait's or parent's own file.
      */
-    protected function analyzedMethod(ReflectionMethod $method): ?MethodResult
+    public function analyzedMethod(ReflectionMethod $method): ?MethodResult
     {
         $path = $method->getFileName();
 
