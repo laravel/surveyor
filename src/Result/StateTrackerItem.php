@@ -2,7 +2,6 @@
 
 namespace Laravel\Surveyor\Result;
 
-use Illuminate\Support\Arr;
 use InvalidArgumentException;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Support\ShimmedNode;
@@ -102,7 +101,40 @@ class StateTrackerItem
 
     public function unsetArrayKey(string $name, string|array $key, NodeAbstract $node): void
     {
-        $this->updateArrayKey($name, $key, Type::null(), $node);
+        $this->unsetArrayKeys($name, [is_array($key) ? $key : [$key]], $node);
+    }
+
+    /**
+     * Every key one unset() statement removes from a variable has to be taken
+     * out together, since each would otherwise start from the state before it.
+     *
+     * @param  list<list<string|int>>  $paths
+     */
+    public function unsetArrayKeys(string $name, array $paths, NodeAbstract $node): void
+    {
+        $lastValue = $this->getLastSnapshotValue($name) ?? $this->getAtLine($name, $node);
+        $type = $lastValue?->type();
+
+        $without = function (ArrayType $array) use ($paths): ArrayType {
+            foreach ($paths as $path) {
+                $array = $this->withoutArrayPath($array, $path);
+            }
+
+            return $array;
+        };
+
+        $newType = match (true) {
+            $type instanceof ArrayType => $without($type),
+            $type instanceof UnionType => new UnionType(array_map(
+                fn ($member) => $member instanceof ArrayType ? $without($member) : $member,
+                $type->types,
+            )),
+            default => null,
+        };
+
+        if ($newType !== null) {
+            $this->updateSnapshotOrVariable($name, $this->getAttributes($newType, $node));
+        }
     }
 
     public function removeType(string $name, NodeAbstract $node, TypeContract $type): void
@@ -213,17 +245,53 @@ class StateTrackerItem
         return $this->getLastValue($name)?->type();
     }
 
+    /**
+     * Set a nested key, keeping each level an ArrayType with its other keys.
+     */
+    protected function withArrayPath(ArrayType $array, array $keys, TypeContract $type): ArrayType
+    {
+        $value = $array->value;
+        $key = array_shift($keys);
+
+        if ($keys === []) {
+            $value[$key] = $type;
+        } else {
+            $child = $value[$key] ?? null;
+            $child = $child instanceof VariableState ? $child->type() : $child;
+
+            $value[$key] = $this->withArrayPath($child instanceof ArrayType ? $child : new ArrayType([]), $keys, $type);
+        }
+
+        return new ArrayType($value);
+    }
+
+    protected function withoutArrayPath(ArrayType $array, array $keys): ArrayType
+    {
+        $value = $array->value;
+        $key = array_shift($keys);
+
+        $child = $value[$key] ?? null;
+        $child = $child instanceof VariableState ? $child->type() : $child;
+
+        if ($keys === []) {
+            unset($value[$key]);
+        } elseif ($child instanceof ArrayType) {
+            $value[$key] = $this->withoutArrayPath($child, $keys);
+        }
+
+        return new ArrayType($value);
+    }
+
     protected function resolveArrayKeyType(?VariableState $lastValue, string|array $key, TypeContract $type): TypeContract
     {
         $key = is_array($key) ? $key : [$key];
-        $newArray = Arr::undot([implode('.', $key) => $type]);
 
         if ($lastValue === null || $lastValue->type() instanceof MixedType) {
-            return new ArrayType($newArray);
+            return $this->withArrayPath(new ArrayType([]), $key, $type);
         }
 
         if ($lastValue->type() instanceof ArrayType) {
-            return new ArrayType(array_merge($lastValue->type()->value, $newArray));
+            return $this->withArrayPath($lastValue->type(), $key, $type);
         }
 
         if ($lastValue->type() instanceof ArrayShapeType) {
@@ -235,7 +303,7 @@ class StateTrackerItem
 
             try {
                 return new UnionType(
-                    array_map(fn ($t) => ! $t instanceof ArrayType ? $t : new ArrayType(array_merge($t->value, $newArray)), $existingTypes)
+                    array_map(fn ($t) => ! $t instanceof ArrayType ? $t : $this->withArrayPath($t, $key, $type), $existingTypes)
                 );
             } catch (Throwable $e) {
                 Debug::error($e, 'Merging union types');

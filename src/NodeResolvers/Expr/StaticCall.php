@@ -4,6 +4,9 @@ namespace Laravel\Surveyor\NodeResolvers\Expr;
 
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule as ValidationRule;
+use Illuminate\Validation\Rules\Enum as EnumRule;
+use Illuminate\Validation\Rules\In as InRule;
 use Laravel\Surveyor\Analysis\Condition;
 use Laravel\Surveyor\Analyzer\ResourceAnalyzer;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
@@ -13,6 +16,7 @@ use Laravel\Surveyor\NodeResolvers\Shared\ResolvesEloquentAttributes;
 use Laravel\Surveyor\Support\Util;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\MultiType;
+use Laravel\Surveyor\Types\Entities\InertiaProp;
 use Laravel\Surveyor\Types\Entities\InertiaRender;
 use Laravel\Surveyor\Types\Entities\View;
 use Laravel\Surveyor\Types\StringType;
@@ -38,6 +42,12 @@ class StaticCall extends AbstractResolver
 
         if ($class instanceof ClassType && $class->value === Validator::class && $method === 'make') {
             $this->addValidationRules($node->args[1]->value);
+        }
+
+        // Rule::enum() and Rule::in() only mean something with their arguments.
+        if ($class instanceof ClassType && $class->value === ValidationRule::class && in_array($method, ['enum', 'in'], true)) {
+            return (new ClassType($method === 'enum' ? EnumRule::class : InRule::class))
+                ->setConstructorArguments(array_map(fn ($arg) => $this->from($arg->value), $node->getArgs()));
         }
 
         if ($class instanceof UnionType) {
@@ -125,7 +135,7 @@ class StaticCall extends AbstractResolver
 
         if (
             $class->value === 'Inertia\Inertia'
-            && in_array($method, ['defer', 'optional', 'lazy', 'always', 'merge'], true)
+            && in_array($method, ['defer', 'optional', 'lazy', 'always', 'merge', 'deepMerge', 'once', 'scroll'], true)
         ) {
             return true;
         }
@@ -167,6 +177,11 @@ class StaticCall extends AbstractResolver
         if ($method === 'render') {
             $args = array_map(fn ($arg) => $this->from($arg->value), $node->getArgs());
 
+            // A page type is only useful when the component name is known exactly.
+            if (! (($args[0] ?? null) instanceof StringType) || $args[0]->value === null) {
+                return [];
+            }
+
             return [
                 new InertiaRender(
                     $args[0]->value,
@@ -175,20 +190,29 @@ class StaticCall extends AbstractResolver
             ];
         }
 
-        if (in_array($method, ['defer', 'optional', 'lazy', 'always', 'merge'], true)) {
+        $propClass = match ($method) {
+            'defer' => 'Inertia\\DeferProp',
+            'optional' => 'Inertia\\OptionalProp',
+            'lazy' => 'Inertia\\LazyProp',
+            'always' => 'Inertia\\AlwaysProp',
+            'merge', 'deepMerge' => 'Inertia\\MergeProp',
+            'once' => 'Inertia\\OnceProp',
+            'scroll' => 'Inertia\\ScrollProp',
+            default => null,
+        };
+
+        if ($propClass !== null) {
             $args = $node->getArgs();
 
-            if (empty($args)) {
-                return [Type::mixed()];
-            }
+            // Every helper takes its value first, either directly or as a callback.
+            $value = empty($args)
+                ? Type::mixed()
+                : ($this->resolveClosureReturnType($args[0]->value) ?? $this->from($args[0]->value) ?? Type::mixed());
 
-            $type = $this->resolveClosureReturnType($args[0]->value) ?? Type::mixed();
+            $prop = new InertiaProp($propClass, $value);
 
-            if (in_array($method, ['defer', 'optional', 'lazy'], true)) {
-                $type->optional();
-            }
-
-            return [$type];
+            // These are left out of the first page load until asked for.
+            return [in_array($method, ['defer', 'optional', 'lazy'], true) ? $prop->optional() : $prop];
         }
 
         return [];

@@ -358,6 +358,10 @@ class Reflector
                 return [$this->scope->result()->getProperty($method)->type];
             }
 
+            if ($parentType = $this->genericParentDeclaring($class, $reflection, $method)) {
+                return $this->methodReturnType($parentType, $method, $node);
+            }
+
             $returnTypes = [];
 
             if ($reflection->hasMethod($method)) {
@@ -367,18 +371,9 @@ class Reflector
                     $returnTypes[] = $this->returnType($methodReflection->getReturnType());
                 }
 
-                $methodDocComment = $methodReflection->getDocComment();
-
-                if ($methodDocComment) {
-                    array_push(
-                        $returnTypes,
-                        ...$this->parseDocBlock($methodDocComment),
-                    );
-                }
-
                 array_push(
                     $returnTypes,
-                    ...$this->parseDocBlock($methodDocComment, $node)
+                    ...$this->parseDocBlock($methodReflection->getDocComment() ?: '', $node)
                 );
             }
 
@@ -392,7 +387,11 @@ class Reflector
             if (count($returnTypes) === 0 && $reflection->isSubclassOf(Model::class)) {
                 array_push(
                     $returnTypes,
-                    ...$this->methodReturnType(Builder::class, $method, $node),
+                    ...$this->methodReturnType(
+                        (new ClassType(Builder::class))->setGenericTypes([new ClassType($reflection->getName())]),
+                        $method,
+                        $node,
+                    ),
                 );
             }
 
@@ -433,6 +432,33 @@ class Reflector
                 $this->setScope($scopeToRestore);
             }
         }
+    }
+
+    /**
+     * A generic class whose method lives on a generic parent has to hand its
+     * bound templates up through its @extends tag, or the parent's templates
+     * (e.g. TValue) reach the caller unbound.
+     */
+    protected function genericParentDeclaring(ClassType|string $class, ReflectionClass $reflection, string $method): ?ClassType
+    {
+        if (! $class instanceof ClassType || count($class->genericTypes()) === 0 || ! $reflection->hasMethod($method)) {
+            return null;
+        }
+
+        $declaring = $reflection->getMethod($method)->getDeclaringClass();
+        $parent = $reflection->getParentClass();
+
+        if (! $parent || $declaring->getName() === $reflection->getName() || ! $reflection->isSubclassOf($declaring->getName())) {
+            return null;
+        }
+
+        foreach ($this->getDocBlockParser()->parseExtendsTags($reflection->getDocComment() ?: '') as $extends) {
+            if ($extends instanceof ClassType && ltrim($extends->value, '\\') === $parent->getName() && count($extends->genericTypes()) > 0) {
+                return $extends;
+            }
+        }
+
+        return null;
     }
 
     /**

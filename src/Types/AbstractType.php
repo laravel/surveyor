@@ -10,11 +10,20 @@ abstract class AbstractType implements Contracts\Type
 
     abstract public function id(): string;
 
+    /**
+     * Types are shared between results, so a change returns a copy instead of
+     * altering every other place that holds the same instance.
+     */
     public function nullable(bool $nullable = true): static
     {
-        $this->nullable = $nullable;
+        if ($this->nullable === $nullable) {
+            return $this;
+        }
 
-        return $this;
+        $copy = clone $this;
+        $copy->nullable = $nullable;
+
+        return $copy;
     }
 
     public function isMoreSpecificThan(Contracts\Type $type): bool
@@ -24,16 +33,19 @@ abstract class AbstractType implements Contracts\Type
 
     public function required(bool $required = true): static
     {
-        $this->required = $required;
+        if ($this->required === $required) {
+            return $this;
+        }
 
-        return $this;
+        $copy = clone $this;
+        $copy->required = $required;
+
+        return $copy;
     }
 
     public function optional(bool $optional = true): static
     {
-        $this->required = ! $optional;
-
-        return $this;
+        return $this->required(! $optional);
     }
 
     public function isOptional(): bool

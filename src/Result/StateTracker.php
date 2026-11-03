@@ -104,6 +104,18 @@ class StateTracker
         );
     }
 
+    /**
+     * @param  list<list<string|int>>  $paths
+     */
+    public function unsetArrayKeys(NodeAbstract $node, array $paths, ?NodeAbstract $referenceNode = null): void
+    {
+        $this->route(
+            $node,
+            fn ($node) => $this->variableTracker->unsetArrayKeys($node->name, $paths, $referenceNode ?? $node),
+            fn ($node) => $this->propertyTracker->unsetArrayKeys($node->name->name, $paths, $referenceNode ?? $node)
+        );
+    }
+
     public function removeArrayKeyType(NodeAbstract $node, string|array $key, TypeContract $type, ?NodeAbstract $referenceNode = null): void
     {
         $this->route(

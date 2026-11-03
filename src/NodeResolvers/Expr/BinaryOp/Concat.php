@@ -14,7 +14,10 @@ class Concat extends AbstractResolver
         $left = $this->from($node->left) ?? Type::string();
         $right = $this->from($node->right) ?? Type::string();
 
-        if (Type::is($left, StringType::class) && Type::is($right, StringType::class)) {
+        if (
+            Type::is($left, StringType::class) && $left->value !== null
+            && Type::is($right, StringType::class) && $right->value !== null
+        ) {
             return Type::string($left->value.$right->value);
         }
 

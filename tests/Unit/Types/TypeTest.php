@@ -263,26 +263,34 @@ describe('Type::is()', function () {
 });
 
 describe('type properties', function () {
-    it('tracks nullable state', function () {
+    it('tracks nullable state on a copy', function () {
         $type = Type::string();
         expect($type->isNullable())->toBeFalse();
 
-        $type->nullable(true);
-        expect($type->isNullable())->toBeTrue();
-
-        $type->nullable(false);
+        $nullable = $type->nullable(true);
+        expect($nullable->isNullable())->toBeTrue();
         expect($type->isNullable())->toBeFalse();
+
+        expect($nullable->nullable(false)->isNullable())->toBeFalse();
+        expect($nullable->isNullable())->toBeTrue();
     });
 
-    it('tracks required state', function () {
+    it('tracks required state on a copy', function () {
         $type = Type::string();
         expect($type->isOptional())->toBeFalse();
 
-        $type->optional(true);
-        expect($type->isOptional())->toBeTrue();
-
-        $type->required(true);
+        $optional = $type->optional(true);
+        expect($optional->isOptional())->toBeTrue();
         expect($type->isOptional())->toBeFalse();
+
+        expect($optional->required(true)->isOptional())->toBeFalse();
+    });
+
+    it('returns the same instance when nothing changes', function () {
+        $type = Type::string();
+
+        expect($type->nullable(false))->toBe($type);
+        expect($type->required(true))->toBe($type);
     });
 
     it('returns unique id', function () {

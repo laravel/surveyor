@@ -24,8 +24,33 @@ class ClassType extends AbstractType implements Contracts\Type
         return $this;
     }
 
+    protected bool $classString = false;
+
+    /**
+     * The same class, standing for its name (Foo::class) rather than an instance.
+     */
+    public function asClassString(): static
+    {
+        $copy = clone $this;
+        $copy->classString = true;
+
+        return $copy;
+    }
+
+    public function isClassString(): bool
+    {
+        return $this->classString;
+    }
+
+    public function constructorArguments(): array
+    {
+        return $this->constructorArguments;
+    }
+
     public function setGenericTypes(array $genericTypes): self
     {
+        $genericTypes = array_map(fn ($type) => $type ?? Type::mixed(), $genericTypes);
+
         $this->genericTypes = $genericTypes;
 
         return $this;
@@ -48,7 +73,7 @@ class ClassType extends AbstractType implements Contracts\Type
             $id .= '<'.implode(',', $genericIds).'>';
         }
 
-        return $id;
+        return $this->classString ? "class-string<{$id}>" : $id;
     }
 
     public function genericTypes(): array

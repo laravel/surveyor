@@ -11,6 +11,7 @@ use Laravel\Surveyor\Analyzed\MethodResult;
 use Laravel\Surveyor\Analyzed\PropertyResult;
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
 use Laravel\Surveyor\NodeResolvers\Shared\ResolvesIgnoreMarkers;
+use Laravel\Surveyor\Support\ValidationRules;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\StringType;
@@ -110,11 +111,6 @@ class ClassMethod extends AbstractResolver
 
     protected function parseSubRule(TypeContract $subRule)
     {
-        if ($subRule instanceof StringType) {
-            return ValidationRuleParser::parse($subRule->value);
-        }
-
-        // Class based rules are not supported yet
-        return null;
+        return ValidationRules::parse($subRule);
     }
 }

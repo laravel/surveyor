@@ -40,3 +40,29 @@ class ArrayDimAssignTest
         expect($returnType->value)->toBe(1);
     });
 });
+
+describe('array keys', function () {
+    it('keeps assigned keys and removes unset ones', function () {
+        $fixture = createPhpFixture('
+namespace App;
+
+class ArrayKeyAssignTest
+{
+    public function test(bool $flag)
+    {
+        $array = ["keep" => 1, "drop" => "x", "meta" => ["a" => 1, "b" => 2]];
+        $array["2fa_enabled"] = $flag;
+        $array["meta"]["c"] = 3;
+        unset($array["drop"], $array["meta"]["a"]);
+
+        return $array;
+    }
+}
+');
+
+        $type = app(Analyzer::class)->analyze($fixture)->result()->getMethod('test')->returnType();
+
+        expect(array_keys($type->value))->toBe(['keep', 'meta', '2fa_enabled']);
+        expect(array_keys($type->value['meta']->value))->toBe(['b', 'c']);
+    });
+});

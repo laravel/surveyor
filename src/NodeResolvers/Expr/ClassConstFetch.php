@@ -3,6 +3,7 @@
 namespace Laravel\Surveyor\NodeResolvers\Expr;
 
 use Laravel\Surveyor\NodeResolvers\AbstractResolver;
+use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Type;
 use PhpParser\Node;
 
@@ -11,7 +12,11 @@ class ClassConstFetch extends AbstractResolver
     public function resolve(Node\Expr\ClassConstFetch $node)
     {
         if ($node->name instanceof Node\Identifier && $node->name->name === 'class') {
-            return $this->from($node->class);
+            $class = $this->from($node->class);
+
+            // Foo::class is the class's name, not an instance of Foo, but callers
+            // like app(Foo::class) still need to know which class it names.
+            return $class instanceof ClassType ? $class->asClassString() : $class;
         }
 
         if ($node->class instanceof Node\Name) {

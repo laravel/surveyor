@@ -496,7 +496,7 @@ class ResourceAnalyzer
             ]);
         }
 
-        $identifier->nullable(true);
+        $identifier = $identifier->nullable(true);
 
         return new ArrayType([
             'data' => $identifier,

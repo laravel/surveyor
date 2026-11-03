@@ -47,7 +47,7 @@ class ModelAnalyzer
                 $type = $this->resolveAttributeType($attribute, $model, $result);
 
                 if (isset($attribute['nullable'])) {
-                    $type->nullable($attribute['nullable']);
+                    $type = $type->nullable($attribute['nullable']);
                 }
             }
 

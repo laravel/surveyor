@@ -30,7 +30,7 @@ function resetCacheDirectory(): void
     $persistProp = $reflection->getProperty('persistToDisk');
     $persistProp->setValue(null, false);
 
-    foreach (['dependencies', 'records', 'current', 'surfaces'] as $property) {
+    foreach (['dependencies', 'records', 'current', 'surfaces', 'touched'] as $property) {
         $reflection->getProperty($property)->setValue(null, []);
     }
 
@@ -1074,4 +1074,24 @@ describe('settling cycles', function () {
         expect(AnalyzedCache::dependenciesOf('/path/to/middle.php'))->toBe(['/path/to/inner.php']);
         expect(AnalyzedCache::dependenciesOf('/path/to/unknown.php'))->toBe([]);
     });
+});
+
+it('prunes entries the run never read or wrote', function () {
+    $dir = createCacheDir();
+    AnalyzedCache::enableDiskCache($dir);
+
+    $kept = createPhpFixture('namespace App; class PruneKept {}');
+    app(Analyzer::class)->analyze($kept);
+
+    file_put_contents($dir.'/'.md5('/old/release/app/Gone.php').'.cache', 'stale');
+    file_put_contents($dir.'/'.md5('/old/release/app/Gone.php').'.record', 'stale');
+    file_put_contents($dir.'/inventory-'.md5('x').'.cache', 'ranger');
+
+    expect(AnalyzedCache::pruneUntouched())->toBe(2);
+    expect(file_exists($dir.'/'.md5($kept).'.cache'))->toBeTrue();
+    expect(file_exists($dir.'/'.md5('/old/release/app/Gone.php').'.cache'))->toBeFalse();
+    expect(file_exists($dir.'/inventory-'.md5('x').'.cache'))->toBeTrue();
+
+    unlink($dir.'/inventory-'.md5('x').'.cache');
+    cleanupCacheDir($dir);
 });

@@ -5,12 +5,19 @@ namespace Laravel\Surveyor\Parser;
 use Illuminate\Support\Arr;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Resolvers\DocBlockResolver;
+use Laravel\Surveyor\Types\ArrayShapeType;
+use Laravel\Surveyor\Types\ClassType;
+use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
+use Laravel\Surveyor\Types\StringType;
+use Laravel\Surveyor\Types\TemplateTagType;
 use Laravel\Surveyor\Types\Type;
-// use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
+use Laravel\Surveyor\Types\UnionType;
 // use Laravel\Surveyor\Types\Type as RangerType;
 use PhpParser\Node\Expr\CallLike;
+use PHPStan\PhpDocParser\Ast\PhpDoc\ExtendsTagValueNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\MixinTagValueNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\PhpDocNode;
+use PHPStan\PhpDocParser\Ast\PhpDoc\TemplateTagValueNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\UsesTagValueNode;
 use PHPStan\PhpDocParser\Lexer\Lexer;
 use PHPStan\PhpDocParser\Parser\ConstExprParser;
@@ -56,7 +63,100 @@ class DocBlockParser
 
         $returnTypeValues = $this->parsed->getReturnTagValues();
 
-        return array_map($this->resolve(...), $returnTypeValues);
+        $methodTemplates = array_map(fn ($tag) => $tag->name, $this->templateTagValues());
+        $templateNames = [...$methodTemplates, ...array_map(fn ($tag) => $tag->name, $this->scope->getTemplateTags())];
+
+        if ($methodTemplates === []) {
+            return array_map(
+                fn ($value) => $this->withoutUnboundTemplates($this->resolve($value), $templateNames),
+                $returnTypeValues,
+            );
+        }
+
+        $previousTags = $this->scope->getTemplateTags();
+        $this->scope->setTemplateTags([...$previousTags, ...$this->omittedArgumentTemplates($methodTemplates, $node)]);
+
+        try {
+            return array_map(
+                fn ($value) => $this->withoutUnboundTemplates($this->resolve($value), $templateNames),
+                $returnTypeValues,
+            );
+        } finally {
+            $this->scope->setTemplateTags($previousTags);
+        }
+    }
+
+    /**
+     * A method template tied to a parameter the call leaves out takes that
+     * parameter's default, which for Laravel's helpers is null.
+     *
+     * @param  list<string>  $methodTemplates
+     * @return list<TemplateTagType>
+     */
+    protected function omittedArgumentTemplates(array $methodTemplates, ?CallLike $node): array
+    {
+        if ($node === null || $node->isFirstClassCallable()) {
+            return [];
+        }
+
+        $args = $node->getArgs();
+        $namedArgs = array_filter(array_map(fn ($arg) => $arg->name?->toString(), $args));
+        $tags = [];
+
+        foreach (array_values($this->parsed->getParamTagValues()) as $index => $param) {
+            $paramName = ltrim($param->parameterName, '$');
+
+            if (isset($args[$index]) && $args[$index]->name === null) {
+                continue;
+            }
+
+            if (in_array($paramName, $namedArgs, true)) {
+                continue;
+            }
+
+            foreach ($methodTemplates as $template) {
+                if (preg_match('/\b'.preg_quote($template, '/').'\b/', (string) $param->type)) {
+                    $tags[$template] = new TemplateTagType($template, Type::null(), null, null, null);
+                }
+            }
+        }
+
+        return array_values($tags);
+    }
+
+    /**
+     * Template names that nothing bound would otherwise read as string literals.
+     *
+     * @param  list<string>  $templateNames
+     */
+    protected function withoutUnboundTemplates(?TypeContract $type, array $templateNames): ?TypeContract
+    {
+        if ($type instanceof StringType && in_array($type->value, $templateNames, true)) {
+            return Type::mixed();
+        }
+
+        if ($type instanceof UnionType) {
+            return Type::union(...array_map(
+                fn ($member) => $this->withoutUnboundTemplates($member, $templateNames),
+                $type->types,
+            ));
+        }
+
+        if ($type instanceof ClassType && count($type->genericTypes()) > 0) {
+            return (clone $type)->setGenericTypes(array_map(
+                fn ($generic) => $this->withoutUnboundTemplates($generic, $templateNames),
+                $type->genericTypes(),
+            ));
+        }
+
+        if ($type instanceof ArrayShapeType) {
+            return Type::arrayShape(
+                $this->withoutUnboundTemplates($type->keyType, $templateNames) ?? Type::mixed(),
+                $this->withoutUnboundTemplates($type->valueType, $templateNames) ?? Type::mixed(),
+            )->nullable($type->isNullable());
+        }
+
+        return $type;
     }
 
     public function parseVar(string $docBlock) // : ?TypeContract
@@ -109,11 +209,11 @@ class DocBlockParser
     {
         $this->parse($docBlock);
 
-        $templateTags = array_map(fn ($tag) => $this->resolve($tag), $this->parsed->getTemplateTagValues());
+        $templateTags = array_map(fn ($tag) => $this->resolve($tag), $this->templateTagValues());
 
         $this->scope->setTemplateTags($templateTags);
 
-        return $this->parsed->getTemplateTagValues();
+        return $this->templateTagValues();
     }
 
     public function parseProperties(string $docBlock): array
@@ -184,6 +284,33 @@ class DocBlockParser
     }
 
     /**
+     * Every @template variant (covariant, contravariant, phpstan-/psalm-
+     * prefixed) in declaration order, since bindings are matched by position.
+     *
+     * @return list<TemplateTagValueNode>
+     */
+    protected function templateTagValues(): array
+    {
+        return array_values(array_filter(
+            array_map(fn ($tag) => $tag->value, $this->parsed->getTags()),
+            fn ($value) => $value instanceof TemplateTagValueNode,
+        ));
+    }
+
+    /**
+     * Parse @extends Parent<Type> tags, resolving generic types through the current scope.
+     */
+    public function parseExtendsTags(string $docBlock): array
+    {
+        $this->parse($docBlock);
+
+        return array_map(
+            fn (ExtendsTagValueNode $node) => $this->resolve($node->type),
+            $this->parsed->getExtendsTagValues(),
+        );
+    }
+
+    /**
      * Return the template parameter names declared in @template tags of a
      * docblock, without updating scope (unlike parseTemplateTags).
      *
@@ -197,7 +324,7 @@ class DocBlockParser
 
         $this->parse($docBlock);
 
-        return array_map(fn ($tag) => $tag->name, $this->parsed->getTemplateTagValues());
+        return array_map(fn ($tag) => $tag->name, $this->templateTagValues());
     }
 
     protected function parse(string $docBlock): PhpDocNode

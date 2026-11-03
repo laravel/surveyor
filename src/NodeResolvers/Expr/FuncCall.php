@@ -77,6 +77,11 @@ class FuncCall extends AbstractResolver
             return [];
         }
 
+        // A page type is only useful when the component name is known exactly.
+        if (! (($args[0] ?? null) instanceof Types\StringType) || $args[0]->value === null) {
+            return [];
+        }
+
         return [
             new InertiaRender(
                 $args[0]->value,

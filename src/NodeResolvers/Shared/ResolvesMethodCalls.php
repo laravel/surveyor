@@ -7,9 +7,11 @@ use Illuminate\Support\Facades\Request as RequestFacade;
 use Laravel\Surveyor\Concerns\LazilyLoadsDependencies;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
+use Laravel\Surveyor\Types\Entities\InertiaProp;
 use Laravel\Surveyor\Types\MixedType;
 use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
+use Laravel\Surveyor\Types\UnionType;
 use PhpParser\Node;
 
 trait ResolvesMethodCalls
@@ -19,6 +21,15 @@ trait ResolvesMethodCalls
     protected function resolveMethodCall(Node\Expr\MethodCall|Node\Expr\NullsafeMethodCall $node)
     {
         $var = $this->from($node->var);
+
+        // ->fresh(), ->deepMerge(), ->until() and the rest configure the prop and return it.
+        if ($var instanceof InertiaProp) {
+            return $var;
+        }
+
+        if ($var instanceof UnionType && $prop = collect($var->types)->first(fn ($type) => $type instanceof InertiaProp)) {
+            return $prop;
+        }
 
         if ($var instanceof MixedType || ! $var instanceof ClassType) {
             return Type::mixed();

@@ -119,6 +119,14 @@ class AnalyzedCache
 
     protected static ?string $key = null;
 
+    /**
+     * Cache file names this process read or wrote, so a finished run can
+     * delete the entries nothing asked for (deleted files, old releases).
+     *
+     * @var array<string, true>
+     */
+    protected static array $touched = [];
+
     public static function setKey(string $key): void
     {
         static::$key = $key;
@@ -639,6 +647,7 @@ class AnalyzedCache
     public static function clear(): void
     {
         static::clearMemory();
+        static::$touched = [];
 
         if (static::$cacheDirectory && is_dir(static::$cacheDirectory)) {
             $files = [
@@ -818,11 +827,45 @@ class AnalyzedCache
 
     protected static function getCacheFilePath(string $path): string
     {
+        static::$touched[md5($path)] = true;
+
         return static::$cacheDirectory.'/'.md5($path).'.cache';
     }
 
     protected static function getRecordFilePath(string $path): string
     {
+        static::$touched[md5($path)] = true;
+
         return static::$cacheDirectory.'/'.md5($path).'.record';
+    }
+
+    /**
+     * Delete the entries this process never read or wrote. Only call it after
+     * a run that analyzed everything it needs, or live entries go with them.
+     */
+    public static function pruneUntouched(): int
+    {
+        if (! static::$cacheDirectory || ! is_dir(static::$cacheDirectory)) {
+            return 0;
+        }
+
+        $pruned = 0;
+
+        $files = [
+            ...(glob(static::$cacheDirectory.'/*.cache') ?: []),
+            ...(glob(static::$cacheDirectory.'/*.record') ?: []),
+        ];
+
+        foreach ($files as $file) {
+            if (! preg_match('/^([0-9a-f]{32})\.(cache|record)$/', basename($file), $match)) {
+                continue;
+            }
+
+            if (! isset(static::$touched[$match[1]]) && @unlink($file)) {
+                $pruned++;
+            }
+        }
+
+        return $pruned;
     }
 }
