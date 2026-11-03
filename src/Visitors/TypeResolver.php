@@ -23,6 +23,11 @@ class TypeResolver extends NodeVisitorAbstract
         return $this->scope;
     }
 
+    public function setScope(Scope $scope): void
+    {
+        $this->scope = $scope;
+    }
+
     public function newScope(string $path)
     {
         $this->scope = new Scope;

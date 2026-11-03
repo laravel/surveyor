@@ -3,9 +3,12 @@
 namespace Laravel\Surveyor\Parser;
 
 use Laravel\Surveyor\Analysis\Scope;
+use Laravel\Surveyor\Analyzed\ClassLikeResult;
+use Laravel\Surveyor\Analyzed\MethodResult;
 use Laravel\Surveyor\Resolvers\NodeResolver;
 use Laravel\Surveyor\Support\Markers;
 use Laravel\Surveyor\Visitors\TypeResolver;
+use PhpParser\Node;
 use PhpParser\NodeFinder;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
@@ -79,6 +82,32 @@ class Parser
         $traverser->traverse($this->parser->parse($code));
 
         return $typeResolver->scope();
+    }
+
+    public function parseMethod(ReflectionMethod $method, Scope $scope): ?MethodResult
+    {
+        $result = $scope->result();
+        $path = $method->getFileName();
+
+        if (! $result instanceof ClassLikeResult || $path === false) {
+            return null;
+        }
+
+        $nodes = $this->parseFile($path);
+        $nodes = (new NodeTraverser(new NameResolver(null, ['preserveOriginalNames' => true])))->traverse($nodes);
+        $class = $this->nodeFinder->findFirst($nodes, fn (Node $node) => $node instanceof Node\Stmt\ClassLike
+            && $node->namespacedName?->toString() === $method->getDeclaringClass()->getName());
+        $node = $class instanceof Node\Stmt\ClassLike ? $class->getMethod($method->getName()) : null;
+
+        if ($node === null) {
+            return null;
+        }
+
+        $typeResolver = new TypeResolver($this->resolver);
+        $typeResolver->setScope($scope);
+        (new NodeTraverser($typeResolver))->traverse([$node]);
+
+        return $result->getMethod($method->getName());
     }
 
     public function nodeFinder()
