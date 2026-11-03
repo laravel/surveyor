@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.3.1 - 2026-11-03
+
+### What's Changed
+
+* Drop Laravel 11 add PHP 8.2 to test matrix by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/82
+* Composer dependency audit by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/83
+* Fix type inversion when removing a non-matching condition type by [@Button99](https://github.com/Button99) in https://github.com/laravel/surveyor/pull/74
+* Fix static analysis branch in workflow by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/84
+* Bump phpstan to level 5 and fix errors by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/85
+* Guard unary minus against non-numeric types by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/86
+* Bump phpstan to level 2 by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/87
+* Remove security policy in favor of the org-wide default by [@pushpak1300](https://github.com/pushpak1300) in https://github.com/laravel/surveyor/pull/94
+* Bump shivammathur/setup-php from 2.37.2 to 2.40.0 in the github-actions group by [@dependabot](https://github.com/dependabot)[bot] in https://github.com/laravel/surveyor/pull/96
+* Bump symfony/yaml from 8.1.2 to 8.1.10 by [@dependabot](https://github.com/dependabot)[bot] in https://github.com/laravel/surveyor/pull/105
+* Bump symfony/http-foundation from 8.1.4 to 8.1.10 by [@dependabot](https://github.com/dependabot)[bot] in https://github.com/laravel/surveyor/pull/104
+* Security updates by [@joetannenbaum](https://github.com/joetannenbaum) in https://github.com/laravel/surveyor/pull/109
+
+### New Contributors
+
+* [@pushpak1300](https://github.com/pushpak1300) made their first contribution in https://github.com/laravel/surveyor/pull/94
+
+**Full Changelog**: https://github.com/laravel/surveyor/compare/v0.3.0...v0.3.1
+
 ## v0.3.0 - 2026-08-22
 
 ### What's Changed

@@ -8,6 +8,7 @@ use Laravel\Surveyor\Concerns\LazilyLoadsDependencies;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Entities\InertiaProp;
+use Laravel\Surveyor\Types\Entities\ResourceResponse;
 use Laravel\Surveyor\Types\MixedType;
 use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
@@ -70,6 +71,10 @@ trait ResolvesMethodCalls
 
         if (in_array($methodName->value, static::$conditionalMethods) && $this->isJsonResource($var)) {
             return $this->resolveResourceConditional($var, $methodName->value, $node);
+        }
+
+        if ($var instanceof ResourceResponse && $methodName->value === 'resolve') {
+            return $var->payload();
         }
 
         $returned = Type::union(

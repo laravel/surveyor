@@ -3,6 +3,8 @@
 namespace Laravel\Surveyor\Analyzer;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Resources\Attributes\PreserveKeys;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use Illuminate\Http\Resources\JsonApi\JsonApiResource;
@@ -18,7 +20,9 @@ use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
 use Laravel\Surveyor\Types\Entities\JsonApiResourceResponse;
 use Laravel\Surveyor\Types\Entities\ResourceResponse;
 use Laravel\Surveyor\Types\Type;
+use Laravel\Surveyor\Types\UnionType;
 use ReflectionClass;
+use ReflectionMethod;
 use ReflectionNamedType;
 use Throwable;
 
@@ -71,7 +75,7 @@ class ResourceAnalyzer
     }
 
     /**
-     * Phase B: After toArray() has been walked, extract the resolved data shape
+     * Phase B: After resource methods have been walked, extract the resolved data shape
      * and store resource metadata on the ClassLikeResult.
      *
      * Called on class EXIT (after method bodies have been walked).
@@ -86,7 +90,7 @@ class ResourceAnalyzer
             return;
         }
 
-        $data = $this->extractToArrayShape($resource, $result);
+        $data = $this->extractDataShape($resource, $result);
 
         if (! $data) {
             return;
@@ -98,9 +102,10 @@ class ResourceAnalyzer
         $this->responses[$resource] = new ResourceResponse(
             resourceClass: $resource,
             data: $data,
-            isCollection: $this->isResourceCollection($resource),
+            isCollection: $this->needsCollectionWrapping($resource),
             wrap: $wrap,
             additional: $additional,
+            preserveKeys: $this->preservesKeys($resource),
         );
     }
 
@@ -130,61 +135,81 @@ class ResourceAnalyzer
             return null;
         }
 
-        // Reuse the response cached during Phase B if analysis already produced one
-        if ($existing = $this->responses[$resourceClass] ?? null) {
-            if ($isCollection && ! $existing->isCollection) {
-                return new ResourceResponse(
-                    resourceClass: $existing->resourceClass,
-                    data: $existing->data,
-                    isCollection: true,
-                    wrap: $existing->wrap,
-                    additional: $existing->additional,
-                );
+        // Reuse the response cached during Phase B if analysis already produced one.
+        $response = $this->responses[$resourceClass] ?? null;
+
+        if ($response === null) {
+            $data = $this->extractDataShape($resourceClass, $result);
+
+            if ($data === null) {
+                return null;
             }
 
-            return $existing;
+            $response = new ResourceResponse(
+                resourceClass: $resourceClass,
+                data: $data,
+                isCollection: $this->needsCollectionWrapping($resourceClass),
+                wrap: $this->resolveWrapKey($resourceClass),
+                additional: $this->resolveWithMethod($result),
+                preserveKeys: $this->preservesKeys($resourceClass),
+            );
         }
 
-        // Fallback: try to extract toArray shape directly
-        $data = $this->extractToArrayShape($resourceClass, $result);
-
-        if (! $data) {
-            return null;
-        }
-
-        return new ResourceResponse(
-            resourceClass: $resourceClass,
-            data: $data,
-            isCollection: $isCollection || $this->isResourceCollection($resourceClass),
-            wrap: $this->resolveWrapKey($resourceClass),
-            additional: $this->resolveWithMethod($result),
-        );
+        return $isCollection ? new ResourceResponse(
+            resourceClass: $response->resourceClass,
+            data: $response->payload(),
+            isCollection: true,
+            wrap: $response->wrap,
+            additional: $response->additional,
+            responseClass: AnonymousResourceCollection::class,
+            preserveKeys: $this->preservesKeys($response->resourceClass),
+        ) : $response;
     }
 
-    protected function extractToArrayShape(string $resource, ClassLikeResult $result): ?TypeContract
+    protected function resolveDataMethod(string $resource): ?ReflectionMethod
     {
-        if ($result->hasMethod('toArray')) {
-            $returnType = $result->getMethod('toArray')->returnType();
+        $reflection = new ReflectionClass($resource);
 
-            if ($returnType instanceof ArrayType) {
-                return $returnType;
+        foreach (['resolve', 'resolveResourceData', 'toAttributes', 'toArray'] as $method) {
+            // Older Laravel 12 releases lack resolveResourceData and toAttributes.
+            if (! $reflection->hasMethod($method)) {
+                continue;
             }
-        }
 
-        // For ResourceCollection without toArray, the shape is an array of the collected resource
-        if ($this->isResourceCollection($resource)) {
-            $collectedResource = $this->resolveCollectedResource($resource);
+            $reflected = $reflection->getMethod($method);
 
-            if ($collectedResource) {
-                $innerResponse = $this->buildResourceResponse($collectedResource);
+            if ($reflected->getDeclaringClass()->getName() !== JsonResource::class) {
+                return $reflected;
+            }
 
-                if ($innerResponse) {
-                    return $innerResponse->data;
-                }
+            if ($method === 'toAttributes' && $reflection->hasProperty('attributes')) {
+                return null;
             }
         }
 
         return null;
+    }
+
+    protected function extractDataShape(string $resource, ClassLikeResult $result): ?TypeContract
+    {
+        $method = $this->resolveDataMethod($resource);
+
+        if ($method === null) {
+            return null;
+        }
+
+        if ($method->getDeclaringClass()->getName() === ResourceCollection::class) {
+            $collectedResource = $this->resolveCollectedResource($resource);
+
+            return $collectedResource ? $this->buildResourceResponse($collectedResource)?->payload() : null;
+        }
+
+        $returnType = $result->getMethod($method->getName())?->returnType();
+        $types = $returnType instanceof UnionType ? $returnType->types : [$returnType];
+
+        return collect($types)->every(fn ($type) => $type !== null && Type::is($type, ArrayType::class, ArrayShapeType::class))
+            ? $returnType
+            : null;
     }
 
     protected function resolveModelClass(string $resource, ClassLikeResult $result, Scope $scope): ?string
@@ -313,9 +338,25 @@ class ResourceAnalyzer
         return null;
     }
 
-    protected function isResourceCollection(string $resource): bool
+    protected function needsCollectionWrapping(string $resource): bool
     {
-        return is_subclass_of($resource, ResourceCollection::class);
+        return $this->resolveDataMethod($resource)?->getDeclaringClass()->getName() === ResourceCollection::class;
+    }
+
+    /**
+     * JsonResource::collection() copies the collected resource's setting onto the anonymous
+     * collection, and a named collection reads its own, so both resolve from the given class.
+     */
+    protected function preservesKeys(string $resource): bool
+    {
+        $reflection = new ReflectionClass($resource);
+
+        if ($reflection->getAttributes(PreserveKeys::class) !== []) {
+            return true;
+        }
+
+        return $reflection->hasProperty('preserveKeys')
+            && $reflection->getProperty('preserveKeys')->getDefaultValue() === true;
     }
 
     protected function resolveCollectedResource(string $collectionClass): ?string
