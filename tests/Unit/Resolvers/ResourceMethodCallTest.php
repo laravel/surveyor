@@ -42,7 +42,7 @@ it('preserves the anonymous receiver when collecting named collections through m
 it('resolves a collected named payload after a fluent method call', function () {
     $type = app(Analyzer::class)->analyzeClass(ResourceMethodCalls::class)->result()->getMethod('collectedNamedResolved')->returnType();
 
-    expect($type)->toEqual(Type::arrayShape(Type::union(Type::int(), Type::string()), Type::array(['count' => Type::int(42)])));
+    expect($type)->toEqual(Type::arrayShape(Type::int(), Type::array(['count' => Type::int(42)])));
 });
 
 it('preserves resource collection shapes within an array returned by a method', function () {

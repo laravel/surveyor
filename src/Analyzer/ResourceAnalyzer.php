@@ -3,6 +3,7 @@
 namespace Laravel\Surveyor\Analyzer;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Resources\Attributes\PreserveKeys;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Resources\Json\ResourceCollection;
@@ -104,6 +105,7 @@ class ResourceAnalyzer
             isCollection: $this->needsCollectionWrapping($resource),
             wrap: $wrap,
             additional: $additional,
+            preserveKeys: $this->preservesKeys($resource),
         );
     }
 
@@ -149,6 +151,7 @@ class ResourceAnalyzer
                 isCollection: $this->needsCollectionWrapping($resourceClass),
                 wrap: $this->resolveWrapKey($resourceClass),
                 additional: $this->resolveWithMethod($result),
+                preserveKeys: $this->preservesKeys($resourceClass),
             );
         }
 
@@ -159,6 +162,7 @@ class ResourceAnalyzer
             wrap: $response->wrap,
             additional: $response->additional,
             responseClass: AnonymousResourceCollection::class,
+            preserveKeys: $this->preservesKeys($response->resourceClass),
         ) : $response;
     }
 
@@ -167,6 +171,11 @@ class ResourceAnalyzer
         $reflection = new ReflectionClass($resource);
 
         foreach (['resolve', 'resolveResourceData', 'toAttributes', 'toArray'] as $method) {
+            // Older Laravel 12 releases lack resolveResourceData and toAttributes.
+            if (! $reflection->hasMethod($method)) {
+                continue;
+            }
+
             $reflected = $reflection->getMethod($method);
 
             if ($reflected->getDeclaringClass()->getName() !== JsonResource::class) {
@@ -332,6 +341,22 @@ class ResourceAnalyzer
     protected function needsCollectionWrapping(string $resource): bool
     {
         return $this->resolveDataMethod($resource)?->getDeclaringClass()->getName() === ResourceCollection::class;
+    }
+
+    /**
+     * JsonResource::collection() copies the collected resource's setting onto the anonymous
+     * collection, and a named collection reads its own, so both resolve from the given class.
+     */
+    protected function preservesKeys(string $resource): bool
+    {
+        $reflection = new ReflectionClass($resource);
+
+        if ($reflection->getAttributes(PreserveKeys::class) !== []) {
+            return true;
+        }
+
+        return $reflection->hasProperty('preserveKeys')
+            && $reflection->getProperty('preserveKeys')->getDefaultValue() === true;
     }
 
     protected function resolveCollectedResource(string $collectionClass): ?string

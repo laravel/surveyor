@@ -18,6 +18,7 @@ class ResourceResponse extends ClassType
         public readonly ?string $wrap = 'data',
         public readonly ?TypeContract $additional = null,
         ?string $responseClass = null,
+        public readonly bool $preserveKeys = false,
     ) {
         parent::__construct($responseClass ?? $resourceClass);
     }
@@ -28,7 +29,7 @@ class ResourceResponse extends ClassType
     public function payload(): TypeContract
     {
         return $this->isCollection
-            ? Type::arrayShape(Type::union(Type::int(), Type::string()), $this->data)
+            ? Type::arrayShape($this->preserveKeys ? Type::union(Type::int(), Type::string()) : Type::int(), $this->data)
             : clone $this->data;
     }
 

@@ -9,8 +9,11 @@ use App\Http\Resources\CustomResolveResource;
 use App\Http\Resources\CustomWrapResource;
 use App\Http\Resources\MappedResourceCollection;
 use App\Http\Resources\MethodCallCollection;
+use App\Http\Resources\MethodCallResource;
 use App\Http\Resources\PlainLabelResource;
 use App\Http\Resources\PostResource;
+use App\Http\Resources\PreservedKeysCollection;
+use App\Http\Resources\PreservedKeysResource;
 use App\Http\Resources\UnwrappedResource;
 use App\Http\Resources\UserCollection;
 use App\Http\Resources\UserResource;
@@ -63,17 +66,17 @@ class ResourceController
             );
 
             expect($result->getMethod('index')->returnType())->toEqual($isCollection
-                ? Type::arrayShape(Type::union(Type::int(), Type::string()), $data)
+                ? Type::arrayShape(Type::int(), $data)
                 : Type::array(['id' => Type::int(1), 'name' => Type::string('Ada')->optional()]));
 
             expect(app(ResourceAnalyzer::class)->buildResourceResponse(ConditionalShapeResource::class)->data)->toEqual($data);
 
             $request = Request::create('/');
             $resolved = $isCollection
-                ? ConditionalShapeResource::collection(['featured' => null])->resolve($request)
+                ? ConditionalShapeResource::collection([3 => null])->resolve($request)
                 : (new ConditionalShapeResource(null))->resolve($request);
 
-            expect($resolved)->toBe($isCollection ? ['featured' => ['id' => 1]] : ['id' => 1]);
+            expect($resolved)->toBe($isCollection ? [['id' => 1]] : ['id' => 1]);
         } finally {
             unlink($fixture);
         }
@@ -129,27 +132,75 @@ class ResourceController
         ],
         'native named collection' => [
             '(new MethodCallCollection([null]))->resolve()',
-            fn () => Type::arrayShape(Type::union(Type::int(), Type::string()), Type::array(['id' => Type::int(1), 'label' => Type::string('Example')])),
+            fn () => Type::arrayShape(Type::int(), Type::array(['id' => Type::int(1), 'label' => Type::string('Example')])),
             fn () => (new MethodCallCollection([null]))->resolve(Request::create('/')),
             [['id' => 1, 'label' => 'Example']],
         ],
         'collected native collection' => [
             'MethodCallCollection::collection([[null]])->resolve()',
-            fn () => Type::arrayShape(Type::union(Type::int(), Type::string()), Type::arrayShape(Type::union(Type::int(), Type::string()), Type::array(['id' => Type::int(1), 'label' => Type::string('Example')]))),
+            fn () => Type::arrayShape(Type::int(), Type::arrayShape(Type::int(), Type::array(['id' => Type::int(1), 'label' => Type::string('Example')]))),
             fn () => MethodCallCollection::collection([[null]])->resolve(Request::create('/')),
             [[['id' => 1, 'label' => 'Example']]],
         ],
         'collected custom collection' => [
             'CustomPayloadCollection::collection([[null]])->resolve()',
-            fn () => Type::arrayShape(Type::union(Type::int(), Type::string()), Type::array(['count' => Type::int(42)])),
+            fn () => Type::arrayShape(Type::int(), Type::array(['count' => Type::int(42)])),
             fn () => CustomPayloadCollection::collection([[null]])->resolve(Request::create('/')),
             [['count' => 42]],
         ],
         'collected resource override' => [
             'CustomResolveResource::collection([null])->resolve()',
-            fn () => Type::arrayShape(Type::union(Type::int(), Type::string()), Type::array(['custom' => Type::int(42)])),
+            fn () => Type::arrayShape(Type::int(), Type::array(['custom' => Type::int(42)])),
             fn () => CustomResolveResource::collection([null])->resolve(Request::create('/')),
             [['custom' => 42]],
+        ],
+    ]);
+
+    it('keeps collection keys only when the resource preserves them', function (string $expression, Closure $resolve, array $expectedData, TypeContract $keyType) {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use App\\Http\\Resources\\MethodCallResource;
+use App\\Http\\Resources\\PreservedKeysCollection;
+use App\\Http\\Resources\\PreservedKeysResource;
+
+class ResourceController
+{
+    public function index()
+    {
+        return '.$expression.';
+    }
+}');
+
+        try {
+            expect($resolve())->toBe($expectedData);
+
+            $result = app(Analyzer::class)->analyze($fixture)->result();
+
+            expect($result->getMethod('index')->returnType())->toEqual(
+                Type::arrayShape($keyType, Type::array(['id' => Type::int(1), 'label' => Type::string('Example')])),
+            );
+        } finally {
+            unlink($fixture);
+        }
+    })->with([
+        'collected resource' => [
+            'MethodCallResource::collection([5 => null])->resolve()',
+            fn () => MethodCallResource::collection([5 => null])->resolve(Request::create('/')),
+            [['id' => 1, 'label' => 'Example']],
+            fn () => Type::int(),
+        ],
+        'collected resource preserving keys' => [
+            'PreservedKeysResource::collection([5 => null])->resolve()',
+            fn () => PreservedKeysResource::collection([5 => null])->resolve(Request::create('/')),
+            [5 => ['id' => 1, 'label' => 'Example']],
+            fn () => Type::union(Type::int(), Type::string()),
+        ],
+        'named collection preserving keys' => [
+            '(new PreservedKeysCollection([5 => null]))->resolve()',
+            fn () => (new PreservedKeysCollection([5 => null]))->resolve(Request::create('/')),
+            [5 => ['id' => 1, 'label' => 'Example']],
+            fn () => Type::union(Type::int(), Type::string()),
         ],
     ]);
 
@@ -192,7 +243,7 @@ class ResourceController
             $result = app(Analyzer::class)->analyze($caller)->result();
 
             expect($result->getMethod('index')->returnType())->toEqual($analyzed
-                ? Type::arrayShape(Type::union(Type::int(), Type::string()), Type::array(['custom' => Type::int(42)]))
+                ? Type::arrayShape(Type::int(), Type::array(['custom' => Type::int(42)]))
                 : Type::array([]));
         } finally {
             unlink($caller);
