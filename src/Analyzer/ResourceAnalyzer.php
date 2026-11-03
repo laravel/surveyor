@@ -3,7 +3,6 @@
 namespace Laravel\Surveyor\Analyzer;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\Resources\Attributes\PreserveKeys;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Resources\Json\ResourceCollection;
@@ -351,7 +350,9 @@ class ResourceAnalyzer
     {
         $reflection = new ReflectionClass($resource);
 
-        if ($reflection->getAttributes(PreserveKeys::class) !== []) {
+        // Named as a string because the attribute only exists from Laravel 13,
+        // and matching by name never loads the class.
+        if ($reflection->getAttributes('Illuminate\Http\Resources\Attributes\PreserveKeys') !== []) {
             return true;
         }
 
