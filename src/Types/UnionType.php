@@ -57,7 +57,7 @@ class UnionType extends AbstractType implements Contracts\CollapsibleType, Contr
 
         foreach ($types as $type) {
             foreach ($type->value as $key => $value) {
-                $value->required(in_array($key, $requiredKeys));
+                $value = (clone $value)->required(in_array($key, $requiredKeys));
 
                 $newData[$key] ??= [];
                 $newData[$key][] = $value;

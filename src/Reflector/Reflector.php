@@ -9,10 +9,13 @@ use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Application;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Laravel\Surveyor\Analysis\Scope;
+use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Concerns\LazilyLoadsDependencies;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Support\Util;
+use Laravel\Surveyor\Types\ArrayShapeType;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
@@ -43,6 +46,8 @@ class Reflector
     protected array $cachedFunctions = [];
 
     protected array $cachedMacros = [];
+
+    protected array $resolvingMethods = [];
 
     /** @var array<string, list<string>> */
     protected array $cachedTraitUseDocBlocks = [];
@@ -360,8 +365,10 @@ class Reflector
 
             $returnTypes = [];
 
-            if ($reflection->hasMethod($method)) {
-                $methodReflection = $reflection->getMethod($method);
+            $methodReflection = $reflection->hasMethod($method) ? $reflection->getMethod($method) : null;
+
+            if ($methodReflection !== null) {
+                $method = $methodReflection->getName();
 
                 if ($methodReflection->hasReturnType()) {
                     $returnTypes[] = $this->returnType($methodReflection->getReturnType());
@@ -417,6 +424,41 @@ class Reflector
                 }
             }
 
+            // Resource class names omit their response data. Preserve the analyzed
+            // shape, including when its helper has not been visited yet, without
+            // replacing the generic contracts of unrelated methods.
+            $methodScope = $this->scope;
+
+            while ($methodScope && ! $methodScope->result() instanceof ClassLikeResult) {
+                $methodScope = $methodScope->parent();
+            }
+
+            if ($methodScope?->result()?->name() === $reflection->getName() && $methodReflection !== null) {
+                $analyzedMethod = $methodScope->result()->getMethod($method);
+                $key = $reflection->getName().'::'.$method;
+
+                if ($analyzedMethod === null && $this->containsResourceType(Type::union(...$returnTypes))
+                    && ! isset($this->resolvingMethods[$key])
+                    && $methodReflection->getDeclaringClass()->getName() === $reflection->getName()) {
+                    $this->resolvingMethods[$key] = true;
+                    $currentScope = $this->scope;
+
+                    try {
+                        $analyzedMethod = $this->getParser()->parseMethod($methodReflection, $methodScope);
+                    } finally {
+                        unset($this->resolvingMethods[$key]);
+                        $this->setScope($currentScope);
+                    }
+                }
+
+                $inferred = $analyzedMethod?->returnType();
+
+                if ($inferred !== null && $this->containsResourceType($inferred)) {
+                    $returnTypes[] = $inferred;
+                    $returnTypes = [Type::collapse(Type::union(...$returnTypes))];
+                }
+            }
+
             if (count($returnTypes) > 0) {
                 return $returnTypes;
             }
@@ -433,6 +475,28 @@ class Reflector
                 $this->setScope($scopeToRestore);
             }
         }
+    }
+
+    protected function containsResourceType(TypeContract $type): bool
+    {
+        if ($type instanceof ClassType && is_a($type->resolved(), JsonResource::class, true)) {
+            return true;
+        }
+
+        $types = match (true) {
+            $type instanceof UnionType => $type->types,
+            $type instanceof ArrayType => $type->value,
+            $type instanceof ArrayShapeType => [$type->valueType],
+            default => [],
+        };
+
+        foreach ($types as $inner) {
+            if ($this->containsResourceType($inner)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
