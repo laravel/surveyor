@@ -12,6 +12,8 @@ use Illuminate\Foundation\Application;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Analyzed\ClassLikeResult;
+use Laravel\Surveyor\Analyzed\MethodResult;
+use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Concerns\LazilyLoadsDependencies;
 use Laravel\Surveyor\Debug\Debug;
 use Laravel\Surveyor\Support\Util;
@@ -28,10 +30,12 @@ use PhpParser\Node\Stmt\TraitUse;
 use ReflectionClass;
 use ReflectionFunction;
 use ReflectionIntersectionType;
+use ReflectionMethod;
 use ReflectionNamedType;
 use ReflectionProperty;
 use ReflectionUnionType;
 use Throwable;
+use WeakMap;
 
 class Reflector
 {
@@ -48,6 +52,14 @@ class Reflector
     protected array $cachedMacros = [];
 
     protected array $resolvingMethods = [];
+
+    /**
+     * Methods analyzed ahead of the traversal, kept off the class result so the
+     * traversal's own answer replaces them rather than merging into them.
+     *
+     * @var WeakMap<ClassLikeResult, array<string, ?MethodResult>>|null
+     */
+    protected ?WeakMap $analyzedEarly = null;
 
     /** @var array<string, list<string>> */
     protected array $cachedTraitUseDocBlocks = [];
@@ -106,7 +118,10 @@ class Reflector
     protected function handleFunctionArrayMerge(?CallLike $node): ?array
     {
         $args = collect($node->getArgs())
-            ->map(fn ($arg) => $this->getNodeResolver()->from($arg->value, $this->scope))
+            ->map(fn ($arg) => $this->preferReturnedLiteral(
+                $arg->value,
+                $this->getNodeResolver()->from($arg->value, $this->scope),
+            ))
             ->filter(fn ($arg) => Type::is($arg, ArrayType::class, UnionType::class));
 
         if ($args->every(fn ($arg) => $arg instanceof ArrayType)) {
@@ -427,28 +442,14 @@ class Reflector
             // Resource class names omit their response data. Preserve the analyzed
             // shape, including when its helper has not been visited yet, without
             // replacing the generic contracts of unrelated methods.
-            $methodScope = $this->scope;
-
-            while ($methodScope && ! $methodScope->result() instanceof ClassLikeResult) {
-                $methodScope = $methodScope->parent();
-            }
+            $methodScope = $this->classScope($this->scope);
 
             if ($methodScope?->result()?->name() === $reflection->getName() && $methodReflection !== null) {
                 $analyzedMethod = $methodScope->result()->getMethod($method);
-                $key = $reflection->getName().'::'.$method;
 
                 if ($analyzedMethod === null && $this->containsResourceType(Type::union(...$returnTypes))
-                    && ! isset($this->resolvingMethods[$key])
                     && $methodReflection->getDeclaringClass()->getName() === $reflection->getName()) {
-                    $this->resolvingMethods[$key] = true;
-                    $currentScope = $this->scope;
-
-                    try {
-                        $analyzedMethod = $this->getParser()->parseMethod($methodReflection, $methodScope);
-                    } finally {
-                        unset($this->resolvingMethods[$key]);
-                        $this->setScope($currentScope);
-                    }
+                    $analyzedMethod = $this->analyzeMethodNow($methodReflection, $methodScope);
                 }
 
                 $inferred = $analyzedMethod?->returnType();
@@ -497,6 +498,158 @@ class Reflector
         }
 
         return false;
+    }
+
+    /**
+     * Trade a type that names no keys for the array literal the call behind it
+     * returns, where there is one to find.
+     *
+     * A return type of `array` says nothing about what is inside, and neither
+     * does `array<string, mixed>`, while the body often spells the keys out.
+     * Going by the declaration alone, spreading such a call into another array
+     * or merging it with one contributes nothing.
+     */
+    public function preferReturnedLiteral(Node $expr, mixed $resolved): mixed
+    {
+        if ($resolved instanceof ArrayType && $resolved->value !== []) {
+            return $resolved;
+        }
+
+        return $this->returnedArrayLiteral($expr) ?? $resolved;
+    }
+
+    /**
+     * Only asked of a call a class makes on itself, which keeps it to the
+     * class's own methods and the traits it uses.
+     */
+    protected function returnedArrayLiteral(Node $call): ?ArrayType
+    {
+        if (! $this->isCalledOnThis($call) || ! $call->name instanceof Node\Identifier) {
+            return null;
+        }
+
+        // A method that calls itself has no answer of its own to build on yet.
+        if ($call->name->name === $this->scope->methodName()) {
+            return null;
+        }
+
+        try {
+            $reflection = $this->reflectClass($this->scope->entityName() ?? '');
+        } catch (Throwable $e) {
+            return null;
+        }
+
+        if (! $reflection->hasMethod($call->name->name)) {
+            return null;
+        }
+
+        return $this->arrayLiteral($this->analyzedMethod($reflection->getMethod($call->name->name)));
+    }
+
+    protected function arrayLiteral(?MethodResult $method): ?ArrayType
+    {
+        $returned = $method?->returnType();
+
+        return $returned instanceof ArrayType && $returned->value !== [] ? $returned : null;
+    }
+
+    /**
+     * @phpstan-assert-if-true Node\Expr\MethodCall $node
+     */
+    protected function isCalledOnThis(Node $node): bool
+    {
+        return $node instanceof Node\Expr\MethodCall
+            && $node->var instanceof Node\Expr\Variable
+            && $node->var->name === 'this';
+    }
+
+    /**
+     * What analysis made of a method, read from the file it is written in,
+     * which for a method that comes from a trait is the trait's own file.
+     */
+    protected function analyzedMethod(ReflectionMethod $method): ?MethodResult
+    {
+        $path = $method->getFileName();
+
+        if (! $path) {
+            return null;
+        }
+
+        // The file being analyzed has no finished result to ask yet. Methods
+        // above the one in hand have been through; one further down has not.
+        if (AnalyzedCache::isInProgress($path)) {
+            $classScope = $this->classScope($this->scope);
+            $result = $classScope?->result();
+
+            if (! $result instanceof ClassLikeResult || $result->filePath() !== $path) {
+                return null;
+            }
+
+            return $result->getMethod($method->getName())
+                ?? $this->analyzeMethodNow($method, $classScope);
+        }
+
+        $scope = $this->scope;
+
+        try {
+            $result = $this->getAnalyzer()->analyze($path)->result();
+        } finally {
+            $this->setScope($scope);
+        }
+
+        return $result instanceof ClassLikeResult ? $result->getMethod($method->getName()) : null;
+    }
+
+    /**
+     * Analyze one method of the class in progress ahead of the traversal, for a
+     * caller that needs it before the file reaches it.
+     */
+    protected function analyzeMethodNow(ReflectionMethod $method, Scope $classScope): ?MethodResult
+    {
+        $result = $classScope->result();
+
+        if (! $result instanceof ClassLikeResult) {
+            return null;
+        }
+
+        $name = $method->getName();
+        $early = ($this->analyzedEarly ??= new WeakMap)[$result] ?? [];
+
+        if (array_key_exists($name, $early)) {
+            return $early[$name];
+        }
+
+        $key = $result->name().'::'.$name;
+
+        // Two methods that need each other would otherwise analyze each other
+        // without end. A method already on the result is one marked to be left
+        // out, which has no answer to give.
+        if (isset($this->resolvingMethods[$key]) || $result->method($name) !== null) {
+            return null;
+        }
+
+        $this->resolvingMethods[$key] = true;
+        $currentScope = $this->scope;
+
+        try {
+            $analyzed = $this->getParser()->parseMethod($method, $classScope);
+            $this->analyzedEarly[$result] = [...$this->analyzedEarly[$result] ?? [], $name => $analyzed];
+
+            return $analyzed;
+        } finally {
+            $result->forgetMethod($name);
+            unset($this->resolvingMethods[$key]);
+            $this->setScope($currentScope);
+        }
+    }
+
+    protected function classScope(?Scope $scope): ?Scope
+    {
+        while ($scope !== null && ! $scope->result() instanceof ClassLikeResult) {
+            $scope = $scope->parent();
+        }
+
+        return $scope;
     }
 
     /**
