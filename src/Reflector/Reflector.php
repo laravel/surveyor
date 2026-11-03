@@ -547,7 +547,7 @@ class Reflector
 
     protected function arrayLiteral(?MethodResult $method): ?ArrayType
     {
-        $returned = $method?->returnType();
+        $returned = $method ? Type::collapseArrays($method->returnType()) : null;
 
         return $returned instanceof ArrayType && $returned->value !== [] ? $returned : null;
     }

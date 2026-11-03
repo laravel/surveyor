@@ -22,6 +22,26 @@ class Type
         ));
     }
 
+    /**
+     * A union made only of arrays, as a method with several array returns
+     * gives, folded into one array whose keys are optional wherever a branch
+     * leaves them out. Anything else comes back untouched.
+     */
+    public static function collapseArrays(Contracts\Type $type): Contracts\Type
+    {
+        if (! $type instanceof UnionType) {
+            return $type;
+        }
+
+        foreach ($type->types as $member) {
+            if (! $member instanceof ArrayType) {
+                return $type;
+            }
+        }
+
+        return $type->collapse();
+    }
+
     public static function collapse(Contracts\Type $type): Contracts\Type
     {
         if ($type instanceof CollapsibleType) {
@@ -220,9 +240,12 @@ class Type
         // With one member there is nothing to de-duplicate or compare, so skip
         // toString(), which is a json_encode() for array and union types.
         if (count($types) === 1) {
-            return ($types[0] instanceof MixedType || $types[0] instanceof NullType)
-                ? self::mixed()
-                : $types[0];
+            // A key's optional flag rides on its type, mixed included.
+            if ($types[0] instanceof MixedType || $types[0] instanceof NullType) {
+                return $types[0]->isOptional() ? self::mixed()->optional() : self::mixed();
+            }
+
+            return $types[0];
         }
 
         $unique = [];
@@ -257,21 +280,48 @@ class Type
             $unique = $nullable;
         }
 
-        $remaining = [];
+        $candidates = array_values(array_filter($unique, fn ($type) => ! $type instanceof MixedType));
+        $dominators = [];
 
-        foreach ($unique as $type) {
-            if ($type instanceof MixedType) {
-                continue;
+        foreach ($candidates as $i => $type) {
+            foreach ($candidates as $j => $other) {
+                if ($i !== $j && $other->isMoreSpecificThan($type)) {
+                    $dominators[$i][] = $j;
+                }
+            }
+        }
+
+        // A type gives way only to a more specific one that is itself kept. Being
+        // more specific doesn't always carry over: a declared array<string, mixed>
+        // covers a literal [] and a keyed branch covers the declaration, but the
+        // keyed branch must not swallow the [], which says its keys may be missing.
+        $kept = [];
+        $keeps = function (int $i, array $visiting) use (&$keeps, &$kept, $dominators): bool {
+            if (isset($kept[$i])) {
+                return $kept[$i];
             }
 
-            // Remove types that have a more specific counterpart.
-            foreach ($unique as $other) {
-                if ($type !== $other && $other->isMoreSpecificThan($type)) {
-                    continue 2;
+            if (isset($visiting[$i])) {
+                return true;
+            }
+
+            $visiting[$i] = true;
+
+            foreach ($dominators[$i] ?? [] as $j) {
+                if ($keeps($j, $visiting)) {
+                    return $kept[$i] = false;
                 }
             }
 
-            $remaining[] = $type;
+            return $kept[$i] = true;
+        };
+
+        $remaining = [];
+
+        foreach ($candidates as $i => $type) {
+            if ($keeps($i, [])) {
+                $remaining[] = $type;
+            }
         }
 
         return match (count($remaining)) {

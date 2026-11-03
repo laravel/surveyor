@@ -16,6 +16,10 @@ class Array_ extends AbstractResolver
 
     public function resolve(Node\Expr\Array_ $node)
     {
+        if ($node->items === []) {
+            return (new ArrayType([]))->asKnownEmpty();
+        }
+
         if ($this->isListArray($node)) {
             return $this->resolveListArray($node);
         }
@@ -31,7 +35,7 @@ class Array_ extends AbstractResolver
             }
 
             if ($item->unpack) {
-                $spreadValue = $this->reflector->preferReturnedLiteral($item->value, $this->from($item->value));
+                $spreadValue = Type::collapseArrays($this->reflector->preferReturnedLiteral($item->value, $this->from($item->value)));
 
                 if ($spreadValue instanceof ArrayType && ! $spreadValue->isList()) {
                     return false;
@@ -59,7 +63,7 @@ class Array_ extends AbstractResolver
             }
 
             if ($item->unpack) {
-                $spreadValue = $this->reflector->preferReturnedLiteral($item->value, $this->from($item->value));
+                $spreadValue = Type::collapseArrays($this->reflector->preferReturnedLiteral($item->value, $this->from($item->value)));
 
                 if ($spreadValue instanceof ArrayType) {
                     foreach ($spreadValue->value as $value) {
@@ -87,7 +91,7 @@ class Array_ extends AbstractResolver
             }
 
             if ($item->unpack) {
-                $spreadValue = $this->reflector->preferReturnedLiteral($item->value, $this->from($item->value));
+                $spreadValue = Type::collapseArrays($this->reflector->preferReturnedLiteral($item->value, $this->from($item->value)));
 
                 if ($spreadValue instanceof ArrayType) {
                     foreach ($spreadValue->value as $key => $value) {

@@ -3,6 +3,7 @@
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
 use Laravel\Surveyor\Types\ArrayType;
+use Laravel\Surveyor\Types\Type;
 
 uses()->group('integration');
 
@@ -120,8 +121,12 @@ describe('a method further down the class', function () {
             ->getMethod('ancestors')
             ->returnType();
 
-        expect($returnType)->toBeInstanceOf(ArrayType::class);
-        expect($returnType->value)->toHaveCount(1);
+        // The base case returns [], so the answer is that or the single ancestor.
+        $collapsed = Type::collapseArrays($returnType);
+
+        expect($collapsed)->toBeInstanceOf(ArrayType::class);
+        expect($collapsed->value)->toHaveCount(1);
+        expect($collapsed->value[0]->isOptional())->toBeTrue();
     });
 
     it('gives the same keys whichever order the methods are written in', function () {
@@ -130,5 +135,22 @@ describe('a method further down the class', function () {
         expect($result->getMethod('contactRules')->returnType()->keys())->toBe(['email', 'city']);
         expect($result->getMethod('rules')->returnType()->keys())
             ->toBe(['name', 'price_amount', 'price_currency', 'note', 'email', 'city']);
+    });
+});
+
+describe('a helper that can return an empty array', function () {
+    it('makes the keys it only sometimes adds optional', function () {
+        $returnType = analyzeFile('app/Spreading/Conditional.php')->result()->getMethod('toArray')->returnType();
+
+        expect($returnType)->toBeInstanceOf(ArrayType::class);
+        expect($returnType->value['id']->isOptional())->toBeFalse();
+        expect($returnType->value['php_version']->isOptional())->toBeTrue();
+        expect($returnType->value['node_version']->isOptional())->toBeTrue();
+    });
+
+    it('keeps the helper\'s empty branch next to its keyed one', function () {
+        $returnType = analyzeFile('app/Spreading/Conditional.php')->result()->getMethod('whenSettings')->returnType();
+
+        expect(Type::collapseArrays($returnType)->value['php_version']->isOptional())->toBeTrue();
     });
 });
