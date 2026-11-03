@@ -35,6 +35,7 @@ use ReflectionNamedType;
 use ReflectionProperty;
 use ReflectionUnionType;
 use Throwable;
+use WeakMap;
 
 class Reflector
 {
@@ -51,6 +52,14 @@ class Reflector
     protected array $cachedMacros = [];
 
     protected array $resolvingMethods = [];
+
+    /**
+     * Methods analyzed ahead of the traversal, kept off the class result so the
+     * traversal's own answer replaces them rather than merging into them.
+     *
+     * @var WeakMap<ClassLikeResult, array<string, ?MethodResult>>|null
+     */
+    protected ?WeakMap $analyzedEarly = null;
 
     /** @var array<string, list<string>> */
     protected array $cachedTraitUseDocBlocks = [];
@@ -433,28 +442,14 @@ class Reflector
             // Resource class names omit their response data. Preserve the analyzed
             // shape, including when its helper has not been visited yet, without
             // replacing the generic contracts of unrelated methods.
-            $methodScope = $this->scope;
-
-            while ($methodScope && ! $methodScope->result() instanceof ClassLikeResult) {
-                $methodScope = $methodScope->parent();
-            }
+            $methodScope = $this->classScope($this->scope);
 
             if ($methodScope?->result()?->name() === $reflection->getName() && $methodReflection !== null) {
                 $analyzedMethod = $methodScope->result()->getMethod($method);
-                $key = $reflection->getName().'::'.$method;
 
                 if ($analyzedMethod === null && $this->containsResourceType(Type::union(...$returnTypes))
-                    && ! isset($this->resolvingMethods[$key])
                     && $methodReflection->getDeclaringClass()->getName() === $reflection->getName()) {
-                    $this->resolvingMethods[$key] = true;
-                    $currentScope = $this->scope;
-
-                    try {
-                        $analyzedMethod = $this->getParser()->parseMethod($methodReflection, $methodScope);
-                    } finally {
-                        unset($this->resolvingMethods[$key]);
-                        $this->setScope($currentScope);
-                    }
+                    $analyzedMethod = $this->analyzeMethodNow($methodReflection, $methodScope);
                 }
 
                 $inferred = $analyzedMethod?->returnType();
@@ -533,8 +528,7 @@ class Reflector
             return null;
         }
 
-        // A method that calls itself has no answer of its own to build on, and
-        // taking the one from the pass before would grow it on every pass.
+        // A method that calls itself has no answer of its own to build on yet.
         if ($call->name->name === $this->scope->methodName()) {
             return null;
         }
@@ -581,17 +575,18 @@ class Reflector
             return null;
         }
 
-        // The file being analyzed has no finished result to ask yet, but the
-        // methods above the one in hand have already been through.
+        // The file being analyzed has no finished result to ask yet. Methods
+        // above the one in hand have been through; one further down has not.
         if (AnalyzedCache::isInProgress($path)) {
-            $result = $this->classLikeResult($this->scope);
+            $classScope = $this->classScope($this->scope);
+            $result = $classScope?->result();
 
-            if ($result?->filePath() !== $path) {
+            if (! $result instanceof ClassLikeResult || $result->filePath() !== $path) {
                 return null;
             }
 
             return $result->getMethod($method->getName())
-                ?? $this->methodFurtherDown($path, $result->name(), $method->getName());
+                ?? $this->analyzeMethodNow($method, $classScope);
         }
 
         $scope = $this->scope;
@@ -606,42 +601,55 @@ class Reflector
     }
 
     /**
-     * A method the pass over its file has not reached, as the pass before left
-     * it. The first pass has no pass before it and so nothing to tell, and
-     * asking is what has the file gone over again.
+     * Analyze one method of the class in progress ahead of the traversal, for a
+     * caller that needs it before the file reaches it.
      */
-    protected function methodFurtherDown(string $path, string $class, string $method): ?MethodResult
+    protected function analyzeMethodNow(ReflectionMethod $method, Scope $classScope): ?MethodResult
     {
-        $find = static function (?Scope $scope) use ($class, $method): ?MethodResult {
-            $result = $scope?->result();
+        $result = $classScope->result();
 
-            return $result instanceof ClassLikeResult && $result->name() === $class
-                ? $result->getMethod($method)
-                : null;
-        };
+        if (! $result instanceof ClassLikeResult) {
+            return null;
+        }
 
-        $earlier = $find($this->getAnalyzer()->earlierPass($path));
-        $answered = $this->arrayLiteral($earlier)?->toString();
+        $name = $method->getName();
+        $early = ($this->analyzedEarly ??= new WeakMap)[$result] ?? [];
 
-        $this->getAnalyzer()->askAgain(
-            $path,
-            fn (Scope $finished) => $this->arrayLiteral($find($finished))?->toString() !== $answered,
-        );
+        if (array_key_exists($name, $early)) {
+            return $early[$name];
+        }
 
-        return $earlier;
+        $key = $result->name().'::'.$name;
+
+        // Two methods that need each other would otherwise analyze each other
+        // without end. A method already on the result is one marked to be left
+        // out, which has no answer to give.
+        if (isset($this->resolvingMethods[$key]) || $result->method($name) !== null) {
+            return null;
+        }
+
+        $this->resolvingMethods[$key] = true;
+        $currentScope = $this->scope;
+
+        try {
+            $analyzed = $this->getParser()->parseMethod($method, $classScope);
+            $this->analyzedEarly[$result] = [...$this->analyzedEarly[$result] ?? [], $name => $analyzed];
+
+            return $analyzed;
+        } finally {
+            $result->forgetMethod($name);
+            unset($this->resolvingMethods[$key]);
+            $this->setScope($currentScope);
+        }
     }
 
-    protected function classLikeResult(?Scope $scope): ?ClassLikeResult
+    protected function classScope(?Scope $scope): ?Scope
     {
-        while ($scope !== null) {
-            if (($result = $scope->result()) instanceof ClassLikeResult) {
-                return $result;
-            }
-
+        while ($scope !== null && ! $scope->result() instanceof ClassLikeResult) {
             $scope = $scope->parent();
         }
 
-        return null;
+        return $scope;
     }
 
     /**

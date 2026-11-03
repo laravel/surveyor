@@ -2,12 +2,7 @@
 
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
-use Laravel\Surveyor\Parser\Parser;
-use Laravel\Surveyor\Resolvers\NodeResolver;
 use Laravel\Surveyor\Types\ArrayType;
-use PhpParser\NodeFinder;
-use PhpParser\Parser as PhpParserParser;
-use PhpParser\PrettyPrinter\Standard;
 
 uses()->group('integration');
 
@@ -111,49 +106,29 @@ describe('a method call spread or merged into an array', function () {
     });
 });
 
-describe('going over a file again', function () {
-    beforeEach(function () {
-        app()->singleton(Parser::class, fn ($app) => new class($app->make(Standard::class), $app->make(NodeResolver::class), $app->make(PhpParserParser::class), $app->make(NodeFinder::class)) extends Parser
-        {
-            /** @var array<string, int> */
-            public array $passes = [];
+describe('a method further down the class', function () {
+    it('keeps a trait\'s own methods when the trait is analyzed on its own', function () {
+        $result = analyzeFile('app/Http/Requests/Concerns/HasPriceRules.php')->result();
 
-            public function parse($code, string $path): array
-            {
-                $this->passes[basename($path)] = ($this->passes[basename($path)] ?? 0) + 1;
-
-                return parent::parse($code, $path);
-            }
-        });
+        expect($result->name())->toBe('App\\Http\\Requests\\Concerns\\HasPriceRules');
+        expect($result->getMethod('priceRules')->returnType()->keys())->toBe(['price_amount', 'price_currency']);
     });
 
-    it('reads a file once when nothing in it asks for a method further down', function () {
-        analyzeFile('app/Http/Requests/Concerns/HasPriceRules.php');
+    it('does not grow the answer of a method that only asks for itself', function () {
+        $returnType = analyzeFile('app/Spreading/Recursive.php')
+            ->result()
+            ->getMethod('ancestors')
+            ->returnType();
 
-        expect(app(Parser::class)->passes['HasPriceRules.php'])->toBe(1);
+        expect($returnType)->toBeInstanceOf(ArrayType::class);
+        expect($returnType->value)->toHaveCount(1);
     });
 
-    it('reads a file once when the method further down has no literal to give', function () {
-        analyzeFile('app/Spreading/Unanswerable.php');
+    it('gives the same keys whichever order the methods are written in', function () {
+        $result = analyzeFile('app/Http/Requests/StoreGroupRequest.php')->result();
 
-        expect(app(Parser::class)->passes['Unanswerable.php'])->toBe(1);
-    });
-
-    it('reads a file again when a method further down returns a literal', function () {
-        analyzeFile('app/Http/Requests/StoreGroupRequest.php');
-
-        expect(app(Parser::class)->passes['StoreGroupRequest.php'])->toBeGreaterThan(1);
-    });
-
-    it('reads a file once when a method only asks for itself', function () {
-        analyzeFile('app/Spreading/Recursive.php');
-
-        expect(app(Parser::class)->passes['Recursive.php'])->toBe(1);
-    });
-
-    it('stops going over two methods that spread each other', function () {
-        analyzeFile('app/Spreading/Circular.php');
-
-        expect(app(Parser::class)->passes['Circular.php'])->toBe(2);
+        expect($result->getMethod('contactRules')->returnType()->keys())->toBe(['email', 'city']);
+        expect($result->getMethod('rules')->returnType()->keys())
+            ->toBe(['name', 'price_amount', 'price_currency', 'note', 'email', 'city']);
     });
 });

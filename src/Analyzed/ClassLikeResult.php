@@ -165,6 +165,11 @@ class ClassLikeResult
         return $this->methods[$name] ?? null;
     }
 
+    public function forgetMethod(string $name): void
+    {
+        unset($this->methods[$name]);
+    }
+
     public function hasProperty(string $name): bool
     {
         return $this->getProperty($name) !== null;
