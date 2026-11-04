@@ -1,7 +1,10 @@
 <?php
 
+use App\Models\User;
 use Laravel\Surveyor\Analyzer\AnalyzedCache;
 use Laravel\Surveyor\Analyzer\Analyzer;
+use Laravel\Surveyor\Types\BoolType;
+use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\StringType;
 use Laravel\Surveyor\Types\Type;
 use Laravel\Surveyor\Types\UnionType;
@@ -55,6 +58,51 @@ class ConfigController
 
         expect(Type::is($returnType, StringType::class) || $returnType instanceof UnionType)->toBeTrue();
         expect(findStringType($returnType))->not->toBeNull();
+
+        unlink($fixture);
+    });
+});
+
+describe('Facade subclass methods', function () {
+    it('resolves a method the facade declares itself from that declaration', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use App\\Facades\\CurrentUser;
+
+class ProfileController
+{
+    public function owner()
+    {
+        return CurrentUser::user();
+    }
+}');
+
+        $returnType = app(Analyzer::class)->analyze($fixture)->result()->getMethod('owner')->returnType();
+
+        expect($returnType)->toBeInstanceOf(ClassType::class);
+        expect($returnType->value)->toBe(User::class);
+
+        unlink($fixture);
+    });
+
+    it('still hands a method the facade does not declare to the object behind it', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use App\\Facades\\CurrentUser;
+
+class ProfileController
+{
+    public function guest()
+    {
+        return CurrentUser::guest();
+    }
+}');
+
+        $returnType = app(Analyzer::class)->analyze($fixture)->result()->getMethod('guest')->returnType();
+
+        expect($returnType)->toBeInstanceOf(BoolType::class);
 
         unlink($fixture);
     });
