@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Facade;
 use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Analyzed\MethodResult;
@@ -330,7 +331,7 @@ class Reflector
     public function methodReturnType(ClassType|string $class, string $method, ?Node $node = null): array
     {
         $className = $class instanceof ClassType ? $class->value : $class;
-        $reflection = $this->reflectClass($class);
+        $reflection = $this->facadeAnswering($className, $method) ?? $this->reflectClass($class);
 
         $scopeToRestore = null;
 
@@ -564,9 +565,10 @@ class Reflector
 
     /**
      * What analysis made of a method, read from the file it is written in,
-     * which for a method that comes from a trait is the trait's own file.
+     * which for a method that comes from a trait or a parent class is that
+     * trait's or parent's own file.
      */
-    protected function analyzedMethod(ReflectionMethod $method): ?MethodResult
+    public function analyzedMethod(ReflectionMethod $method): ?MethodResult
     {
         $path = $method->getFileName();
 
@@ -875,6 +877,27 @@ class Reflector
         }
 
         return $this->getDocBlockParser()->parseReturn($docBlock, $node);
+    }
+
+    /**
+     * A facade answers a static call itself when it has the method, and only
+     * hands the call to the object behind it when it does not. Looking the
+     * class up swaps a facade for that object, so a method the facade has of
+     * its own has to be found before the swap. A method the caller can't reach
+     * (protected or private) still goes to the object behind it.
+     */
+    protected function facadeAnswering(string $className, string $method): ?ReflectionClass
+    {
+        $className = Util::resolveValidClass($className, $this->scope);
+
+        if (! is_subclass_of($className, Facade::class)) {
+            return null;
+        }
+
+        $reflection = new ReflectionClass($className);
+        $candidate = $reflection->hasMethod($method) ? $reflection->getMethod($method) : null;
+
+        return $candidate?->isStatic() && $candidate->isPublic() ? $reflection : null;
     }
 
     public function reflectClass(ClassType|string $class): ReflectionClass

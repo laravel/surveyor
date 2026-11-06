@@ -27,15 +27,21 @@ class Ternary extends AbstractResolver
 
         if (! $result->hasConditions()) {
             // Probably checking a variable for truthiness
-            $result->whenTrue(fn ($_, TypeContract $type) => $type->nullable(false))
-                ->whenFalse(fn ($_, TypeContract $type) => $type->nullable(true));
+            $result->whenTrue(fn ($_, TypeContract $type) => $type->nullable(false));
         }
+
+        // Narrow independent copies so neither branch changes the original type.
+        $ifCondition = clone $result;
+        $ifCondition->type = clone $result->type;
+
+        $elseCondition = clone $result;
+        $elseCondition->type = clone $result->type;
 
         // These are the narrowed types of the value the condition tests, not
         // the types of the branches. Record them so each branch resolves
         // against what the condition proved, then take the branches' own types.
-        $if = $result->apply();
-        $else = $result->toggle()->apply();
+        $if = $ifCondition->apply();
+        $else = $elseCondition->toggle()->apply();
 
         if ($this->scope->state()->canHandle($node->if)) {
             $this->scope->state()->add($node->if, $if);

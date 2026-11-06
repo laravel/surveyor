@@ -325,9 +325,13 @@ class ModelAnalyzer
             }
 
             // First try analyzed return types — these capture generic types set during AST analysis
-            // (e.g. Attribute::make(get: fn(): string => ...) → Attribute<string>)
-            if ($result->hasMethod($method)) {
-                foreach ($result->getMethod($method)->returnTypes() as $analyzedReturnType) {
+            // (e.g. Attribute::make(get: fn(): string => ...) → Attribute<string>). An accessor the
+            // model inherits from a trait or a parent class was analyzed in that file, not this one.
+            $analyzedMethod = $result->getMethod($method)
+                ?? $this->reflector->analyzedMethod($reflection->getMethod($method));
+
+            if ($analyzedMethod !== null) {
+                foreach ($analyzedMethod->returnTypes() as $analyzedReturnType) {
                     if ($extractedType = $this->extractAttributeGenericType($analyzedReturnType['type'])) {
                         return $this->arrayableResolver->resolve($extractedType) ?? $extractedType;
                     }
