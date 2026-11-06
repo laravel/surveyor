@@ -18,6 +18,10 @@ class IdentifierTypeNode extends AbstractResolver
             }
         }
 
+        if ($name === 'array-key') {
+            return Type::union(Type::int(), Type::string());
+        }
+
         return Type::from($this->scope->getUse($name));
     }
 }
