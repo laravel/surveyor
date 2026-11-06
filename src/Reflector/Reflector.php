@@ -856,7 +856,8 @@ class Reflector
      * A facade answers a static call itself when it has the method, and only
      * hands the call to the object behind it when it does not. Looking the
      * class up swaps a facade for that object, so a method the facade has of
-     * its own has to be found before the swap.
+     * its own has to be found before the swap. A method the caller can't reach
+     * (protected or private) still goes to the object behind it.
      */
     protected function facadeAnswering(string $className, string $method): ?ReflectionClass
     {
@@ -867,10 +868,9 @@ class Reflector
         }
 
         $reflection = new ReflectionClass($className);
+        $candidate = $reflection->hasMethod($method) ? $reflection->getMethod($method) : null;
 
-        return $reflection->hasMethod($method) && $reflection->getMethod($method)->isStatic()
-            ? $reflection
-            : null;
+        return $candidate?->isStatic() && $candidate->isPublic() ? $reflection : null;
     }
 
     public function reflectClass(ClassType|string $class): ReflectionClass

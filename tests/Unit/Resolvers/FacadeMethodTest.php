@@ -106,4 +106,25 @@ class ProfileController
 
         unlink($fixture);
     });
+
+    it('hands a protected static method on the facade to the object behind it', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use App\\Facades\\CurrentUser;
+
+class ProfileController
+{
+    public function check()
+    {
+        return CurrentUser::check();
+    }
+}');
+
+        $returnType = app(Analyzer::class)->analyze($fixture)->result()->getMethod('check')->returnType();
+
+        expect($returnType)->toBeInstanceOf(BoolType::class);
+
+        unlink($fixture);
+    });
 });

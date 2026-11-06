@@ -16,4 +16,9 @@ class CurrentUser extends Auth
     {
         return parent::user() ?? throw new AuthenticationException;
     }
+
+    protected static function check(): string
+    {
+        return '';
+    }
 }
