@@ -396,7 +396,7 @@ class Reflector
 
                 array_push(
                     $returnTypes,
-                    ...$this->parseDocBlock($methodReflection->getDocComment() ?: '', $node)
+                    ...$this->parseMethodDocBlock($methodReflection, $reflection, $node)
                 );
             }
 
@@ -868,6 +868,40 @@ class Reflector
         }
 
         return null;
+    }
+
+    /**
+     * A method a class gets from a trait reports the trait's file, and the names in
+     * its docblock refer to that file's imports, not the class's.
+     *
+     * @return list<TypeContract>
+     */
+    protected function parseMethodDocBlock(ReflectionMethod $method, ReflectionClass $class, ?Node $node = null): array
+    {
+        $docBlock = $method->getDocComment() ?: '';
+        $file = $method->getFileName();
+
+        if ($docBlock === '' || $file === false || $file === $class->getFileName()) {
+            return $this->parseDocBlock($docBlock, $node);
+        }
+
+        // Analyzing another file can move the reflector onto that file's scope.
+        $previous = $this->scope;
+        $declaring = $this->getAnalyzer()->analyze($file)->analyzed();
+
+        if ($declaring === null) {
+            $this->setScope($previous);
+
+            return $this->parseDocBlock($docBlock, $node);
+        }
+
+        $this->setScope($previous->withImportsFrom($declaring));
+
+        try {
+            return $this->parseDocBlock($docBlock, $node);
+        } finally {
+            $this->setScope($previous);
+        }
     }
 
     protected function parseDocBlock(string $docBlock, ?Node $node = null): array

@@ -231,7 +231,8 @@ class DashboardController
         expect($render)->not->toBeNull();
         expect($render->data->value['plain'])->toBeInstanceOf(BoolType::class);
         expect($render->data->value['plain']->isOptional())->toBeFalse();
-        expect($render->data->value['wrapped'])->toBeInstanceOf(BoolType::class);
+        expect($render->data->value['wrapped'])->toBeInstanceOf(InertiaProp::class);
+        expect($render->data->value['wrapped']->data)->toBeInstanceOf(BoolType::class);
         expect($render->data->value['wrapped']->isOptional())->toBeTrue();
 
         unlink($fixture);

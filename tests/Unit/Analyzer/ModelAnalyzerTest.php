@@ -4,6 +4,7 @@ use App\Models\Annotation;
 use App\Models\Note;
 use App\Models\Post;
 use App\Models\User;
+use App\Support\Dimensions;
 use Illuminate\Database\Eloquent\ModelInspector;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -424,6 +425,14 @@ describe('ModelAnalyzer inherited accessors', function () {
         $result = app(Analyzer::class)->analyzeClass(Note::class)->result();
 
         expect($result->getProperty('trait_public')->type)->toBeInstanceOf(StringType::class);
+    });
+
+    it('resolves a trait accessor\'s class against the trait\'s own imports', function () {
+        $result = app(Analyzer::class)->analyzeClass(Note::class)->result();
+        $type = $result->getProperty('trait_dimensions')->type;
+
+        expect($type)->toBeInstanceOf(ClassType::class);
+        expect($type->resolved())->toBe(Dimensions::class);
     });
 
     it('extracts the getter type of an accessor written in a parent class', function () {

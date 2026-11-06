@@ -350,6 +350,19 @@ class Scope
         return $this->uses;
     }
 
+    /**
+     * This scope, with names resolved the way another file resolves them. Template
+     * bindings and the receiver stay, as they come from the call being resolved.
+     */
+    public function withImportsFrom(self $other): static
+    {
+        $copy = clone $this;
+        $copy->uses = $other->uses();
+        $copy->namespace = $other->namespace();
+
+        return $copy;
+    }
+
     public function getUse(string $candidate): string
     {
         if (in_array($candidate, ['static', 'self'])) {
