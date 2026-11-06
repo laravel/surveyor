@@ -23,3 +23,18 @@ it('continues to resolve array JsonSerializable results', function () {
     expect($type)->toBeInstanceOf(ArrayType::class)
         ->and($type->keys())->toContain('amount', 'currency', 'currency_amount');
 });
+
+it('keeps a nullable class nullable', function () {
+    $type = app(ArrayableResolver::class)->resolve((new ClassType(ScalarJsonDTO::class))->nullable());
+
+    expect($type)->toBeInstanceOf(StringType::class)
+        ->and($type->isNullable())->toBeTrue();
+});
+
+it('does not change the analyzed return type when adding nullability', function () {
+    app(ArrayableResolver::class)->resolve((new ClassType(ScalarJsonDTO::class))->nullable());
+
+    $type = app(ArrayableResolver::class)->resolve(new ClassType(ScalarJsonDTO::class));
+
+    expect($type->isNullable())->toBeFalse();
+});

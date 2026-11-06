@@ -71,7 +71,7 @@ class ArrayableResolver
             $returnType = $analyzed->getMethod('toArray')->returnType();
 
             if ($returnType instanceof ArrayType || $returnType instanceof ArrayShapeType) {
-                return $returnType;
+                return $this->withNullability($returnType, $type);
             }
         }
 
@@ -79,10 +79,20 @@ class ArrayableResolver
             $returnType = $analyzed->getMethod('jsonSerialize')->returnType();
 
             if (! $returnType instanceof MixedType) {
-                return $returnType;
+                return $this->withNullability($returnType, $type);
             }
         }
 
         return null;
+    }
+
+    // A null object serializes to null. Clone because the return type belongs to the analyzed method.
+    protected function withNullability(TypeContract $returnType, ClassType $type): TypeContract
+    {
+        if (! $type->isNullable() || $returnType->isNullable()) {
+            return $returnType;
+        }
+
+        return (clone $returnType)->nullable();
     }
 }
