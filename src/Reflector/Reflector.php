@@ -6,6 +6,7 @@ use DateInterval;
 use DatePeriod;
 use DateTimeInterface;
 use Exception;
+use Illuminate\Contracts\Translation\Translator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Application;
@@ -21,6 +22,8 @@ use Laravel\Surveyor\Types\ArrayShapeType;
 use Laravel\Surveyor\Types\ArrayType;
 use Laravel\Surveyor\Types\ClassType;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
+use Laravel\Surveyor\Types\MixedType;
+use Laravel\Surveyor\Types\NullType;
 use Laravel\Surveyor\Types\TemplateTagType;
 use Laravel\Surveyor\Types\Type;
 use Laravel\Surveyor\Types\UnionType;
@@ -111,8 +114,48 @@ class Reflector
             'compact' => $this->handleFunctionCompact($node),
             'app' => $this->handleFunctionApp($node),
             'get_class_vars' => $this->handleFunctionGetClassVars($node),
+            'trans' => $this->handleTranslationHelper($node, new ClassType(Translator::class)),
+            '__' => $this->handleTranslationHelper($node, Type::null()),
             default => null,
         };
+    }
+
+    /**
+     * The native return types of trans() and __() include their null-key result even when
+     * a key is passed, so the key argument decides the type here instead.
+     */
+    protected function handleTranslationHelper(?CallLike $node, TypeContract $nullKeyType): ?array
+    {
+        if ($node === null) {
+            return null;
+        }
+
+        // A translation group is a string-keyed array, which reaches JSON as an object, not a list.
+        $translated = [Type::arrayShape(Type::string(), Type::mixed()), Type::string()];
+
+        $key = Type::null();
+
+        foreach ($node->getArgs() as $index => $arg) {
+            if ($arg->unpack) {
+                return [...$translated, $nullKeyType];
+            }
+
+            if ($arg->name?->name === 'key' || ($index === 0 && $arg->name === null)) {
+                $key = $this->getNodeResolver()->from($arg->value, $this->scope);
+            }
+        }
+
+        if ($key instanceof NullType) {
+            return [$nullKeyType];
+        }
+
+        foreach ($key instanceof UnionType ? $key->types : [$key] as $type) {
+            if ($type instanceof MixedType || $type instanceof NullType || $type->isNullable()) {
+                return [...$translated, $nullKeyType];
+            }
+        }
+
+        return $translated;
     }
 
     protected function handleFunctionArrayMerge(?CallLike $node): ?array
