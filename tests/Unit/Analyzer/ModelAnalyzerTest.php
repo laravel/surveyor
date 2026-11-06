@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Annotation;
+use App\Models\Note;
 use App\Models\Post;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelInspector;
@@ -405,6 +406,30 @@ describe('ModelAnalyzer computed attributes', function () {
         expect($property->type->value['amount']->id())->toBe('int');
         expect($property->type->value['currency']->id())->toBe('string');
         expect($property->type->value['currency_amount']->id())->toBe('string');
+    });
+});
+
+describe('ModelAnalyzer inherited accessors', function () {
+    beforeEach(function () {
+        Schema::create('notes', function (Blueprint $table) {
+            $table->id();
+        });
+    });
+
+    afterEach(function () {
+        Schema::dropIfExists('notes');
+    });
+
+    it('extracts the getter type of an accessor written in a trait', function () {
+        $result = app(Analyzer::class)->analyzeClass(Note::class)->result();
+
+        expect($result->getProperty('trait_public')->type)->toBeInstanceOf(StringType::class);
+    });
+
+    it('extracts the getter type of an accessor written in a parent class', function () {
+        $result = app(Analyzer::class)->analyzeClass(Note::class)->result();
+
+        expect($result->getProperty('parent_public')->type)->toBeInstanceOf(StringType::class);
     });
 });
 
