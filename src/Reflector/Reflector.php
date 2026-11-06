@@ -97,22 +97,30 @@ class Reflector
             'compact' => $this->handleFunctionCompact($node),
             'app' => $this->handleFunctionApp($node),
             'get_class_vars' => $this->handleFunctionGetClassVars($node),
-            'trans' => $this->handleFunctionTrans($node),
+            'trans' => $this->handleTranslationHelper($node, new ClassType(Translator::class)),
+            '__' => $this->handleTranslationHelper($node, Type::null()),
             default => null,
         };
     }
 
-    protected function handleFunctionTrans(?CallLike $node): ?array
+    /**
+     * The native return types of trans() and __() include their null-key result even when
+     * a key is passed, so the key argument decides the type here instead.
+     */
+    protected function handleTranslationHelper(?CallLike $node, TypeContract $nullKeyType): ?array
     {
         if ($node === null) {
             return null;
         }
 
+        // A translation group is a string-keyed array, which reaches JSON as an object, not a list.
+        $translated = [Type::arrayShape(Type::string(), Type::mixed()), Type::string()];
+
         $key = Type::null();
 
         foreach ($node->getArgs() as $index => $arg) {
             if ($arg->unpack) {
-                return null;
+                return [...$translated, $nullKeyType];
             }
 
             if ($arg->name?->name === 'key' || ($index === 0 && $arg->name === null)) {
@@ -121,18 +129,16 @@ class Reflector
         }
 
         if ($key instanceof NullType) {
-            return [new ClassType(Translator::class)];
+            return [$nullKeyType];
         }
-
-        $types = [Type::array([]), Type::string()];
 
         foreach ($key instanceof UnionType ? $key->types : [$key] as $type) {
             if ($type instanceof MixedType || $type instanceof NullType || $type->isNullable()) {
-                return [...$types, new ClassType(Translator::class)];
+                return [...$translated, $nullKeyType];
             }
         }
 
-        return $types;
+        return $translated;
     }
 
     protected function handleFunctionArrayMerge(?CallLike $node): ?array
