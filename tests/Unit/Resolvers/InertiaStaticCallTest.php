@@ -257,4 +257,64 @@ class DashboardController
 
         unlink($fixture);
     });
+
+    it('resolves Inertia::deepMerge() to the callback return type', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use Inertia\\Inertia;
+use App\\Models\\User;
+
+class DashboardController
+{
+    public function index()
+    {
+        return Inertia::render(\'Dashboard\', [
+            \'users\' => Inertia::deepMerge(fn () => User::all()),
+        ]);
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        $render = findInertiaRender($result->getMethod('index')->returnType());
+
+        expect($render)->not->toBeNull();
+        expect($render->data->value['users'])->toBeInstanceOf(ClassType::class);
+        expect($render->data->value['users']->value)->toBe('Illuminate\\Database\\Eloquent\\Collection');
+        expect($render->data->value['users']->isOptional())->toBeFalse();
+
+        unlink($fixture);
+    });
+
+    it('resolves Inertia::once() to the callback return type', function () {
+        $fixture = createPhpFixture('
+namespace App\\Test;
+
+use Inertia\\Inertia;
+use App\\Models\\User;
+
+class DashboardController
+{
+    public function index()
+    {
+        return Inertia::render(\'Dashboard\', [
+            \'users\' => Inertia::once(fn () => User::all()),
+        ]);
+    }
+}');
+
+        $analyzer = app(Analyzer::class);
+        $result = $analyzer->analyze($fixture)->result();
+
+        $render = findInertiaRender($result->getMethod('index')->returnType());
+
+        expect($render)->not->toBeNull();
+        expect($render->data->value['users'])->toBeInstanceOf(ClassType::class);
+        expect($render->data->value['users']->value)->toBe('Illuminate\\Database\\Eloquent\\Collection');
+        expect($render->data->value['users']->isOptional())->toBeFalse();
+
+        unlink($fixture);
+    });
 });
