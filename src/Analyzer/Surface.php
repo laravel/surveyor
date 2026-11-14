@@ -6,6 +6,7 @@ use Laravel\Surveyor\Analysis\Scope;
 use Laravel\Surveyor\Analyzed\ClassLikeResult;
 use Laravel\Surveyor\Analyzed\MethodResult;
 use Laravel\Surveyor\Types\Contracts\Type as TypeContract;
+use PhpToken;
 use Throwable;
 
 /**
@@ -48,6 +49,11 @@ class Surface
             // edit to such a file counts as a change to its surface.
             $lines[] = 'no result, bytes '.static::fileHash($scope->fullPath());
         }
+
+        // Dependents read docblocks such as a method's @return shape through
+        // reflection, so an edit that touches only a docblock still moves the
+        // surface even when the inferred types stay the same.
+        $lines[] = 'docblocks '.static::docBlockHash($scope->fullPath());
 
         // Methods and properties are keyed by name, so sorting keeps the hash
         // independent of the order they were recorded in.
@@ -203,6 +209,20 @@ class Surface
         }
 
         return hash_file('xxh128', $path);
+    }
+
+    protected static function docBlockHash(?string $path): string
+    {
+        if ($path === null || ! is_file($path)) {
+            return '-';
+        }
+
+        $docBlocks = array_filter(
+            PhpToken::tokenize((string) file_get_contents($path)),
+            fn (PhpToken $token): bool => $token->is(T_DOC_COMMENT),
+        );
+
+        return hash('xxh128', implode("\n", array_map(fn (PhpToken $token): string => $token->text, $docBlocks)));
     }
 
     protected static function describe(mixed $type): string
