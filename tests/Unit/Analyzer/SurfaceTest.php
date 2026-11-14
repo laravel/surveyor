@@ -206,3 +206,29 @@ class Marked
     unlink($ignoredProperty);
     unlink($ignoredMethod);
 });
+
+it('moves the surface when only a docblock changes', function () {
+    $subject = '
+namespace App\Surface;
+
+class Documented
+{
+    /**
+     * @return array{id: int%s}
+     */
+    public function toArray(): array
+    {
+        return $this->row;
+    }
+}';
+
+    $fixture = createPhpFixture(sprintf($subject, ''));
+
+    $before = surfaceHashOf($fixture);
+
+    rewriteFixture($fixture, sprintf($subject, ', name: string'));
+
+    expect(surfaceHashOf($fixture))->not->toBe($before);
+
+    unlink($fixture);
+});
